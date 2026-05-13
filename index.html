@@ -7,17 +7,25 @@
 <meta name="description" content="hey, i'm adhi.">
 <meta property="og:title" content="adhi">
 <meta property="og:description" content="hey, i'm adhi.">
-<meta name="theme-color" content="#FAFAFA">
+<meta name="theme-color" content="#080807">
 <link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: #d4632a; color: #f5f0e8; }
+  ::-moz-selection { background: #d4632a; color: #f5f0e8; }
   html, body { height: 100%; }
   body {
-    background: #FAFAFA;
-    color: #1a1a1a;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 17px;
-    line-height: 1.65;
+    background: #080807;
+    color: #d8d4c8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
     letter-spacing: -0.01em;
     display: flex;
     flex-direction: column;
@@ -25,8 +33,21 @@
     padding: 60px;
     padding-left: 18%;
   }
+  .grain {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.07;
+    z-index: 0;
+  }
+  .text, .icons {
+    position: relative;
+    z-index: 1;
+  }
   .text {
-    max-width: 580px;
+    max-width: 720px;
   }
   .text p {
     margin-bottom: 1.4em;
@@ -41,8 +62,8 @@
     align-items: center;
   }
   .icons a {
-    color: #4a4a4a;
-    opacity: 0.35;
+    color: #d8d4c8;
+    opacity: 0.4;
     transition: opacity 0.2s ease;
     display: flex;
     align-items: center;
@@ -63,9 +84,16 @@
 </style>
 </head>
 <body>
+  <svg class="grain" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)"/>
+  </svg>
   <div class="text">
     <p>hey, i'm adhi.</p>
-    <p>i always found it kinda cool that humans felt the need to invent unicorns and centaurs, as if giraffes and octopuses weren't mystical enough.</p>
+    <p>we invented unicorns and centaurs as if giraffes and octopuses weren't mystical enough.</p>
     <p>somehow, we already live in sci-fi, yet it falls on us to make it even more so.</p>
     <p>if you're building too, let's run up trails/ hike ridges/ hit the open road.</p>
   </div>
