@@ -9,6 +9,14 @@
 /assets/inter-latin-c940764593d0.woff2
   Cache-Control: public, max-age=31536000, immutable
 
+/etc
+  Cache-Control: public, max-age=300, must-revalidate
+  Link: </assets/inter-latin-c940764593d0.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin
+
+/etc/*
+  Cache-Control: public, max-age=300, must-revalidate
+  Link: </assets/inter-latin-c940764593d0.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin
+
 /favicon.png
   Cache-Control: public, max-age=86400, must-revalidate
 

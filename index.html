@@ -75,6 +75,10 @@
   .links a:hover {
     color: #ffffff;
   }
+  .links > span {
+    color: #8a8a8a;
+    font-size: 14px;
+  }
   @media (max-width: 720px) {
     body {
       padding: 40px 28px;
@@ -85,8 +89,12 @@
     }
     .links {
       gap: 8px;
+      flex-wrap: wrap;
     }
-    .links a {
+    .links .etc {
+      flex-basis: 100%;
+    }
+    .links a, .links > span {
       font-size: 13px;
     }
   }
@@ -97,7 +105,7 @@
     .links {
       gap: 6px;
     }
-    .links a {
+    .links a, .links > span {
       font-size: 12px;
     }
   }
@@ -114,6 +122,8 @@
     <a href="mailto:contact@adhikrish.cloud">contact@adhikrish.cloud</a>
     <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer">linkedin</a>
     <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer">github</a>
+    <span aria-hidden="true">//</span>
+    <a class="etc" href="/etc">etc</a>
   </div>
 </body>
 </html>
