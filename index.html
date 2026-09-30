@@ -13,10 +13,16 @@
 <meta name="twitter:image" content="https://adhikrish.cloud/og.png">
 <meta name="theme-color" content="#080807">
 <link rel="icon" type="image/png" href="/favicon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap">
+<link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
   *, *::before, *::after {
     margin: 0;
     padding: 0;
@@ -108,6 +114,7 @@
     <a href="mailto:contact@adhikrish.cloud">contact@adhikrish.cloud</a>
     <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer">linkedin</a>
     <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer">github</a>
+    <a href="https://x.com/adhikrysh" target="_blank" rel="noopener noreferrer">x</a>
     <a href="https://www.strava.com/athletes/adhikrish" target="_blank" rel="noopener noreferrer">strava ;)</a>
   </div>
 </body>
