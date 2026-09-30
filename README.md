@@ -2,9 +2,11 @@
 
 static html and css, deployed from `main` through cloudflare pages. no build step or application javascript is needed.
 
-`/etc` serves `etc.html` for thoughts and notes. cloudflare pages serves html files at extensionless paths; nginx uses the same lookup. `404.html` makes missing pages return a real 404 instead of the homepage.
+`/etc` serves `etc.html` for thoughts and notes. `/src` serves `src.html` for personal projects. cloudflare pages serves html files at extensionless paths; nginx uses the same lookup. `404.html` makes missing pages return a real 404 instead of the homepage.
 
 to publish a note, add `etc/note-title.html` and link to `/etc/note-title` from `etc.html`. keep font and image urls absolute so nested pages load them correctly. when adding the first note, add `COPY etc/ /usr/share/nginx/html/etc/` to the dockerfile for the alternate deployment.
+
+to add a project, link it from `src.html`. a local project page can use `src/project-name.html`, served at `/src/project-name`. when adding the first local project page, add `COPY src/ /usr/share/nginx/html/src/` to the dockerfile.
 
 the page preloads a local copy of the exact inter v20 latin font previously served by google fonts. keeping that file unchanged preserves its rendering. the font license is in `font-licenses/inter-OFL.txt`.
 

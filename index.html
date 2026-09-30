@@ -64,20 +64,26 @@
     align-items: center;
     gap: 14px;
   }
-  .links a {
+  .links a, .explore a {
     flex-shrink: 0;
     white-space: nowrap;
     color: #8a8a8a;
-    font-size: 14px;
     text-decoration: underline;
     transition: color 220ms ease;
   }
-  .links a:hover {
+  .links a {
+    font-size: 14px;
+  }
+  .links a:hover, .explore a:hover {
     color: #ffffff;
   }
-  .links > span {
+  .explore {
+    margin-top: 72px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     color: #8a8a8a;
-    font-size: 14px;
+    font-size: 12px;
   }
   @media (max-width: 720px) {
     body {
@@ -89,12 +95,8 @@
     }
     .links {
       gap: 8px;
-      flex-wrap: wrap;
     }
-    .links .etc {
-      flex-basis: 100%;
-    }
-    .links a, .links > span {
+    .links a {
       font-size: 13px;
     }
   }
@@ -105,7 +107,7 @@
     .links {
       gap: 6px;
     }
-    .links a, .links > span {
+    .links a {
       font-size: 12px;
     }
   }
@@ -122,8 +124,12 @@
     <a href="mailto:contact@adhikrish.cloud">contact@adhikrish.cloud</a>
     <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer">linkedin</a>
     <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer">github</a>
-    <span aria-hidden="true">//</span>
-    <a class="etc" href="/etc">etc</a>
   </div>
+
+  <nav class="explore" aria-label="writing and projects">
+    <span>check this out:</span>
+    <a href="/etc">words</a>
+    <a href="/src">projects</a>
+  </nav>
 </body>
 </html>
