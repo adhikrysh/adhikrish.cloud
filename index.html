@@ -63,27 +63,18 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    color: #8a8a8a;
+    font-size: 14px;
   }
-  .links a, .explore a {
+  .links a {
     flex-shrink: 0;
     white-space: nowrap;
     color: #8a8a8a;
     text-decoration: underline;
     transition: color 220ms ease;
   }
-  .links a {
-    font-size: 14px;
-  }
-  .links a:hover, .explore a:hover {
+  .links a:hover {
     color: #ffffff;
-  }
-  .explore {
-    margin-top: 72px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #8a8a8a;
-    font-size: 12px;
   }
   @media (max-width: 720px) {
     body {
@@ -95,8 +86,6 @@
     }
     .links {
       gap: 8px;
-    }
-    .links a {
       font-size: 13px;
     }
   }
@@ -106,8 +95,6 @@
     }
     .links {
       gap: 6px;
-    }
-    .links a {
       font-size: 12px;
     }
   }
@@ -120,16 +107,13 @@
     <p>if you're building in this field too, i'd love to chat</p>
   </div>
 
-  <div class="links">
-    <a href="mailto:contact@adhikrish.cloud">contact@adhikrish.cloud</a>
+  <nav class="links" aria-label="essays, projects, and social links">
+    <a href="/etc">essays</a>
+    <a href="/src">projects</a>
+    <span aria-hidden="true">·</span>
+    <a href="mailto:contact@adhikrish.cloud">email</a>
     <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer">linkedin</a>
     <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer">github</a>
-  </div>
-
-  <nav class="explore" aria-label="writing and projects">
-    <span>check this out:</span>
-    <a href="/etc">words</a>
-    <a href="/src">projects</a>
   </nav>
 </body>
 </html>
