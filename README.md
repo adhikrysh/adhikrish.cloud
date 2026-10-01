@@ -4,7 +4,7 @@ static html and css, deployed from `main` through cloudflare pages. no build ste
 
 `/etc` serves `etc.html` for thoughts and notes. `/src` serves `src.html` for personal projects. cloudflare pages serves html files at extensionless paths; nginx uses the same lookup. `404.html` makes missing pages return a real 404 instead of the homepage.
 
-to publish a note, add `etc/note-title.html` and link to `/etc/note-title` from `etc.html`. keep font and image urls absolute so nested pages load them correctly. when adding the first note, add `COPY etc/ /usr/share/nginx/html/etc/` to the dockerfile for the alternate deployment.
+to publish an essay, copy `etc/a-sample-essay.html` to `etc/essay-title.html`. update the title, canonical url, description, published date, edit history, and body. link it from the list in `etc.html`, newest publication date first. use ISO dates in `time datetime` and readable dates in the visible text. edits stay in the essay's history and do not change its place in the publication list. keep font and image urls absolute so nested pages load them correctly.
 
 to add a project, link it from `src.html`. a local project page can use `src/project-name.html`, served at `/src/project-name`. when adding the first local project page, add `COPY src/ /usr/share/nginx/html/src/` to the dockerfile.
 
