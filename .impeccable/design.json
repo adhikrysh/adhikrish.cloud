@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-02T04:05:45Z",
+  "title": "Design System: adhikrish.cloud",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#080807" },
+      "cream": { "role": "neutral", "displayName": "Cream", "canonical": "#d8d4c8" },
+      "muted": { "role": "neutral", "displayName": "Muted Gray", "canonical": "#8a8a8a" },
+      "selection": { "role": "primary", "displayName": "Selection Orange", "canonical": "rgba(255, 100, 0, 0.25)" }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Body", "purpose": "default reading copy." },
+      "page-title": { "displayName": "Page Title", "purpose": "essays and projects indexes." },
+      "project-title": { "displayName": "Project Title", "purpose": "project page titles." },
+      "project-heading": { "displayName": "Project Heading", "purpose": "readme h2 elements." },
+      "metadata": { "displayName": "Metadata", "purpose": "dates, captions, and first-commit text." }
+    },
+    "motion": [
+      { "name": "link-color", "value": "color 220ms ease", "purpose": "link hover transition; disabled for reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "narrow", "value": "720px" },
+      { "name": "compact", "value": "360px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Reading Navigation",
+      "kind": "nav",
+      "refersTo": "reading-nav-link",
+      "description": "Muted, underlined site links on reading pages.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">home</a><a href=\"#\">projects</a></nav>",
+      "css": ".ds-nav { display:flex; gap:18px; font-family:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-size:16px; } .ds-nav a { color:#8a8a8a; text-decoration:underline; text-underline-offset:2px; transition:color 220ms ease; } .ds-nav a:hover { color:#ffffff; } .ds-nav a:focus-visible { outline:1px solid #d8d4c8; outline-offset:5px; }"
+    },
+    {
+      "name": "Project List Entry",
+      "kind": "custom",
+      "refersTo": "project-list-entry",
+      "description": "A project title and first-commit date, with a muted description below.",
+      "html": "<div class=\"ds-entry\"><a href=\"#\"><span>orbit-access</span><time>dec 13, 2025</time></a><p>simulate satellite orbits and find ground-station visibility windows.</p></div>",
+      "css": ".ds-entry { font-family:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif; } .ds-entry a { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:baseline; gap:24px; color:#d8d4c8; padding-block:8px; text-decoration:none; } .ds-entry a:hover { color:#ffffff; } .ds-entry span { overflow-wrap:anywhere; text-decoration:underline; text-underline-offset:2px; } .ds-entry time { color:#8a8a8a; font-size:12px; white-space:nowrap; } .ds-entry p { margin:0; color:#8a8a8a; font-size:14px; line-height:1.6; }"
+    },
+    {
+      "name": "Project Code Block",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "An inset code sample that scrolls horizontally when needed.",
+      "html": "<pre class=\"ds-code\"><code>cmake --build build --parallel 3</code></pre>",
+      "css": ".ds-code { max-width:100%; overflow-x:auto; margin:0; padding:16px; background:#121210; border:1px solid #252522; color:#d8d4c8; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; line-height:1.7; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "static dark reading pages",
+    "overview": "the site is a sparse, dark reading surface. its interface steps aside for brief personal text, dated indexes, and static project readmes. homepage essays and projects links omit underlines; reading-page links retain them.",
+    "keyCharacteristics": [
+      "self-hosted inter throughout.",
+      "dark surface with cream reading text and muted navigation or metadata.",
+      "unadorned homepage text links, underlined reading links, and no decorative containers.",
+      "static project pages that preserve readme structure."
+    ],
+    "rules": [
+      { "name": "The Quiet Palette Rule", "body": "Keep ordinary page content within the dark, cream, and muted-gray system. Reserve orange for text selection.", "section": "colors" }
+    ],
+    "dos": [
+      "Do use the local inter font and the established type scale.",
+      "Do keep index and project reading columns at 680px maximum width.",
+      "Do use muted text for navigation, dates, descriptions, captions, and project metadata.",
+      "Do leave the homepage essays and projects links unadorned; preserve underlines on reading pages.",
+      "Do keep project images local and responsive, and external github links in a new tab with rel=\"noopener noreferrer\"."
+    ],
+    "donts": [
+      "Don't add browser-side rendering scripts for project content.",
+      "Don't replace the flat reading surface with cards, shadows, gradients, or decorative color.",
+      "Don't let long code expand the page width; preserve internal horizontal scrolling."
+    ]
+  }
+}

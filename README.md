@@ -6,7 +6,11 @@ static html and css, deployed from `main` through cloudflare pages. no build ste
 
 to publish an essay, create `etc/essay-title.html` using the font, colors, and centered reading column from `etc.html`. include the title, canonical url, description, published date, edit history, and body. link it from the list in `etc.html`, newest publication date first. use ISO dates in `time datetime` and readable dates in the visible text. edits stay in the essay's history and do not change its place in the publication list. keep font and image urls absolute so nested pages load them correctly. when adding the first essay, add `COPY etc/ /usr/share/nginx/html/etc/` to the dockerfile.
 
-to add a project, link it from `src.html`. a local project page can use `src/project-name.html`, served at `/src/project-name`. when adding the first local project page, add `COPY src/ /usr/share/nginx/html/src/` to the dockerfile.
+the project list uses first commit dates in UTC, not github repository creation dates. each title opens a local reading page. its github link opens the repository in a new tab.
+
+to update a project, edit its markdown in `content/projects/` and its metadata in `content/projects.json`. keep the first commit date and commit id unchanged when editing a readme. `source_commit` pins relative documentation and code links to the version reviewed for that page. images use local files with a content hash in their names.
+
+run `python3 scripts/render-projects.py` after changing project content. it requires Python 3 and Pandoc, updates the project list, and writes static pages to `src/`. commit the generated html with the source markdown. visitors receive plain html, css, and images; no markdown renderer or github request runs in their browser.
 
 the page preloads a local copy of the exact inter v20 latin font previously served by google fonts. keeping that file unchanged preserves its rendering. the font license is in `font-licenses/inter-OFL.txt`.
 

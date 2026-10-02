@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>contact-router | adhikrish rk</title>
+<meta name="description" content="route data through scheduled space links without double-booking radios.">
+<meta property="og:title" content="contact-router | adhikrish rk">
+<meta property="og:description" content="route data through scheduled space links without double-booking radios.">
+<meta property="og:image" content="https://adhikrish.cloud/og.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://adhikrish.cloud/og.png">
+<meta name="theme-color" content="#080807">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://adhikrish.cloud/src/contact-router">
+<style>
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: rgba(255, 100, 0, 0.25); }
+  body {
+    background: #080807;
+    color: #d8d4c8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    letter-spacing: -0.012em;
+    padding: 40px 28px 80px;
+  }
+  .reading { max-width: 680px; margin-inline: auto; }
+  nav { display: flex; gap: 18px; }
+  nav a { color: #8a8a8a; font-size: 16px; }
+  a { text-decoration: underline; text-underline-offset: 2px; transition: color 220ms ease; }
+  a:hover { color: #ffffff; }
+  a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
+  main, article { margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  @media (max-width: 720px) {
+    body { padding-top: 32px; font-size: 16px; }
+    nav a { font-size: 15px; }
+    main, article { margin-top: 48px; }
+  }
+  @media (max-width: 360px) {
+    body { padding-inline: 20px; }
+    nav a { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+
+  nav { flex-wrap: wrap; }
+  nav .github { margin-left: auto; }
+  .project h1 { font-size: 28px; }
+  .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  .project-meta a { color: inherit; }
+  .readme { margin-top: 40px; line-height: 1.8; }
+  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme > :first-child { margin-top: 0; }
+  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
+  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
+  .readme ul, .readme ol { padding-left: 24px; }
+  .readme li + li { margin-top: 8px; }
+  .readme a { color: inherit; overflow-wrap: anywhere; }
+  .readme strong { font-weight: 550; }
+  .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme pre code { font-size: inherit; }
+  .readme figure { margin-block: 32px; }
+  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="reading">
+    <nav aria-label="site">
+      <a href="/">home</a>
+      <a href="/src">projects</a>
+      <a class="github" href="https://github.com/adhikrysh/contact-router" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
+    </nav>
+    <main class="project">
+      <h1>contact-router</h1>
+      <p class="project-meta">first commit (utc) <a href="https://github.com/adhikrysh/contact-router/commit/a5c12aba7ae50f46754dcf98396db753f5873baa" target="_blank" rel="noopener noreferrer"><time datetime="2026-01-19">jan 19, 2026</time></a></p>
+      <div class="readme">
+<p>contact-router plans routes over links that are available only at
+scheduled times. each contact has a transmission rate, closing time, and
+propagation delay. a bundle, a unit of data, can wait at a relay, but
+each full transmission must fit inside its contact window.</p>
+<p>the planner reserves actual transmission intervals. contacts can
+share a transmitter, so two otherwise valid routes cannot use the same
+radio at once.</p>
+<p><img src="/assets/projects/contact-router-9db8e917504b.png"
+loading="lazy" decoding="async" width="1600" height="720"
+alt="Contact reservations" /></p>
+<h2 id="build-and-run">build and run</h2>
+<p>requires C++20 and CMake 3.20+. it has no runtime dependencies.</p>
+<pre class="sh"><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 3
+ctest --test-dir build --output-on-failure
+./build/contact-route examples/contacts.csv examples/bundles.csv
+./build/contact-route examples/contacts.csv examples/bundles.csv --bookings</code></pre>
+<p>the first command prints one result per bundle. the second prints
+reserved transmission intervals. the CSV files use integer microseconds,
+bytes, and bytes per second. names accept letters, digits, underscores,
+hyphens, and dots. quoted CSV fields are not supported.</p>
+<h2 id="the-example">the example</h2>
+<p>a lunar node can send directly to Earth or through a relay. health
+data has higher priority than science data, so it uses the direct link
+and arrives at 6.3 seconds.</p>
+<p>that transmission occupies the lunar transmitter for five seconds.
+the science bundle cannot fit in the remaining time of the first relay
+contact. it waits for the later contact and arrives at 44.3 seconds. the
+image bundle has no feasible route under the remaining reservations.</p>
+<p>counting link capacity alone is not enough. the free time must exist
+when both the bundle and transmitter are available.</p>
+<h2 id="routing-rule">routing rule</h2>
+<p>the library uses an earliest-arrival search. at each node, it finds
+the first free transmission slot in each outgoing contact, adds
+propagation time, and keeps the earliest arrival at the next node. that
+is sufficient here because storage is unlimited and a bundle may always
+wait.</p>
+<p>capacity is reserved only after the planner finds a complete route. a
+failed search consumes nothing. the library can release a planned route
+and disable a contact before replanning. releasing a reservation does
+not model undoing a transmission that already happened.</p>
+<p>the CLI processes bundles by release time, descending priority,
+earliest expiry, then bundle ID. each route is earliest-arrival for that
+bundle given existing reservations. the complete set of routes is not
+necessarily optimal for total throughput or fairness. the example
+exposes that tradeoff.</p>
+<h2 id="tests-and-limits">tests and limits</h2>
+<p>tests compare 2,800 routing attempts with exhaustive simple-path
+search and a microsecond-by-microsecond slot scan. they also cover
+shared-radio conflicts, expiry boundaries, propagation delay, rollback,
+disabled contacts, integer overflow, search budgets, and input-order
+determinism.</p>
+<p>there is no bundle fragmentation, receiver-conflict model, buffer
+limit, retransmission, or uncertain contact time. a shared resource
+represents one transmitter calendar, not a complete half-duplex radio
+model. this is a planning simulator, not an implementation of the Bundle
+Protocol.</p>
+<p>each successful reservation copies the calendars before committing.
+this makes rollback simple but costs time proportional to existing
+bookings. for larger plans, a transaction over only the affected
+intervals would avoid copying every calendar.</p>
+<p>the API is <a
+href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/include/contact/router.hpp"
+target="_blank" rel="noopener noreferrer">router.hpp</a>. reproduce the
+plot with Matplotlib and <code>python examples/plot.py</code>. enable
+sanitizers with
+<code>-DCONTACT_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug</code>. NASA's <a
+href="https://www.nasa.gov/communicating-with-missions/delay-disruption-tolerant-networking/"
+target="_blank" rel="noopener noreferrer">delay/disruption tolerant
+networking overview</a> gives the broader store-and-forward context.</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
