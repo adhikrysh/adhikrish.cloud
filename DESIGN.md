@@ -105,7 +105,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 
 ## Layout
 
-the homepage vertically centers a left-aligned text block with a maximum width of 720px and a 15% left inset. its unadorned essays and projects links and svg social icons share one line.
+the homepage places a left-aligned text block slightly above center with a maximum width of 720px and a 15% left inset. its underlined essays and projects links and svg social icons share one line.
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. below 720px, body text becomes 16px, navigation becomes 15px, and the main gap becomes 48px. below 360px, horizontal padding is 20px and navigation becomes 14px.
 
@@ -123,7 +123,7 @@ text and rules define the form language. text links use one-pixel underlines wit
 
 ### Navigation
 
-navigation links use muted grey. text links are underlined. the homepage has one compact row of essays, projects, and social icons, 16px below the last paragraph. the two text links are 16px apart, and a 24px gap separates them from the icon group. hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
+navigation links use muted grey. text links are underlined. the homepage has one compact row of essays, projects, and social icons, 20px below the last paragraph. the content sits six percent of the viewport height above center. all five links share a 16px visible gap. icon viewboxes omit unused horizontal space while preserving the drawing scale; invisible hit areas stay at least 32px wide. hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
 
 ### Index Entries
 

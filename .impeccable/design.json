@@ -53,7 +53,7 @@
   ],
   "narrative": {
     "northStar": "static dark reading pages",
-    "overview": "the site is a sparse, dark reading surface. its interface steps aside for brief personal text, dated indexes, and static project readmes. text links are underlined throughout. the homepage groups essays, projects, and social icons into one compact row, 16px below the last paragraph.",
+    "overview": "the site is a sparse, dark reading surface. its interface steps aside for brief personal text, dated indexes, and static project readmes. text links are underlined throughout. the homepage groups essays, projects, and social icons into one compact row with equal 16px visible gaps, 20px below the last paragraph. the content sits six percent of the viewport height above center.",
     "keyCharacteristics": [
       "self-hosted inter throughout.",
       "dark surface with cream reading text and muted navigation or metadata.",
