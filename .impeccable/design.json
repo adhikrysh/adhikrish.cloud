@@ -30,9 +30,9 @@
       "name": "Reading Navigation",
       "kind": "nav",
       "refersTo": "reading-nav-link",
-      "description": "Muted site links with home underlined on reading pages.",
+      "description": "Muted, underlined site links on reading pages.",
       "html": "<nav class=\"ds-nav\"><a href=\"#\">home</a><a href=\"#\">projects</a></nav>",
-      "css": ".ds-nav { display:flex; gap:18px; font-family:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-size:16px; } .ds-nav a { color:#8a8a8a; text-decoration:none; transition:color 220ms ease; } .ds-nav a:first-child { text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; } .ds-nav a:hover { color:#787878; } .ds-nav a:focus-visible { outline:1px solid #d8d4c8; outline-offset:5px; }"
+      "css": ".ds-nav { display:flex; gap:18px; font-family:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-size:16px; } .ds-nav a { color:#8a8a8a; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; transition:color 220ms ease; } .ds-nav a:hover { color:#787878; } .ds-nav a:focus-visible { outline:1px solid #d8d4c8; outline-offset:5px; }"
     },
     {
       "name": "Project List Entry",
@@ -40,7 +40,7 @@
       "refersTo": "project-list-entry",
       "description": "A project title and first-commit date, with a muted description below.",
       "html": "<div class=\"ds-entry\"><a href=\"#\"><span>orbit-access</span><time>dec 13, 2025</time></a><p>simulate satellite orbits and find ground-station visibility windows.</p></div>",
-      "css": ".ds-entry { font-family:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif; } .ds-entry a { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:baseline; gap:24px; color:#d8d4c8; padding-block:8px; text-decoration:none; } .ds-entry a:hover { color:#787878; } .ds-entry span { overflow-wrap:anywhere; text-decoration:none; } .ds-entry time { color:#8a8a8a; font-size:12px; white-space:nowrap; } .ds-entry p { margin:0; color:#8a8a8a; font-size:14px; line-height:1.6; }"
+      "css": ".ds-entry { font-family:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif; } .ds-entry a { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:baseline; gap:24px; color:#d8d4c8; padding-block:8px; text-decoration:none; } .ds-entry a:hover { color:#787878; } .ds-entry span { overflow-wrap:anywhere; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; } .ds-entry time { color:#8a8a8a; font-size:12px; white-space:nowrap; } .ds-entry p { margin:0; color:#8a8a8a; font-size:14px; line-height:1.6; }"
     },
     {
       "name": "Project Code Block",
@@ -53,11 +53,11 @@
   ],
   "narrative": {
     "northStar": "static dark reading pages",
-    "overview": "the site is a sparse, dark reading surface. its interface steps aside for brief personal text, dated indexes, and static project readmes. homepage essays and projects and reading-page home links are underlined; more: essays, projects sits above social icons with equal 16px gaps.",
+    "overview": "the site is a sparse, dark reading surface. its interface steps aside for brief personal text, dated indexes, and static project readmes. text links are underlined throughout. the homepage groups essays, projects, and social icons into one compact row, 16px below the last paragraph.",
     "keyCharacteristics": [
       "self-hosted inter throughout.",
       "dark surface with cream reading text and muted navigation or metadata.",
-      "underlined homepage text links and home navigation, with no decorative containers.",
+      "underlined text links, outlined social icons, and no decorative containers.",
       "static project pages that preserve readme structure."
     ],
     "rules": [
@@ -67,7 +67,7 @@
       "Do use the local inter font and the established type scale.",
       "Do keep index and project reading columns at 680px maximum width.",
       "Do use muted text for navigation, dates, descriptions, captions, and project metadata.",
-      "Do underline homepage essays and projects and reading-page home links, and use the darker grey hover state.",
+      "Do underline text links throughout the site and use the darker grey hover state.",
       "Do keep project images local and responsive, and external github links in a new tab with rel=\"noopener noreferrer\"."
     ],
     "donts": [
