@@ -37,6 +37,9 @@ typography:
   metadata:
     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
     fontSize: "13px"
+  navigation:
+    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+    fontSize: "16px"
 spacing:
   compact: "8px"
   list-gap: "16px"
@@ -47,7 +50,7 @@ spacing:
 components:
   reading-nav-link:
     textColor: "{colors.muted}"
-    typography: "{typography.body}"
+    typography: "{typography.navigation}"
   project-list-entry:
     textColor: "{colors.cream}"
     padding: "8px 0"
@@ -120,7 +123,7 @@ text and rules define the form language. index and project links are underlined 
 
 ### Navigation
 
-reading-page navigation uses muted, underlined text links that move to white on hover. homepage essays and projects links omit the underline while retaining the same hover and focus behavior. links animate only their color over 220ms; reduced-motion users receive no link transition. the project github link sits at the far end of the wrapping project navigation.
+reading-page navigation uses muted, underlined text links that move to white on hover. homepage essays and projects links omit the underline while retaining their hover and focus behavior. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
 
 ### Index Entries
 

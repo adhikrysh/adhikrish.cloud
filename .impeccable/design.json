@@ -14,10 +14,11 @@
       "page-title": { "displayName": "Page Title", "purpose": "essays and projects indexes." },
       "project-title": { "displayName": "Project Title", "purpose": "project page titles." },
       "project-heading": { "displayName": "Project Heading", "purpose": "readme h2 elements." },
-      "metadata": { "displayName": "Metadata", "purpose": "dates, captions, and first-commit text." }
+      "metadata": { "displayName": "Metadata", "purpose": "dates, captions, and first-commit text." },
+      "navigation": { "displayName": "Navigation", "purpose": "16px navigation, reduced to 15px and 14px at the mobile breakpoints." }
     },
     "motion": [
-      { "name": "link-color", "value": "color 220ms ease", "purpose": "link hover transition; disabled for reduced motion." }
+      { "name": "link-color", "value": "color 220ms ease", "purpose": "link hover transition; disabled for reduced motion on reading pages." }
     ],
     "breakpoints": [
       { "name": "narrow", "value": "720px" },
