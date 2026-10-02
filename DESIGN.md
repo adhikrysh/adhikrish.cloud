@@ -71,7 +71,7 @@ the site is a sparse, dark reading surface. its interface steps aside for brief 
 **Key Characteristics:**
 - self-hosted inter throughout.
 - dark surface with cream reading text and muted navigation or metadata.
-- unadorned links and no decorative containers.
+- underlined homepage text links and home navigation, with no decorative containers.
 - static project pages that preserve readme structure.
 
 ## Colors
@@ -117,13 +117,13 @@ the system is flat. pages have no shadows, gradients, or raised cards. the dark 
 
 ## Shapes
 
-text and rules define the form language. links omit underlines throughout the homepage, indexes, and project reading pages. focus uses a one-pixel outline with a visible offset. the homepage's icon outlines use rounded stroke caps and joins; the mail and linkedin svg rectangles retain their source 2px corner radius.
+text and rules define the form language. homepage essays and projects links and reading-page home links use one-pixel underlines with a 2px offset. other links omit underlines. focus uses a one-pixel outline with a visible offset. the homepage's icon outlines use rounded stroke caps and joins; the mail and linkedin svg rectangles retain their source 2px corner radius.
 
 ## Components
 
 ### Navigation
 
-navigation links use muted grey without underlines. hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
+navigation links use muted grey. homepage essays and projects links and reading-page home links are underlined. the homepage places “more: essays, projects” above the social icons, with 16px gaps after the last paragraph and between the two rows. hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
 
 ### Index Entries
 
@@ -138,7 +138,7 @@ project pages render checked-in markdown as static html. each starts with the pr
 - **Do** use the local inter font and the established type scale.
 - **Do** keep index and project reading columns at 680px maximum width.
 - **Do** use muted text for navigation, dates, descriptions, captions, and project metadata.
-- **Do** omit link underlines throughout the site and use the darker grey hover state.
+- **Do** underline homepage essays and projects and reading-page home links, and use the darker grey hover state.
 - **Do** keep project images local and responsive, and external github links in a new tab with `rel="noopener noreferrer"`.
 - **Don't** add browser-side rendering scripts for project content.
 - **Don't** replace the flat reading surface with cards, shadows, gradients, or decorative color.

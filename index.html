@@ -59,11 +59,11 @@
     margin-bottom: 0;
   }
   .links {
-    margin-top: 1.9em;
+    margin-top: 16px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 16px;
     color: #8a8a8a;
     font-size: 16px;
   }
@@ -74,6 +74,7 @@
     text-decoration: none;
     transition: color 220ms ease;
   }
+  .link-group a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .links a:hover {
     color: #787878;
   }
@@ -84,12 +85,12 @@
   .social-links {
     display: flex;
     gap: 4px;
-    margin-left: -8px;
+    margin-left: -0.125em;
   }
   .social-links a {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     width: 32px;
     height: 32px;
   }
@@ -132,6 +133,7 @@
   </div>
 
   <nav class="links" aria-label="essays, projects, and social links">
+    <span class="link-group">more: <a href="/etc">essays</a>, <a href="/src">projects</a></span>
     <span class="social-links">
       <a href="mailto:contact@adhikrish.cloud" aria-label="email contact@adhikrish.cloud" title="contact@adhikrish.cloud">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -152,7 +154,6 @@
         </svg>
       </a>
     </span>
-    <span class="link-group">more: <a href="/etc">essays</a>, <a href="/src">projects</a></span>
   </nav>
 </body>
 </html>
