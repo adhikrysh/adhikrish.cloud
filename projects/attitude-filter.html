@@ -13,8 +13,9 @@
 <meta name="twitter:image" content="https://adhikrish.cloud/og.png">
 <meta name="theme-color" content="#080807">
 <link rel="icon" type="image/png" href="/favicon.png">
+<link rel="icon" type="image/webp" href="/assets/favicon-a54222d526e5.webp">
 <link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="canonical" href="https://adhikrish.cloud/src/attitude-filter">
+<link rel="canonical" href="https://adhikrish.cloud/projects/attitude-filter">
 <style>
 
   @font-face {
@@ -78,6 +79,7 @@
   .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
   .readme pre code { font-size: inherit; }
   .readme figure { margin-block: 32px; }
+  .readme picture { display: block; }
   .readme img { display: block; max-width: 100%; height: auto; }
   .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
 </style>
@@ -86,7 +88,7 @@
   <div class="reading">
     <nav aria-label="site">
       <a href="/">home</a>
-      <a href="/src">projects</a>
+      <a href="/projects">projects</a>
       <a class="github" href="https://github.com/adhikrysh/attitude-filter" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
     </nav>
     <main class="project">
@@ -106,9 +108,9 @@ seconds and adds one bad reading at 150 seconds. With seed 42, the final
 attitude error is <strong>0.089°</strong>, versus
 <strong>18.57°</strong> for the gyro alone. The filter rejects the bad
 reading. These are simulation results under the stated sensor model.</p>
-<p><img src="/assets/projects/attitude-filter-6a50fba41633.png"
+<p><picture><source srcset="/assets/projects/attitude-filter-7befeef9d4fc.webp" type="image/webp"><img src="/assets/projects/attitude-filter-6a50fba41633.png"
 loading="lazy" decoding="async" width="1440" height="1040"
-alt="Tracker outage experiment" /></p>
+alt="Tracker outage experiment" /></picture></p>
 <h2 id="build-and-run">build and run</h2>
 <p>requires C++20, CMake 3.20+, and Eigen. Install Eigen with
 <code>brew install eigen</code> on macOS or

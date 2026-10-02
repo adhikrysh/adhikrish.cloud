@@ -33,6 +33,7 @@ READING_CSS = """
   .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
   .readme pre code { font-size: inherit; }
   .readme figure { margin-block: 32px; }
+  .readme picture { display: block; }
   .readme img { display: block; max-width: 100%; height: auto; }
   .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
 """
@@ -80,13 +81,13 @@ def prepare_ast(node, project):
             prepare_ast(value, project)
 
 
-index_path = ROOT / "src.html"
+index_path = ROOT / "projects.html"
 index = index_path.read_text()
 items = []
 for project in sorted(PROJECTS, key=lambda p: p["date"], reverse=True):
     slug = project["slug"]
     items.append(f'''        <li>
-          <a href="/src/{slug}"><span>{slug}</span><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
+          <a href="/projects/{slug}"><span>{slug}</span><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
           <p>{html.escape(project['description'])}</p>
         </li>''')
 index = re.sub(
@@ -104,14 +105,22 @@ for project in PROJECTS:
         ast["blocks"].pop(0)
     prepare_ast(ast, project)
     body = pandoc(json.dumps(ast), "json", "html5")
+    # Keep the original PNG as a fallback; modern browsers download only the lossless WebP.
+    def picture(match):
+        webp = project.get("webp_images", {}).get(match[2])
+        if not webp:
+            return match[1]
+        return (f'<picture><source srcset="{html.escape(webp, quote=True)}" '
+                f'type="image/webp">{match[1]}</picture>')
+    body = re.sub(r'(<img src="([^"]+)"[^>]*>)', picture, body)
     head = index.split("</head>")[0]
     head = re.sub(r'^  \.project-list[^\n]*\n', '', head, flags=re.MULTILINE)
     head = head.replace("projects | adhikrish rk", f"{slug} | adhikrish rk")
     head = head.replace("personal projects in spacecraft software and simulation.",
                         html.escape(project["description"], quote=True))
     head = head.replace('content="website"', 'content="article"')
-    head = head.replace('href="https://adhikrish.cloud/src"',
-                        f'href="https://adhikrish.cloud/src/{slug}"')
+    head = head.replace('href="https://adhikrish.cloud/projects"',
+                        f'href="https://adhikrish.cloud/projects/{slug}"')
     head = head.replace("</style>", READING_CSS + "</style>")
     repository = f"https://github.com/adhikrysh/{slug}"
     page = head + f'''</head>
@@ -119,7 +128,7 @@ for project in PROJECTS:
   <div class="reading">
     <nav aria-label="site">
       <a href="/">home</a>
-      <a href="/src">projects</a>
+      <a href="/projects">projects</a>
       <a class="github" href="{repository}" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
     </nav>
     <main class="project">
@@ -135,7 +144,7 @@ for project in PROJECTS:
 </body>
 </html>
 '''
-    output = ROOT / "src" / f"{slug}.html"
+    output = ROOT / "projects" / f"{slug}.html"
     output.parent.mkdir(exist_ok=True)
     output.write_text(page)
     print(f"rendered {output.relative_to(ROOT)}")

@@ -17,7 +17,10 @@
     "images": {
       "docs/reservations.png": "/assets/projects/contact-router-9db8e917504b.png"
     },
-    "edited_date": "2026-10-02"
+    "edited_date": "2026-10-02",
+    "webp_images": {
+      "/assets/projects/contact-router-9db8e917504b.png": "/assets/projects/contact-router-8e72ef63106e.webp"
+    }
   },
   {
     "slug": "attitude-filter",
@@ -28,7 +31,10 @@
     "images": {
       "docs/tracker-outage.png": "/assets/projects/attitude-filter-6a50fba41633.png"
     },
-    "edited_date": "2026-10-02"
+    "edited_date": "2026-10-02",
+    "webp_images": {
+      "/assets/projects/attitude-filter-6a50fba41633.png": "/assets/projects/attitude-filter-7befeef9d4fc.webp"
+    }
   },
   {
     "slug": "orbit-access",
@@ -39,6 +45,9 @@
     "images": {
       "docs/orbit-comparison.png": "/assets/projects/orbit-access-b7ea762965f0.png"
     },
-    "edited_date": "2026-10-02"
+    "edited_date": "2026-10-02",
+    "webp_images": {
+      "/assets/projects/orbit-access-b7ea762965f0.png": "/assets/projects/orbit-access-81e42071e79f.webp"
+    }
   }
 ]
