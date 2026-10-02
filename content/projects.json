@@ -5,7 +5,8 @@
     "first_commit": "f93e5b433147978b89375e71301729ad4440f4b6",
     "source_commit": "187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0",
     "description": "recover simulated spacecraft payload commands after a crash.",
-    "images": {}
+    "images": {},
+    "edited_date": "2026-10-02"
   },
   {
     "slug": "contact-router",
@@ -15,7 +16,8 @@
     "description": "route data through scheduled space links without double-booking radios.",
     "images": {
       "docs/reservations.png": "/assets/projects/contact-router-9db8e917504b.png"
-    }
+    },
+    "edited_date": "2026-10-02"
   },
   {
     "slug": "attitude-filter",
@@ -25,7 +27,8 @@
     "description": "estimate spacecraft orientation through star-tracker outages.",
     "images": {
       "docs/tracker-outage.png": "/assets/projects/attitude-filter-6a50fba41633.png"
-    }
+    },
+    "edited_date": "2026-10-02"
   },
   {
     "slug": "orbit-access",
@@ -35,6 +38,7 @@
     "description": "simulate satellite orbits and find ground-station visibility windows.",
     "images": {
       "docs/orbit-comparison.png": "/assets/projects/orbit-access-b7ea762965f0.png"
-    }
+    },
+    "edited_date": "2026-10-02"
   }
 ]

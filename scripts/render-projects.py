@@ -18,6 +18,7 @@ READING_CSS = """
   .project h1 { font-size: 28px; }
   .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
   .project-meta a { color: inherit; }
+  .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
   .readme { margin-top: 40px; line-height: 1.8; }
   .readme p, .readme ul, .readme ol { margin-block: 20px; }
   .readme > :first-child { margin-top: 0; }
@@ -26,6 +27,7 @@ READING_CSS = """
   .readme ul, .readme ol { padding-left: 24px; }
   .readme li + li { margin-top: 8px; }
   .readme a { color: inherit; overflow-wrap: anywhere; }
+  .readme a:hover, .project-meta a:hover { color: #787878; }
   .readme strong { font-weight: 550; }
   .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
   .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
@@ -84,7 +86,7 @@ items = []
 for project in sorted(PROJECTS, key=lambda p: p["date"], reverse=True):
     slug = project["slug"]
     items.append(f'''        <li>
-          <a href="/src/{slug}"><span>{slug}</span><time datetime="{project['date']}" title="first commit (UTC)">{readable_date(project['date'])}</time></a>
+          <a href="/src/{slug}"><span>{slug}</span><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
           <p>{html.escape(project['description'])}</p>
         </li>''')
 index = re.sub(
@@ -122,7 +124,10 @@ for project in PROJECTS:
     </nav>
     <main class="project">
       <h1>{slug}</h1>
-      <p class="project-meta">first commit (utc) <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a></p>
+      <p class="project-meta">
+        <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
+        <span class="last-edited">last edited <a href="{repository}/commit/{project['source_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['edited_date']}">{readable_date(project['edited_date'])}</time></a></span>
+      </p>
       <div class="readme">
 {body}      </div>
     </main>

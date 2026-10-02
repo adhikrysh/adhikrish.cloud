@@ -61,15 +61,11 @@
   .links {
     margin-top: 1.9em;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
     color: #8a8a8a;
     font-size: 16px;
-  }
-  .link-group {
-    display: flex;
-    align-items: center;
-    gap: 0.35em;
   }
   .links a {
     flex-shrink: 0;
@@ -79,7 +75,7 @@
     transition: color 220ms ease;
   }
   .links a:hover {
-    color: #ffffff;
+    color: #787878;
   }
   .links a:focus-visible {
     outline: 1px solid #ffffff;
@@ -88,6 +84,7 @@
   .social-links {
     display: flex;
     gap: 4px;
+    margin-left: -8px;
   }
   .social-links a {
     display: flex;
@@ -135,10 +132,6 @@
   </div>
 
   <nav class="links" aria-label="essays, projects, and social links">
-    <span class="link-group">
-      <a href="/etc">essays</a>
-      <a href="/src">projects</a>
-    </span>
     <span class="social-links">
       <a href="mailto:contact@adhikrish.cloud" aria-label="email contact@adhikrish.cloud" title="contact@adhikrish.cloud">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -159,6 +152,7 @@
         </svg>
       </a>
     </span>
+    <span class="link-group">more: <a href="/etc">essays</a>, <a href="/src">projects</a></span>
   </nav>
 </body>
 </html>

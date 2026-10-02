@@ -5,7 +5,7 @@ colors:
   ink: "#080807"
   cream: "#d8d4c8"
   muted: "#8a8a8a"
-  hover: "#ffffff"
+  hover: "#787878"
   code-surface: "#121210"
   code-border: "#252522"
   selection: "rgba(255, 100, 0, 0.25)"
@@ -71,7 +71,7 @@ the site is a sparse, dark reading surface. its interface steps aside for brief 
 **Key Characteristics:**
 - self-hosted inter throughout.
 - dark surface with cream reading text and muted navigation or metadata.
-- unadorned homepage text links, underlined reading links, and no decorative containers.
+- unadorned links and no decorative containers.
 - static project pages that preserve readme structure.
 
 ## Colors
@@ -85,7 +85,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 - **Ink:** the page background.
 - **Cream:** primary text and project-list links.
 - **Muted Gray:** navigation, dates, descriptions, captions, and project metadata.
-- **Hover White:** link hover state.
+- **Hover Gray:** link hover state.
 - **Code Surface and Code Border:** the only inset surface, used for preformatted code.
 
 **The Quiet Palette Rule.** Keep ordinary page content within the dark, cream, and muted-gray system. Reserve orange for text selection.
@@ -117,28 +117,28 @@ the system is flat. pages have no shadows, gradients, or raised cards. the dark 
 
 ## Shapes
 
-text and rules define the form language. index and project links are underlined with a 2px underline offset; homepage text links are not. focus uses a one-pixel outline with a visible offset. the homepage's icon outlines use rounded stroke caps and joins; the mail and linkedin svg rectangles retain their source 2px corner radius.
+text and rules define the form language. links omit underlines throughout the homepage, indexes, and project reading pages. focus uses a one-pixel outline with a visible offset. the homepage's icon outlines use rounded stroke caps and joins; the mail and linkedin svg rectangles retain their source 2px corner radius.
 
 ## Components
 
 ### Navigation
 
-reading-page navigation uses muted, underlined text links that move to white on hover. homepage essays and projects links omit the underline while retaining their hover and focus behavior. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
+navigation links use muted grey without underlines. hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
 
 ### Index Entries
 
-each title-and-date row uses a two-column grid with a 24px gap. titles remain underlined; dates do not wrap. project descriptions use muted 14px text below the row.
+each title-and-date row uses a two-column grid with a 24px gap. titles have no underline; dates do not wrap. project descriptions use muted 14px text below the row.
 
 ### Project Readmes
 
-project pages render checked-in markdown as static html. each starts with the project title, a linked first-commit date, and a github link that opens safely in a new tab. local hashed plot assets remain responsive. long code blocks scroll inside their own bounds.
+project pages render checked-in markdown as static html. each starts with the project title, the date alone, a smaller last edited line, and a github link that opens safely in a new tab. local hashed plot assets remain responsive. long code blocks scroll inside their own bounds.
 
 ## Do's and Don'ts
 
 - **Do** use the local inter font and the established type scale.
 - **Do** keep index and project reading columns at 680px maximum width.
 - **Do** use muted text for navigation, dates, descriptions, captions, and project metadata.
-- **Do** leave the homepage essays and projects links unadorned; preserve underlines on reading pages.
+- **Do** omit link underlines throughout the site and use the darker grey hover state.
 - **Do** keep project images local and responsive, and external github links in a new tab with `rel="noopener noreferrer"`.
 - **Don't** add browser-side rendering scripts for project content.
 - **Don't** replace the flat reading surface with cards, shadows, gradients, or decorative color.
