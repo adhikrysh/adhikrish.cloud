@@ -18,12 +18,12 @@ the page preloads a local copy of the exact inter v20 latin font previously serv
 
 - html: five minutes, then revalidate. a deployed text change may take five minutes to appear in an existing browser cache.
 - the font: one year, immutable. its filename contains its sha256 prefix. change the filename and every preload and font reference whenever the font changes.
-- hashed project images and the WebP favicon: one year, immutable. the PNG favicon fallback and social preview image: one day, then revalidate. change the url when an image needs an immediate cache refresh.
+- hashed project images and the PNG favicon: one year, immutable. the legacy favicon and social preview image: one day, then revalidate. change the url when an image needs an immediate cache refresh.
 
 run locally with `python3 -m http.server 8000`. this server does not apply the production cache headers or extensionless routes; visit `/essays.html` there.
 
 to test the alternate deployment, build with `docker build -t adhikrish-cloud .` and run with `docker run --rm -p 8000:80 adhikrish-cloud`.
 
-project plots and the favicon use lossless WebP where supported, with the original PNGs as fallbacks. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work even though the application itself has no javascript.
+project plots use lossless WebP where supported, with the original PNGs as fallbacks. the favicon uses one losslessly compressed PNG to avoid downloading multiple icon formats. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work even though the application itself has no javascript.
 
 the homepage gives browsers low-priority prefetch hints for `/essays` and `/projects`. browsers that honor them can load the first navigation from cache. hints do not replace normal links or guarantee prefetch on every browser or connection.
