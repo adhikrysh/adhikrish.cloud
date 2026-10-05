@@ -26,4 +26,4 @@ to test the alternate deployment, build with `docker build -t adhikrish-cloud .`
 
 project plots use lossless WebP where supported, with the original PNGs as fallbacks. the favicon uses one losslessly compressed PNG to avoid downloading multiple icon formats. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work even though the application itself has no javascript.
 
-the homepage gives browsers low-priority prefetch hints for `/essays` and `/projects`. browsers that honor them can load the first navigation from cache. hints do not replace normal links or guarantee prefetch on every browser or connection.
+the homepage gives browsers a low-priority prefetch hint for `/projects`. browsers that honor it can load the first navigation from cache. the hint does not replace the normal link or guarantee prefetch on every browser or connection.
