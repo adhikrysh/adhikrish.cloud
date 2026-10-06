@@ -123,7 +123,7 @@ for project in PROJECTS:
     head = index.split("</head>")[0]
     head = re.sub(r'^  \.project-list[^\n]*\n', '', head, flags=re.MULTILINE)
     head = head.replace("projects | adhikrish rk", f"{slug} | adhikrish rk")
-    head = head.replace("personal projects in spacecraft simulation, scheduling, and developer tools.",
+    head = head.replace("personal projects in spacecraft simulation and developer tools.",
                         html.escape(project["description"], quote=True))
     head = head.replace('content="website"', 'content="article"')
     head = head.replace('href="https://adhikrish.cloud/projects"',
