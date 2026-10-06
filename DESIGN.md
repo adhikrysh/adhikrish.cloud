@@ -105,7 +105,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 
 ## Layout
 
-the homepage centers its text and navigation row horizontally, and the whole group centers vertically within the small viewport height using equal top and bottom padding. its text block has a maximum width of 720px. desktop padding is 60px; at 720px and below, padding becomes 40px vertically and 28px horizontally. its underlined projects link and svg social icons share one line.
+the homepage centers the whole content block horizontally and vertically within the small viewport height using equal top and bottom padding. its text and navigation row align to the block's left edge on desktop and mobile. its text block has a maximum width of 720px. desktop padding is 60px; at 720px and below, padding becomes 40px vertically and 28px horizontally. its underlined projects link and svg social icons share one line.
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. below 720px, body text becomes 16px, navigation becomes 15px, and the main gap becomes 48px. below 360px, horizontal padding is 20px and navigation becomes 14px.
 
