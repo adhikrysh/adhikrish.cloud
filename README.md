@@ -24,6 +24,8 @@ run locally with `python3 -m http.server 8000`. this server does not apply the p
 
 to test the alternate deployment, build with `docker build -t adhikrish-cloud .` and run with `docker run --rm -p 8000:80 adhikrish-cloud`.
 
-project plots use lossless WebP where supported, with the original PNGs as fallbacks. the favicon uses one losslessly compressed PNG to avoid downloading multiple icon formats. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work even though the application itself has no javascript.
+project plots use lossless WebP where supported, with the original PNGs as fallbacks. the opening plot loads eagerly with high fetch priority because it appears in the initial reading viewport; later images remain lazy. image dimensions reserve their layout space.
+
+the favicon uses one opaque 48px square PNG, cropped from the supplied sunset photograph, to avoid downloading multiple icon formats. its hashed asset is 3,541 bytes. the root `favicon.png` provides the same image at the legacy URL. retain older hashed assets so cached HTML can still request them. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work even though the application itself has no javascript.
 
 the homepage gives browsers a low-priority prefetch hint for `/projects`. browsers that honor it can load the first navigation from cache. the hint does not replace the normal link or guarantee prefetch on every browser or connection.

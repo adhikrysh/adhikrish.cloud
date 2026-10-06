@@ -56,20 +56,26 @@ def pandoc(source, source_format, target_format):
     )
 
 
-def prepare_ast(node, project):
+def prepare_ast(node, project, image_state):
     if isinstance(node, dict):
         kind = node.get("t")
         if kind in {"Link", "Image"}:
             attributes, _, target = node["c"]
             url = target[0]
             if kind == "Image":
+                first_image = not image_state["seen"]
+                image_state["seen"] = True
                 target[0] = project["images"][url]
                 image = ROOT / target[0].lstrip("/")
                 width, height = struct.unpack(">II", image.read_bytes()[16:24])
                 attributes[2].extend([
                     ["width", str(width)], ["height", str(height)],
-                    ["loading", "lazy"], ["decoding", "async"],
+                    ["loading", "eager" if first_image else "lazy"],
+                    ["decoding", "async"],
                 ])
+                # The opening plot is visible in the initial reading viewport.
+                if first_image:
+                    attributes[2].append(["fetchpriority", "high"])
             elif not urlsplit(url).scheme and not url.startswith("#"):
                 base = (f"https://github.com/adhikrysh/{project['slug']}/"
                         f"blob/{project['source_commit']}/")
@@ -79,10 +85,10 @@ def prepare_ast(node, project):
                     ["target", "_blank"], ["rel", "noopener noreferrer"],
                 ])
         for value in node.values():
-            prepare_ast(value, project)
+            prepare_ast(value, project, image_state)
     elif isinstance(node, list):
         for value in node:
-            prepare_ast(value, project)
+            prepare_ast(value, project, image_state)
 
 
 index_path = ROOT / "projects.html"
@@ -107,7 +113,7 @@ for project in PROJECTS:
     ast = json.loads(pandoc(markdown, "gfm", "json"))
     if ast["blocks"] and ast["blocks"][0]["t"] == "Header" and ast["blocks"][0]["c"][0] == 1:
         ast["blocks"].pop(0)
-    prepare_ast(ast, project)
+    prepare_ast(ast, project, {"seen": False})
     body = pandoc(json.dumps(ast), "json", "html5")
     body = re.sub(r'(<table>.*?</table>)',
                   r'<div class="table-scroll" tabindex="0">\1</div>',
