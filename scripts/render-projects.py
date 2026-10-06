@@ -30,8 +30,12 @@ READING_CSS = """
   .readme a:hover, .project-meta a:hover { color: #787878; }
   .readme strong { font-weight: 550; }
   .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; }
   .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
   .readme pre code { font-size: inherit; }
+  .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
+  .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
   .readme figure { margin-block: 32px; }
   .readme picture { display: block; }
   .readme img { display: block; max-width: 100%; height: auto; }
@@ -105,6 +109,9 @@ for project in PROJECTS:
         ast["blocks"].pop(0)
     prepare_ast(ast, project)
     body = pandoc(json.dumps(ast), "json", "html5")
+    body = re.sub(r'(<table>.*?</table>)',
+                  r'<div class="table-scroll" tabindex="0">\1</div>',
+                  body, flags=re.DOTALL)
     # Keep the original PNG as a fallback; modern browsers download only the lossless WebP.
     def picture(match):
         webp = project.get("webp_images", {}).get(match[2])
@@ -116,7 +123,7 @@ for project in PROJECTS:
     head = index.split("</head>")[0]
     head = re.sub(r'^  \.project-list[^\n]*\n', '', head, flags=re.MULTILINE)
     head = head.replace("projects | adhikrish rk", f"{slug} | adhikrish rk")
-    head = head.replace("personal projects in spacecraft software and simulation.",
+    head = head.replace("personal projects in spacecraft simulation, scheduling, and developer tools.",
                         html.escape(project["description"], quote=True))
     head = head.replace('content="website"', 'content="article"')
     head = head.replace('href="https://adhikrish.cloud/projects"',

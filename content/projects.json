@@ -49,5 +49,23 @@
     "webp_images": {
       "/assets/projects/orbit-access-b7ea762965f0.png": "/assets/projects/orbit-access-81e42071e79f.webp"
     }
+  },
+  {
+    "slug": "ci-batch-scheduler",
+    "date": "2026-09-16",
+    "first_commit": "d9ed1cdbe9cc8df23a836d6dba9ab0142175840a",
+    "source_commit": "d9ed1cdbe9cc8df23a836d6dba9ab0142175840a",
+    "description": "batch CI jobs onto fewer virtual machines while meeting deadlines.",
+    "images": {},
+    "edited_date": "2026-09-16"
+  },
+  {
+    "slug": "agent-squad",
+    "date": "2026-07-28",
+    "first_commit": "145b2baa31065b6ae8724bde588c3f4f461ab883",
+    "source_commit": "39a9f9c4f271e853e5298f93ae4bface8e8a9f7a",
+    "description": "track coding-agent sessions and jump to the terminal that needs you.",
+    "images": {},
+    "edited_date": "2026-08-03"
   }
 ]

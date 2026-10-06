@@ -105,7 +105,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 
 ## Layout
 
-the homepage places a left-aligned text block slightly above center with a maximum width of 720px and a 15% left inset. its underlined projects link and svg social icons share one line.
+the homepage places a left-aligned text block slightly above center in a centered 680px column, matching the reading pages. its underlined projects link and svg social icons share one line.
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. below 720px, body text becomes 16px, navigation becomes 15px, and the main gap becomes 48px. below 360px, horizontal padding is 20px and navigation becomes 14px.
 
