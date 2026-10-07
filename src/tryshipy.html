@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>shipy (revenue generating) | adhikrish rk</title>
-<meta name="description" content="a ship-broker platform built with cloudflare workers, private aws infrastructure, and an asynchronous processing pipeline.">
+<meta name="description" content="ai operating system for ship brokers.">
 <meta property="og:title" content="shipy (revenue generating) | adhikrish rk">
-<meta property="og:description" content="a ship-broker platform built with cloudflare workers, private aws infrastructure, and an asynchronous processing pipeline.">
+<meta property="og:description" content="ai operating system for ship brokers.">
 <meta property="og:image" content="https://adhikrish.cloud/og.png">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
@@ -98,15 +98,31 @@
       <h1>shipy (revenue generating)</h1>
       <div class="readme">
 <p><a href="https://tryshipy.com" target="_blank"
-rel="noopener noreferrer">shipy</a> brings a ship broker's private
-emails and documents into a workspace for vessels, buyer requirements,
-seller offers, and deals. its architecture separates the interactive
-app, background processing, and the evidence each result depends on.</p>
-<p>the web app runs on cloudflare. aws runs the processing and storage.
-cloudflare workers ai handles classification; fireworks handles deeper
-interpretation. postgres connects these parts through durable state,
-rather than leaving workflow progress inside a queue or a model
-call.</p>
+rel="noopener noreferrer">shipy</a> is an ai operating system for ship
+brokers. it turns private email and documents into source-backed
+commercial records and a workspace for reviewing evidence and moving
+deals forward.</p>
+<p>the hard part is keeping that workspace consistent while new emails
+arrive, attachments fail, model calls retry, and brokers act on earlier
+information. four decisions hold the pipeline together:</p>
+<ul>
+<li><strong>preserve the evidence.</strong> encrypted, versioned
+originals stay separate from the system's interpretation. derived
+records link to the exact source versions behind them.</li>
+<li><strong>make jobs durable.</strong> postgres owns claims, progress,
+and completion. sqs wakes workers with identifiers; a repeated delivery
+converges on the same job.</li>
+<li><strong>check versions before publishing.</strong> a worker must
+still own its claim and be working on the current source revision. late
+work cannot overwrite newer correspondence.</li>
+<li><strong>recover missing work.</strong> retries handle a delivery
+that fails. reconciliation finds pending work whose wake-up was lost,
+including a database commit followed by a failed queue publication.</li>
+</ul>
+<p>the web app runs on cloudflare; aws runs processing and storage. clef
+handles relevance classification through workers ai, and fireworks
+handles deeper structured extraction. the boundaries below keep those
+services tied to one durable workflow.</p>
 <h2 id="the-app-and-the-private-backend">the app and the private
 backend</h2>
 <p>next.js runs on cloudflare workers through opennext. the worker
@@ -266,10 +282,13 @@ thread, keeping ordered work separate from unrelated threads.</p>
 <p>postgres claims and expiring leases decide who may process a job.
 repeated queue deliveries converge on the same durable work. stale
 revisions cannot overwrite newer results. bounded retries and
-dead-letter queues isolate persistent failures; a scheduled reconciler
-rediscovers unfinished work and missed provider changes from saved
-state. provider checkpoints advance only after the work they cover is
-durable.</p>
+dead-letter queues isolate persistent failures.</p>
+<p>database commits and queue publication are separate operations. a
+retry can recover a delivered message that failed, but it cannot recover
+a message that was never published. the scheduled reconciler scans saved
+state and republishes eligible unfinished work. it also discovers missed
+provider changes; provider checkpoints advance only after the work they
+cover is durable.</p>
 <p>background fireworks calls share a capacity controller backed by
 dynamodb. workers reserve capacity before calling the provider, defer
 when the budget is busy, and back off when throttled. conditional

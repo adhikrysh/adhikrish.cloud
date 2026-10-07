@@ -1,8 +1,15 @@
 # shipy (revenue generating)
 
-[shipy](https://tryshipy.com) brings a ship broker's private emails and documents into a workspace for vessels, buyer requirements, seller offers, and deals. its architecture separates the interactive app, background processing, and the evidence each result depends on.
+[shipy](https://tryshipy.com) is an ai operating system for ship brokers. it turns private email and documents into source-backed commercial records and a workspace for reviewing evidence and moving deals forward.
 
-the web app runs on cloudflare. aws runs the processing and storage. cloudflare workers ai handles classification; fireworks handles deeper interpretation. postgres connects these parts through durable state, rather than leaving workflow progress inside a queue or a model call.
+the hard part is keeping that workspace consistent while new emails arrive, attachments fail, model calls retry, and brokers act on earlier information. four decisions hold the pipeline together:
+
+- **preserve the evidence.** encrypted, versioned originals stay separate from the system's interpretation. derived records link to the exact source versions behind them.
+- **make jobs durable.** postgres owns claims, progress, and completion. sqs wakes workers with identifiers; a repeated delivery converges on the same job.
+- **check versions before publishing.** a worker must still own its claim and be working on the current source revision. late work cannot overwrite newer correspondence.
+- **recover missing work.** retries handle a delivery that fails. reconciliation finds pending work whose wake-up was lost, including a database commit followed by a failed queue publication.
+
+the web app runs on cloudflare; aws runs processing and storage. clef handles relevance classification through workers ai, and fireworks handles deeper structured extraction. the boundaries below keep those services tied to one durable workflow.
 
 ## the app and the private backend
 
@@ -126,7 +133,9 @@ finalization verifies the stored object against the intent and pins its exact s3
 
 capture, attachments, classification, extraction, and downstream work have separate queues and lambdas. each stage can have its own concurrency and retry policy. a slow inference service can build a backlog without occupying web requests or blocking unrelated attachment work. the knowledge queue uses fifo (first in, first out) groups per thread, keeping ordered work separate from unrelated threads.
 
-postgres claims and expiring leases decide who may process a job. repeated queue deliveries converge on the same durable work. stale revisions cannot overwrite newer results. bounded retries and dead-letter queues isolate persistent failures; a scheduled reconciler rediscovers unfinished work and missed provider changes from saved state. provider checkpoints advance only after the work they cover is durable.
+postgres claims and expiring leases decide who may process a job. repeated queue deliveries converge on the same durable work. stale revisions cannot overwrite newer results. bounded retries and dead-letter queues isolate persistent failures.
+
+database commits and queue publication are separate operations. a retry can recover a delivered message that failed, but it cannot recover a message that was never published. the scheduled reconciler scans saved state and republishes eligible unfinished work. it also discovers missed provider changes; provider checkpoints advance only after the work they cover is durable.
 
 background fireworks calls share a capacity controller backed by dynamodb. workers reserve capacity before calling the provider, defer when the budget is busy, and back off when throttled. conditional updates prevent concurrent workers from spending the same budget. adding lambda concurrency alone does not increase database or model-provider capacity. those limits govern how fast the queues drain.
 

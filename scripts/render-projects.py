@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render checked-in readmes and public write-ups. Requires Python 3 and Pandoc."""
+"""Render checked-in engineering write-ups. Requires Python 3 and Pandoc."""
 
 import html
 import json
@@ -171,7 +171,7 @@ for project in PROJECTS:
     if project.get("date"):
         metadata = f'''      <p class="project-meta">
         <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
-        <span class="last-edited">last edited <a href="{repository}/commit/{project['source_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['edited_date']}">{readable_date(project['edited_date'])}</time></a></span>
+        <span class="last-edited">code updated <a href="{repository}/commit/{project['source_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['edited_date']}">{readable_date(project['edited_date'])}</time></a></span>
       </p>
 '''
     page = head + f'''</head>

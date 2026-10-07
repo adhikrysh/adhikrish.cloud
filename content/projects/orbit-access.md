@@ -1,14 +1,55 @@
 # orbit-access
 
-calculate how a satellite moves, then find when a ground station can see it. The library supports two-body gravity and Earth's J2 term, which models the largest effect of Earth's equatorial bulge.
+a ground-station pass is the result of two moving frames: a satellite propagated in an inertial frame, and a station fixed to a rotating, oblate earth. `orbit-access` keeps those concerns separate, then joins them at the elevation calculation. it asks a precise question: during this synthetic scenario, when is a satellite above this station's elevation mask?
 
-the included comparison shows how a simple circular orbit changes when J2 is included. Both models start from the same state. After one day, their orbital planes and positions differ, even though each model conserves its own mechanical energy.
+```text
+state at t0 (km, km/s)
+          |
+adaptive J2 propagation
+          |
+satellite position at t
+          |
+WGS84 station + earth spin
+          |
+elevation above mask
+          |
+bracket -> bisection -> pass
+```
+
+the default CLI scenario starts with a circular orbit at a 7,000 km geocentric radius and 51.6 degrees inclination. it reports four above-10-degree windows for a one-day run at 1.3521 degrees north, 103.8198 degrees east: 390.278 s, 449.958 s, 455.508 s, and 404.475 s long. those are outputs of this stated model, not predictions for a named spacecraft.
 
 ![One-day comparison](docs/orbit-comparison.png)
 
-## build and run
+## a model with stated conventions
 
-requires C++20 and CMake 3.20+. It has no runtime dependencies.
+the state is position in kilometres and velocity in kilometres per second. time is elapsed seconds. vectors live in a right-handed inertial frame whose positive z axis is earth's spin axis. library angles are radians; the CLI converts its latitude, longitude, and mask arguments from degrees. those conventions are part of the public API in [orbit.hpp](include/orbit/orbit.hpp), rather than assumptions hidden in a plotting script.
+
+the force model combines central gravity with J2, the dominant correction for earth's equatorial bulge. its potential per unit mass is:
+
+```text
+U = -mu/r [1 - J2/2 (R/r)^2
+            (3z^2/r^2 - 1)]
+```
+
+`U` is potential energy per unit mass in km²/s², `J2` is a dimensionless coefficient, and `z` is the spin-axis component of position in km. `mu` is the gravitational parameter in km³/s², `R` is the reference radius in km, and `r` is the distance from earth's centre in km. [dynamics.cpp](src/dynamics.cpp) evaluates the matching acceleration directly. setting J2 to zero leaves the two-body model. with J2 enabled, the orbit plane precesses; energy and z angular momentum remain conserved, while the full angular-momentum vector does not. [numerics.md](docs/numerics.md) makes that distinction explicit because it determines which conservation check is valid.
+
+three choices make it more than a fixed-step demo.
+
+first, [dynamics.cpp](src/dynamics.cpp) uses Dormand-Prince 5(4), an adaptive Runge-Kutta method. each attempted step produces fifth- and fourth-order states; their scaled difference estimates local error. position and velocity have separate absolute tolerances because kilometres and kilometres per second have different scales: 1e-8 km, 1e-11 km/s, with 1e-11 relative tolerance. accepted steps can grow to 60 s; rejected steps shrink. the propagator either reaches the requested time or throws when its minimum step or work budget is exhausted. it never returns a partial trajectory as though it were complete.
+
+second, [access.cpp](src/access.cpp) uses WGS84 geodetic coordinates for the station, not a spherical-earth shortcut. the station's local vertical is the ellipsoid normal, which generally differs from its centre-to-station direction. the code rotates that position and normal into the inertial frame with an explicit Greenwich angle and a constant 7.2921150e-5 rad/s earth rotation rate. elevation is then the angle between the station-to-satellite line of sight and that local vertical.
+
+third, the pass finder distinguishes finding an event from merely sampling a line. it samples elevation every 10 s by default. when a sample pair changes visibility, it brackets the crossing and bisects it, propagating from the same left endpoint at each midpoint instead of interpolating elevation. the default root tolerance is 1e-5 s. pass records retain `clipped_at_start` and `clipped_at_end` when the search begins or ends inside a visible window. a crossing precision does not prove complete detection: a shorter grazing pass can fall entirely between samples, and a tangency without an above-mask interval is intentionally omitted.
+
+## checks that test independent properties
+
+the test executable passes seven named checks locally. [test_orbit.cpp](tests/test_orbit.cpp) compares 150 elliptic, forward and backward two-body propagations with an independent Kepler-equation solver, requiring position error below 0.5 m and velocity error below 0.5 mm/s. it also checks long-run conservation, the J2 acceleration against a centred potential gradient, and node-drift sign and scale against first-order secular theory within a 1% envelope.
+
+the access tests use an analytic circular equatorial case to check rise and set times, then reduce the sample step from 31 s to 7 s and require the same pass list. they also check WGS84 equatorial and polar geometry, overhead and antipodal elevation, clipped intervals, tangencies, invalid input, adaptive-step rejection, and exhausted work budgets. the [checked-in CI workflow](.github/workflows/check.yml) runs these tests on Ubuntu with address and undefined-behaviour sanitizers and on macOS in release mode.
+
+## build and reproduce
+
+requires C++20 and CMake 3.20+. it has no runtime dependencies.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -19,24 +60,6 @@ ctest --test-dir build --output-on-failure
 ./build/orbit-access passes 86400 1.3521 103.8198 10 j2
 ```
 
-the first command writes one day of states at 60-second intervals. The second finds passes above a 10° elevation mask for a station at the given latitude and longitude. Times are elapsed seconds. This is a synthetic scenario, not a prediction for a named spacecraft.
+the first command writes one day of states at 60-second intervals. the second searches passes above a 10-degree mask. append `x y z vx vy vz` to provide another initial state, in kilometres and kilometres per second; use `two-body` to disable J2. reproduce the figure with Matplotlib and NumPy using `python examples/plot.py`.
 
-the default state has a 7,000 km geocentric radius and 51.6° inclination. To provide another state, append `x y z vx vy vz` in kilometres and kilometres per second. `two-body` disables J2. `--help` lists the arguments.
-
-## model and search
-
-the propagator integrates position and velocity with Dormand–Prince 5(4), an adaptive numerical method. Two estimates for each step give an error estimate. A failed step retries at a smaller size; a successful step can increase the next size. Position and velocity use separate absolute tolerances because their units and scales differ.
-
-ground stations use WGS84 geodetic coordinates. The library rotates a station's position into the inertial frame and measures elevation from the station's local vertical. A transition from below to above the mask brackets a rise time. Bisection with fresh propagation refines that crossing. The same process finds the set time.
-
-the default search samples every 10 seconds. A very short grazing pass can fall between samples and be missed. The root tolerance controls the precision of a detected crossing; it does not guarantee that every crossing was detected. A pass already underway at the start or still visible at the end carries a clipping flag.
-
-## checks and limits
-
-the tests compare 150 elliptic trajectories, including backward propagation, against a separate Kepler-equation solver. They also check long-run energy and angular momentum, the J2 force against a numerical potential gradient, node drift against first-order secular theory, and pass times against an analytic circular equatorial case.
-
-time zero uses a user-defined Earth orientation. The CLI sets the Greenwich angle to zero, assumes constant Earth rotation, and sets station height to zero. It has no UTC conversion, precession, nutation, drag, lunar or solar gravity, or atmospheric refraction. The propagator rejects force evaluations inside its reference radius; it does not find impact times. Use it for controlled experiments, not operational contact predictions.
-
-to recreate the plot, install `matplotlib` and `numpy` in a Python environment, then run `python examples/plot.py`. To run memory and undefined-behavior checks, configure another build with `-DORBIT_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug`.
-
-the public API is in [orbit.hpp](include/orbit/orbit.hpp). [Numerical notes](docs/numerics.md) define the model and its checks. Useful references are JPL's [two-body propagation documentation](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/prop2b_c.html) and the [Dormand–Prince method used by SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.RK45.html).
+this is deliberately a controlled simulator. time zero uses a caller-defined earth orientation; the CLI uses zero Greenwich angle and station height. it has no UTC conversion, precession, nutation, polar motion, drag, lunar or solar gravity, atmospheric refraction, impact detection, or event-completeness guarantee. it is appropriate for inspecting numerical and geometric assumptions, not operational contact prediction.

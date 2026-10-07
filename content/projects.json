@@ -58,7 +58,7 @@
     "slug": "tryshipy",
     "title": "shipy (revenue generating)",
     "group": "others",
-    "description": "a ship-broker platform built with cloudflare workers, private aws infrastructure, and an asynchronous processing pipeline.",
+    "description": "ai operating system for ship brokers.",
     "website": "https://tryshipy.com",
     "website_label": "visit shipy",
     "images": {}

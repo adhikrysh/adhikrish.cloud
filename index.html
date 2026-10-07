@@ -40,7 +40,7 @@
     font-weight: 380;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    line-height: 1.5;
+    line-height: 1.65;
     letter-spacing: -0.012em;
     display: flex;
     flex-direction: column;
@@ -54,23 +54,38 @@
   }
   .home {
     width: 100%;
-    max-width: 720px;
+    max-width: 560px;
   }
   .text p {
-    margin: 0 0 20px 0;
+    margin: 0;
+    text-wrap: balance;
   }
-  .text p:last-child {
-    margin-bottom: 0;
+  .text .intro {
+    font-size: 20px;
+    font-weight: 450;
+    line-height: 1.45;
+  }
+  .text .belief {
+    margin-top: 20px;
+  }
+  .text .invitation {
+    margin-top: 28px;
   }
   .links {
-    margin-top: 16px;
+    margin-top: 28px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 12px 28px;
     color: #8a8a8a;
-    font-size: 16px;
+    font-size: 15px;
+  }
+  .contact-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
   }
   .links a {
     position: relative;
@@ -84,6 +99,9 @@
     text-decoration-thickness: 1px;
     text-underline-offset: 2px;
     transition: color 220ms ease;
+  }
+  .links > a {
+    color: #d8d4c8;
   }
   .links a:hover {
     color: #787878;
@@ -109,8 +127,8 @@
       min-height: 100svh;
       font-size: 16px;
     }
-    .links {
-      font-size: 15px;
+    .text .intro {
+      font-size: 19px;
     }
   }
   @media (max-width: 360px) {
@@ -119,6 +137,7 @@
     }
     .links {
       font-size: 14px;
+      column-gap: 16px;
     }
   }
 </style>
@@ -126,16 +145,18 @@
 <body>
   <main class="home">
     <div class="text">
-      <p>hey i'm adhi - currently studying at nus &amp; stanford</p>
-      <p>i believe space is <em>the</em> problem of our lifetime, and the answer to most of the others</p>
-      <p>if you're building in this field too, i'd love to chat</p>
+      <p class="intro">hey i'm adhi - currently studying at nus &amp; stanford</p>
+      <p class="belief">i believe space is <em>the</em> problem of our lifetime, and the answer to most of the others</p>
+      <p class="invitation">if you're building in this field too, i'd love to chat</p>
     </div>
 
     <nav class="links" aria-label="things i've built and social links">
       <a href="/src">things i've built</a>
-      <a href="mailto:contact@adhikrish.cloud" aria-label="email contact@adhikrish.cloud" title="contact@adhikrish.cloud">email</a>
-      <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer" aria-label="linkedin" title="linkedin">linkedin</a>
-      <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer" aria-label="github" title="github">github</a>
+      <span class="contact-links">
+        <a href="mailto:contact@adhikrish.cloud" aria-label="email contact@adhikrish.cloud" title="contact@adhikrish.cloud">email</a>
+        <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer" aria-label="linkedin" title="linkedin">linkedin</a>
+        <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer" aria-label="github" title="github">github</a>
+      </span>
     </nav>
   </main>
 </body>
