@@ -50,7 +50,6 @@
     min-height: 100vh;
     padding: 60px;
     padding-left: 15%;
-    padding-bottom: calc(60px + 12svh);
     overflow-x: clip;
   }
   .home {
@@ -58,17 +57,18 @@
     max-width: 720px;
   }
   .text p {
-    margin: 0 0 1.9em 0;
+    margin: 0 0 20px 0;
   }
   .text p:last-child {
     margin-bottom: 0;
   }
   .links {
-    margin-top: 20px;
+    margin-top: 16px;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
-    gap: 16px;
+    gap: 8px;
     color: #8a8a8a;
     font-size: 16px;
   }
@@ -134,7 +134,7 @@
     <nav class="links" aria-label="things i've built and social links">
       <a href="/src">things i've built</a>
       <a href="mailto:contact@adhikrish.cloud" aria-label="email contact@adhikrish.cloud" title="contact@adhikrish.cloud">email</a>
-      <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer" aria-label="li (linkedin)" title="linkedin">li</a>
+      <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer" aria-label="linkedin" title="linkedin">linkedin</a>
       <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer" aria-label="github" title="github">github</a>
     </nav>
   </main>

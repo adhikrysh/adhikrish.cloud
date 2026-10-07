@@ -56,10 +56,11 @@
   },
   {
     "slug": "tryshipy",
-    "title": "tryshipy (revenue generating)",
+    "title": "shipy (revenue generating)",
     "group": "others",
-    "description": "turn a ship broker's emails and documents into knowledge, suggested matches, and deal drafts.",
+    "description": "a ship-broker platform built with cloudflare workers, private aws infrastructure, and an asynchronous processing pipeline.",
     "website": "https://tryshipy.com",
+    "website_label": "visit shipy",
     "images": {}
   }
 ]

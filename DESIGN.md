@@ -105,7 +105,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 
 ## Layout
 
-the desktop homepage places a left-aligned text block slightly above center with a maximum width of 720px and a 15% left inset. at 720px and below, its text and navigation row remain left-aligned, with 40px vertical and 28px horizontal padding. the mobile group centers vertically within the small viewport height using equal top and bottom padding. its underlined "things i've built", "email", "li", and "github" links share one line.
+the desktop homepage places a vertically centered, left-aligned text block with a maximum width of 720px and a 15% left inset. at 720px and below, its text and navigation row remain left-aligned, with 40px vertical and 28px horizontal padding. the mobile group centers vertically within the small viewport height using equal top and bottom padding. paragraphs share a compact 20px gap. its underlined "things i've built", "email", "linkedin", and "github" links share one line.
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. below 720px, body text becomes 16px, navigation becomes 15px, and the main gap becomes 48px. below 360px, horizontal padding is 20px and navigation becomes 14px.
 
@@ -123,7 +123,7 @@ text and rules define the form language. text links use one-pixel underlines wit
 
 ### Navigation
 
-navigation links use muted grey. text links are underlined. the homepage has one compact row of "things i've built", "email", "li", and "github", 20px below the last paragraph, aligned to the text block's left edge. desktop content sits six percent of the viewport height above center; mobile content sits at center vertically. all four links share a 16px visible gap. invisible hit areas stay at least 32px wide. the "li" link has an accessible name of "li (linkedin)". hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
+navigation links use muted grey. text links are underlined. the homepage has one compact row of "things i've built", "email", "linkedin", and "github", 16px below the last paragraph, with the link text vertically centered in a 32px hit area, aligned to the text block's left edge. desktop and mobile center the complete text-and-navigation block vertically. all four links share an 8px visible gap and wrap when enlarged text cannot fit. invisible hit areas stay at least 32px wide. the linkedin link uses its full name visibly and for assistive technology. hovered links turn a darker grey, while keyboard focus keeps a visible outline. links animate only their color over 220ms. reading pages disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
 
 ### Index Entries
 

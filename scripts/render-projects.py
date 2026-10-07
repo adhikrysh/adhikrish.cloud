@@ -162,7 +162,7 @@ for project in PROJECTS:
     head = head.replace("</style>", READING_CSS + "</style>")
     repository = f"https://github.com/adhikrysh/{slug}" if project.get("source_commit") else None
     external_url = repository or project.get("website")
-    external_label = "github" if repository else f"visit {slug}"
+    external_label = "github" if repository else project.get("website_label", f"visit {slug}")
     external_link = (f'      <a class="external" href="{html.escape(external_url, quote=True)}" '
                      f'target="_blank" rel="noopener noreferrer" '
                      f'aria-label="{external_label} (opens in a new tab)" '
