@@ -41,20 +41,18 @@
   }
   .reading { max-width: 680px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
-  nav a { color: #8a8a8a; font-size: 16px; }
+  nav a { color: #8a8a8a; font-size: 15px; }
   a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
   a:hover { color: #787878; }
   a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
   main, article { margin-top: 56px; }
   h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
   @media (max-width: 720px) {
-    body { padding-top: 32px; font-size: 16px; }
-    nav a { font-size: 15px; }
+    body { padding-top: 32px; }
     main, article { margin-top: 48px; }
   }
   @media (max-width: 360px) {
     body { padding-inline: 20px; }
-    nav a { font-size: 14px; }
   }
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
 
@@ -101,14 +99,13 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/command-journal/commit/187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
       </p>
       <div class="readme">
-<p>this c++ experiment asks what a ground-side command executor should
-do when it dies between sending a command and recording its result. the
-simulated payload is a register from 0 to 1023, so the persistence
-protocol stays visible.</p>
+<p>command-journal models a ground-side command executor that dies
+between sending a command and recording its result. the simulated
+payload is a register from 0 to 1023.</p>
 <p>a command is a compare-and-set operation. it has a sequence number,
 the sequence and value it expects to find, and the value it wants to
-write. those preconditions turn an old or duplicated command into a
-detectable conflict instead of a silent state change.</p>
+write. the payload checks those preconditions before applying a
+command.</p>
 <h2 id="the-durable-boundary">the durable boundary</h2>
 <p>the host first appends an <strong>accepted</strong> record to its own
 journal and calls <code>fsync</code>. only then may it dispatch the
@@ -126,22 +123,20 @@ commands log         |
  |&lt;------ durable ack|
  v
 complete + sync</code></pre>
-<p>that ordering prevents the dangerous gap where a payload changes
-state but the host has no durable record that it ever asked. recovery is
-finite: one command may be pending, and the payload may be only one
-durable command ahead.</p>
-<p>the key case is a lost acknowledgement. command 2 changes the
-register from 42 to 84, the payload syncs it, and the process exits
-before the host records completion. on restart, both histories are
-replayed before either file changes. the payload already stores the same
-sequence and command body, so recovery writes only the missing host
-completion. it does <strong>not</strong> send command 2 again.</p>
+<p>that ordering records the host's accepted command before the payload
+can change state. recovery has at most one pending command, and the
+payload may be at most one durable command ahead.</p>
+<p>in the lost-acknowledgement case, command 2 changes the register from
+42 to 84, the payload syncs it, and the process exits before the host
+records completion. on restart, both histories are replayed before
+either file changes. the payload already stores the same sequence and
+command body, so recovery writes the missing host completion without
+sending command 2 again.</p>
 <p>if the payload has not stored the accepted command, recovery checks
-the expected sequence and value before applying it. if either check
-fails, it stops rather than guessing. reusing a sequence number with
-different command content is also an error. these rules prevent an old
-command or a split-brain history from being mistaken for a safe
-retry.</p>
+the expected sequence and value before applying it. a failed check stops
+recovery. reusing a sequence number with different command content is
+also an error. these rules reject old commands and split-brain
+histories.</p>
 <h2 id="validating-the-journal">validating the journal</h2>
 <p>each frame has a magic and version, bounded length, typed payload,
 and crc32c checksum. accepted frames carry the full command; completion
@@ -155,20 +150,19 @@ open only reports it. a complete frame with a bad checksum, length,
 kind, or transition is rejected. the scanner never searches for a later
 magic marker, because skipping damaged bytes could also skip a real
 command.</p>
-<p>this is why recovery verifies <strong>both</strong> logs before
-repair. truncating one log first could destroy the evidence needed to
-decide whether the payload already acted. the same conservatism applies
-after an I/O failure: the executor becomes poisoned and rejects further
-calls. close it, reopen it, replay the durable histories, and recover
-from what actually reached disk.</p>
-<h2 id="concurrency-and-containment">concurrency and containment</h2>
+<p>recovery verifies <strong>both</strong> logs before repair.
+truncating one log first could remove the evidence needed to decide
+whether the payload already acted. after an I/O failure, the executor
+becomes poisoned and rejects further calls. close it, reopen it, replay
+the durable histories, and recover from what reached disk.</p>
+<h2 id="file-access">file access</h2>
 <p>the executor takes a non-blocking exclusive write lock and a shared
 inspection lock. it opens logs with <code>O_NOFOLLOW</code>, requires
 regular files, retries interrupted I/O, and caps each journal at 64 mib.
 these checks prevent competing writers, symlink redirects, shortened
 I/O, and unbounded replay memory.</p>
-<p>the payload log proves an effect; the host log preserves intent and
-completion. neither side infers the other from a transient
+<p>the payload log records an effect; the host log records intent and
+completion. recovery does not infer either one from a transient
 acknowledgement or process memory.</p>
 <h2 id="verification">verification</h2>
 <p>the test executable has five checks. it verifies the crc32c
@@ -195,14 +189,14 @@ journal_demo_dir=$(mktemp -d)
 <p>the crash exits 75. before recovery, the host is at sequence 1 while
 the payload is at sequence 2; after recovery, both are at sequence 2
 with value 84 and two payload applications total.</p>
-<p>this demonstrates exactly-once <em>recovery</em> only because the
+<p>this provides exactly-once <em>recovery</em> only because the
 simulated payload durably remembers command ids and command contents. it
 does not establish exactly-once control for a physical actuator that can
 lose that memory, act after power loss without recording the result, or
-have its own write cache lie about durability. the tests exercise
-process death, not sudden power removal or failed storage hardware.
-compaction is also absent, so the 64 mib journals are a bounded
-experiment rather than a long-running flight design.</p>
+have its own write cache report durability incorrectly. the tests
+exercise process death, not sudden power removal or failed storage
+hardware. compaction is absent, so the 64 mib journals bound this
+experiment and do not suit a long-running flight system.</p>
 <p>the <a
 href="https://github.com/adhikrysh/command-journal/blob/187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0/include/journal/executor.hpp"
 target="_blank" rel="noopener noreferrer">executor api</a>, <a
@@ -213,8 +207,8 @@ target="_blank" rel="noopener noreferrer">tests</a> describe the
 implementation at this project revision. JPL's <a
 href="https://fprime.jpl.nasa.gov/v4.3.0/Svc/CmdSequencer/docs/sdd/"
 target="_blank" rel="noopener noreferrer">F Prime command sequencer</a>
-is useful context for command validation and sequencing; this project is
-a separate persistence experiment.</p>
+covers command validation and sequencing; this project implements a
+separate persistence experiment.</p>
       </div>
     </main>
   </div>

@@ -2,9 +2,9 @@
 
 estimate a spacecraft's orientation through star-tracker outages while learning the gyroscope's persistent bias. a gyroscope measures rotation rate; a star tracker measures orientation from stars. integrating the gyro alone also integrates its bias, so even a small sensor offset becomes a growing pointing error.
 
-the engineering problem is keeping the estimated rotation and its uncertainty consistent. this filter represents orientation with a unit quaternion, learns bias alongside it, rejects implausible tracker readings, and moves the uncertainty into the correct coordinates after every accepted correction.
+the filter represents orientation with a unit quaternion, learns bias alongside it, rejects implausible tracker readings, and moves the uncertainty into the correct coordinates after every accepted correction.
 
-## two sensors, one evolving estimate
+## prediction and measurement updates
 
 the library keeps an orientation, a three-component bias estimate, and a covariance matrix describing uncertainty and the relationships between errors. gyro rates use radians per second; sample intervals use seconds. tracker uncertainty describes small angular errors in radians squared.
 
@@ -38,35 +38,35 @@ for each gyro sample, `propagate` subtracts the current bias estimate and integr
 
 when a tracker reading arrives, `observe` measures its angular disagreement with the prediction. it compares that residual with the combined prediction and measurement uncertainty. a rejected reading leaves orientation, bias, and covariance unchanged. an accepted reading corrects both orientation and bias.
 
-## represent uncertainty in the rotation's three degrees of freedom
+## orientation and error state
 
 a quaternion has four coefficients constrained to unit length, but a rotation has three degrees of freedom. the filter therefore keeps a six-component error state: three local rotation errors and three gyro-bias errors. it does not treat four quaternion coefficients as independent uncertain quantities.
 
-the rotation convention is explicit: a quaternion rotates body-frame vectors into the inertial frame, and body-rate increments multiply on the right. keeping that convention consistent across prediction, tracker residuals, and corrections prevents a filter that appears plausible while rotating errors in the wrong frame. [the public interface](include/attitude/filter.hpp) states these units and conventions.
+the rotation convention is explicit: a quaternion rotates body-frame vectors into the inertial frame, and body-rate increments multiply on the right. [the public interface](include/attitude/filter.hpp) states these units and conventions.
 
-## integrate noise over time, then reset its coordinates
+## prediction and covariance reset
 
 [the prediction implementation](src/filter.cpp#L28) uses a block-matrix exponential to integrate the linearized error dynamics and continuous noise over a constant-rate interval. bias uncertainty also contributes to attitude uncertainty and their cross-correlation. adding the same arbitrary noise matrix at every sample would make the result depend incorrectly on sampling frequency.
 
 the tracker update solves a factored linear system rather than forming a matrix inverse. a Joseph-form covariance update combines the prior uncertainty and measurement noise in a way that reduces numerical loss of symmetry and positive definiteness.
 
-there is one further step: applying an attitude correction changes the origin of the local error coordinates. the covariance must move with it. the implementation uses the rotation exponential's right Jacobian, the local map between these error coordinates, to reset the covariance, including its angle/bias cross terms. normalizing the corrected quaternion alone would leave the uncertainty in the old frame.
+applying an attitude correction changes the origin of the local error coordinates, so the covariance moves with it. the implementation uses the rotation exponential's right Jacobian, the local map between these error coordinates, to reset the covariance, including its angle/bias cross terms. normalizing the corrected quaternion alone leaves the uncertainty in the old frame.
 
 prediction and correction build and validate a complete candidate before changing the stored estimate. invalid measurements or a failed covariance factorization therefore cannot leave a partially updated filter. [the equations](docs/filter.md) explain the coordinate reset and noise integration.
 
-## what the experiment establishes
+## simulation results
 
 in the 300-second demonstration, tracker measurements disappear from 80 to 120 seconds, and one false observation arrives at 150 seconds. with seed 42, final attitude error is **0.089°**, compared with **18.57°** for gyro-only integration. the filter rejects the injected false reading. the plot records this controlled simulation, not a real sensor trial.
 
 ![Tracker outage experiment](docs/tracker-outage.png)
 
-[the tests](tests/test_filter.cpp) check more than the final error:
+[the tests](tests/test_filter.cpp) cover:
 
 - transition and covariance-reset Jacobians are compared with finite differences of independent quaternion rotations.
 - integrated process noise is checked against a closed-form zero-rate solution and two composed half steps.
 - 24 seeded simulations exercise bias estimation, tracker outages, false readings, quaternion sign flips, covariance symmetry, and positive definiteness.
 
-these checks can expose a wrong uncertainty model even when one trajectory happens to look accurate. the ensemble uncertainty check is a broad regression check, not a formal statistical consistency study.
+the ensemble uncertainty check is a broad regression check, not a formal statistical consistency study.
 
 ## build and reproduce
 

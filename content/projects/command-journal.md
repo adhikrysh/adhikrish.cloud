@@ -1,8 +1,8 @@
 # command-journal
 
-this c++ experiment asks what a ground-side command executor should do when it dies between sending a command and recording its result. the simulated payload is a register from 0 to 1023, so the persistence protocol stays visible.
+command-journal models a ground-side command executor that dies between sending a command and recording its result. the simulated payload is a register from 0 to 1023.
 
-a command is a compare-and-set operation. it has a sequence number, the sequence and value it expects to find, and the value it wants to write. those preconditions turn an old or duplicated command into a detectable conflict instead of a silent state change.
+a command is a compare-and-set operation. it has a sequence number, the sequence and value it expects to find, and the value it wants to write. the payload checks those preconditions before applying a command.
 
 ## the durable boundary
 
@@ -21,11 +21,11 @@ commands log         |
 complete + sync
 ```
 
-that ordering prevents the dangerous gap where a payload changes state but the host has no durable record that it ever asked. recovery is finite: one command may be pending, and the payload may be only one durable command ahead.
+that ordering records the host's accepted command before the payload can change state. recovery has at most one pending command, and the payload may be at most one durable command ahead.
 
-the key case is a lost acknowledgement. command 2 changes the register from 42 to 84, the payload syncs it, and the process exits before the host records completion. on restart, both histories are replayed before either file changes. the payload already stores the same sequence and command body, so recovery writes only the missing host completion. it does **not** send command 2 again.
+in the lost-acknowledgement case, command 2 changes the register from 42 to 84, the payload syncs it, and the process exits before the host records completion. on restart, both histories are replayed before either file changes. the payload already stores the same sequence and command body, so recovery writes the missing host completion without sending command 2 again.
 
-if the payload has not stored the accepted command, recovery checks the expected sequence and value before applying it. if either check fails, it stops rather than guessing. reusing a sequence number with different command content is also an error. these rules prevent an old command or a split-brain history from being mistaken for a safe retry.
+if the payload has not stored the accepted command, recovery checks the expected sequence and value before applying it. a failed check stops recovery. reusing a sequence number with different command content is also an error. these rules reject old commands and split-brain histories.
 
 ## validating the journal
 
@@ -33,13 +33,13 @@ each frame has a magic and version, bounded length, typed payload, and crc32c ch
 
 the scanner distinguishes an incomplete final tail from corruption. after both journals validate, a writable open truncates only the incomplete tail and syncs the repaired files and directory. a read-only open only reports it. a complete frame with a bad checksum, length, kind, or transition is rejected. the scanner never searches for a later magic marker, because skipping damaged bytes could also skip a real command.
 
-this is why recovery verifies **both** logs before repair. truncating one log first could destroy the evidence needed to decide whether the payload already acted. the same conservatism applies after an I/O failure: the executor becomes poisoned and rejects further calls. close it, reopen it, replay the durable histories, and recover from what actually reached disk.
+recovery verifies **both** logs before repair. truncating one log first could remove the evidence needed to decide whether the payload already acted. after an I/O failure, the executor becomes poisoned and rejects further calls. close it, reopen it, replay the durable histories, and recover from what reached disk.
 
-## concurrency and containment
+## file access
 
 the executor takes a non-blocking exclusive write lock and a shared inspection lock. it opens logs with `O_NOFOLLOW`, requires regular files, retries interrupted I/O, and caps each journal at 64 mib. these checks prevent competing writers, symlink redirects, shortened I/O, and unbounded replay memory.
 
-the payload log proves an effect; the host log preserves intent and completion. neither side infers the other from a transient acknowledgement or process memory.
+the payload log records an effect; the host log records intent and completion. recovery does not infer either one from a transient acknowledgement or process memory.
 
 ## verification
 
@@ -63,6 +63,6 @@ journal_demo_dir=$(mktemp -d)
 
 the crash exits 75. before recovery, the host is at sequence 1 while the payload is at sequence 2; after recovery, both are at sequence 2 with value 84 and two payload applications total.
 
-this demonstrates exactly-once *recovery* only because the simulated payload durably remembers command ids and command contents. it does not establish exactly-once control for a physical actuator that can lose that memory, act after power loss without recording the result, or have its own write cache lie about durability. the tests exercise process death, not sudden power removal or failed storage hardware. compaction is also absent, so the 64 mib journals are a bounded experiment rather than a long-running flight design.
+this provides exactly-once *recovery* only because the simulated payload durably remembers command ids and command contents. it does not establish exactly-once control for a physical actuator that can lose that memory, act after power loss without recording the result, or have its own write cache report durability incorrectly. the tests exercise process death, not sudden power removal or failed storage hardware. compaction is absent, so the 64 mib journals bound this experiment and do not suit a long-running flight system.
 
-the [executor api](include/journal/executor.hpp), [record format](docs/format.md), and [tests](tests/test_journal.cpp) describe the implementation at this project revision. JPL's [F Prime command sequencer](https://fprime.jpl.nasa.gov/v4.3.0/Svc/CmdSequencer/docs/sdd/) is useful context for command validation and sequencing; this project is a separate persistence experiment.
+the [executor api](include/journal/executor.hpp), [record format](docs/format.md), and [tests](tests/test_journal.cpp) describe the implementation at this project revision. JPL's [F Prime command sequencer](https://fprime.jpl.nasa.gov/v4.3.0/Svc/CmdSequencer/docs/sdd/) covers command validation and sequencing; this project implements a separate persistence experiment.

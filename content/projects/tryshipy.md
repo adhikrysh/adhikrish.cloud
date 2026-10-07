@@ -2,14 +2,12 @@
 
 [shipy](https://tryshipy.com) is an ai operating system for ship brokers. it turns private email and documents into source-backed commercial records and a workspace for reviewing evidence and moving deals forward.
 
-the hard part is keeping that workspace consistent while new emails arrive, attachments fail, model calls retry, and brokers act on earlier information. four decisions hold the pipeline together:
+- **evidence.** encrypted, versioned originals stay separate from the system's interpretation. derived records link to the exact source versions behind them.
+- **jobs.** postgres stores claims, progress, and completion. sqs wakes workers with identifiers; a repeated delivery converges on the same job.
+- **publication.** a worker must still own its claim and be working on the current source revision. late work cannot overwrite newer correspondence.
+- **reconciliation.** retries handle a delivery that fails. reconciliation finds pending work whose wake-up was lost, including a database commit followed by a failed queue publication.
 
-- **preserve the evidence.** encrypted, versioned originals stay separate from the system's interpretation. derived records link to the exact source versions behind them.
-- **make jobs durable.** postgres owns claims, progress, and completion. sqs wakes workers with identifiers; a repeated delivery converges on the same job.
-- **check versions before publishing.** a worker must still own its claim and be working on the current source revision. late work cannot overwrite newer correspondence.
-- **recover missing work.** retries handle a delivery that fails. reconciliation finds pending work whose wake-up was lost, including a database commit followed by a failed queue publication.
-
-the web app runs on cloudflare; aws runs processing and storage. clef handles relevance classification through workers ai, and fireworks handles deeper structured extraction. the boundaries below keep those services tied to one durable workflow.
+the web app runs on cloudflare; aws runs processing and storage. clef handles relevance classification through workers ai, and fireworks handles structured extraction.
 
 ## the app and the private backend
 
@@ -45,7 +43,7 @@ private source reads, upload controls, and the ask interface use iam-signed lamb
 
 ## an email through the processing system
 
-gmail and imap have separate synchronization adapters but feed a shared whole-thread processing path. a thread is the unit of interpretation, so a later reply can update the same conversation rather than becoming an unrelated record.
+gmail and imap have separate synchronization adapters but feed a shared whole-thread processing path. processing uses the whole thread; later replies update the interpretation of that conversation.
 
 ```text
 gmail / imap
@@ -89,9 +87,9 @@ for one incoming email, the capture worker preserves the original message and re
 
 the relevance lambda calls [clef](https://developers.cloudflare.com/workers-ai/models/clef-flash/) through an authenticated cloudflare worker gateway. clef returns class probabilities; shipy records the relevance decision. unrelated mail can stop before the more expensive extraction stage. the gateway exposes only the permitted models; the backend does not need a cloudflare account api token.
 
-relevant evidence goes to structured extraction through fireworks. the output must satisfy a schema and refer to the authorized sources. the system publishes an immutable knowledge version, then deterministic code projects its contents into broker-facing records. model output proposes an interpretation; code owns validation, publication, and product state.
+relevant evidence goes to structured extraction through fireworks. the output must satisfy a schema and refer to the authorized sources. the system publishes an immutable knowledge version, then deterministic code projects its contents into broker-facing records.
 
-## storage has two different jobs
+## storage
 
 **s3 preserves evidence and artifacts.** original emails, attachments, and uploads live in private, versioned buckets encrypted with aws key management service (kms). derived knowledge uses separate storage. records pin object versions and checksums, so an update cannot silently replace the bytes behind an earlier conclusion.
 
@@ -99,7 +97,7 @@ relevant evidence goes to structured extraction through fireworks. the output mu
 
 when a broker starts a deal, the system freezes the selected evidence versions. later correspondence can produce a new version and a new recap proposal without rewriting the basis of an earlier decision. authorization follows the evidence into the derived records and source viewer.
 
-## uploads take the direct path to s3
+## document uploads
 
 the app authorizes an upload and asks a lambda to create a short-lived upload intent. the browser sends the file directly to s3 using a presigned form. its conditions constrain the object, size, type, checksum, and encryption.
 
@@ -129,13 +127,13 @@ browser -------------> s3
 
 finalization verifies the stored object against the intent and pins its exact s3 version before creating the processing job. a scheduled lambda claims that job and reuses the attachment extraction and knowledge publication components. file bytes bypass the web app, while authorization and completion stay server-controlled.
 
-## scaling without losing control
+## queues and inference capacity
 
 capture, attachments, classification, extraction, and downstream work have separate queues and lambdas. each stage can have its own concurrency and retry policy. a slow inference service can build a backlog without occupying web requests or blocking unrelated attachment work. the knowledge queue uses fifo (first in, first out) groups per thread, keeping ordered work separate from unrelated threads.
 
 postgres claims and expiring leases decide who may process a job. repeated queue deliveries converge on the same durable work. stale revisions cannot overwrite newer results. bounded retries and dead-letter queues isolate persistent failures.
 
-database commits and queue publication are separate operations. a retry can recover a delivered message that failed, but it cannot recover a message that was never published. the scheduled reconciler scans saved state and republishes eligible unfinished work. it also discovers missed provider changes; provider checkpoints advance only after the work they cover is durable.
+database commits and queue publication are separate operations. if a commit succeeds and queue publication fails, the saved job has no wake-up message. the scheduled reconciler scans saved state and republishes eligible unfinished work. it also discovers missed provider changes; provider checkpoints advance only after the work they cover is durable.
 
 background fireworks calls share a capacity controller backed by dynamodb. workers reserve capacity before calling the provider, defer when the budget is busy, and back off when throttled. conditional updates prevent concurrent workers from spending the same budget. adding lambda concurrency alone does not increase database or model-provider capacity. those limits govern how fast the queues drain.
 
@@ -148,5 +146,3 @@ the request layer derives access from the authenticated user. an organization bo
 cloudwatch tracks queue age, dead-letter depth, function errors, and stalled work. structured logs connect stages through identifiers and error categories without recording source content or credentials.
 
 cloudformation defines the aws infrastructure. the web app and backend have separate releases, and backend rollout separates code and infrastructure, database migrations, consumer activation, and external inference activation. that separation keeps deploying code distinct from immediately starting expensive work against private evidence.
-
-the design keeps one relational authority for the workflow, durable object storage for its evidence, and independently paced workers for expensive processing. the system can grow by increasing the capacity of the stage that needs it while preserving the same ownership, versioning, and recovery rules.

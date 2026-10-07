@@ -1,6 +1,6 @@
 # orbit-access
 
-a ground-station pass is the result of two moving frames: a satellite propagated in an inertial frame, and a station fixed to a rotating, oblate earth. `orbit-access` keeps those concerns separate, then joins them at the elevation calculation. it asks a precise question: during this synthetic scenario, when is a satellite above this station's elevation mask?
+orbit-access propagates a satellite in an inertial frame and computes its elevation above a ground station on a rotating, oblate earth. it reports intervals above the station's elevation mask.
 
 ```text
 state at t0 (km, km/s)
@@ -22,7 +22,7 @@ the default CLI scenario starts with a circular orbit at a 7,000 km geocentric r
 
 ## a model with stated conventions
 
-the state is position in kilometres and velocity in kilometres per second. time is elapsed seconds. vectors live in a right-handed inertial frame whose positive z axis is earth's spin axis. library angles are radians; the CLI converts its latitude, longitude, and mask arguments from degrees. those conventions are part of the public API in [orbit.hpp](include/orbit/orbit.hpp), rather than assumptions hidden in a plotting script.
+the state is position in kilometres and velocity in kilometres per second. time is elapsed seconds. vectors live in a right-handed inertial frame whose positive z axis is earth's spin axis. library angles are radians; the CLI converts its latitude, longitude, and mask arguments from degrees. [orbit.hpp](include/orbit/orbit.hpp) defines these units and conventions.
 
 the force model combines central gravity with J2, the dominant correction for earth's equatorial bulge. its potential per unit mass is:
 
@@ -33,15 +33,19 @@ U = -mu/r [1 - J2/2 (R/r)^2
 
 `U` is potential energy per unit mass in km²/s², `J2` is a dimensionless coefficient, and `z` is the spin-axis component of position in km. `mu` is the gravitational parameter in km³/s², `R` is the reference radius in km, and `r` is the distance from earth's centre in km. [dynamics.cpp](src/dynamics.cpp) evaluates the matching acceleration directly. setting J2 to zero leaves the two-body model. with J2 enabled, the orbit plane precesses; energy and z angular momentum remain conserved, while the full angular-momentum vector does not. [numerics.md](docs/numerics.md) makes that distinction explicit because it determines which conservation check is valid.
 
-three choices make it more than a fixed-step demo.
+## propagation
 
-first, [dynamics.cpp](src/dynamics.cpp) uses Dormand-Prince 5(4), an adaptive Runge-Kutta method. each attempted step produces fifth- and fourth-order states; their scaled difference estimates local error. position and velocity have separate absolute tolerances because kilometres and kilometres per second have different scales: 1e-8 km, 1e-11 km/s, with 1e-11 relative tolerance. accepted steps can grow to 60 s; rejected steps shrink. the propagator either reaches the requested time or throws when its minimum step or work budget is exhausted. it never returns a partial trajectory as though it were complete.
+[dynamics.cpp](src/dynamics.cpp) uses Dormand-Prince 5(4), an adaptive Runge-Kutta method. each attempted step produces fifth- and fourth-order states; their scaled difference estimates local error. position and velocity have separate absolute tolerances because kilometres and kilometres per second have different scales: 1e-8 km, 1e-11 km/s, with 1e-11 relative tolerance. accepted steps can grow to 60 s; rejected steps shrink. the propagator either reaches the requested time or throws when its minimum step or work budget is exhausted. it does not return a partial trajectory as a complete one.
 
-second, [access.cpp](src/access.cpp) uses WGS84 geodetic coordinates for the station, not a spherical-earth shortcut. the station's local vertical is the ellipsoid normal, which generally differs from its centre-to-station direction. the code rotates that position and normal into the inertial frame with an explicit Greenwich angle and a constant 7.2921150e-5 rad/s earth rotation rate. elevation is then the angle between the station-to-satellite line of sight and that local vertical.
+## station geometry
 
-third, the pass finder distinguishes finding an event from merely sampling a line. it samples elevation every 10 s by default. when a sample pair changes visibility, it brackets the crossing and bisects it, propagating from the same left endpoint at each midpoint instead of interpolating elevation. the default root tolerance is 1e-5 s. pass records retain `clipped_at_start` and `clipped_at_end` when the search begins or ends inside a visible window. a crossing precision does not prove complete detection: a shorter grazing pass can fall entirely between samples, and a tangency without an above-mask interval is intentionally omitted.
+[access.cpp](src/access.cpp) uses WGS84 geodetic coordinates for the station. the station's local vertical is the ellipsoid normal, which generally differs from its centre-to-station direction. the code rotates that position and normal into the inertial frame with an explicit Greenwich angle and a constant 7.2921150e-5 rad/s earth rotation rate. elevation is then the angle between the station-to-satellite line of sight and that local vertical.
 
-## checks that test independent properties
+## pass boundaries
+
+the pass finder samples elevation every 10 s by default. when a sample pair changes visibility, it brackets the crossing and bisects it, propagating from the same left endpoint at each midpoint instead of interpolating elevation. the default root tolerance is 1e-5 s. pass records retain `clipped_at_start` and `clipped_at_end` when the search begins or ends inside a visible window. a crossing precision does not prove complete detection: a shorter grazing pass can fall entirely between samples, and a tangency without an above-mask interval is intentionally omitted.
+
+## numerical checks
 
 the test executable passes seven named checks locally. [test_orbit.cpp](tests/test_orbit.cpp) compares 150 elliptic, forward and backward two-body propagations with an independent Kepler-equation solver, requiring position error below 0.5 m and velocity error below 0.5 mm/s. it also checks long-run conservation, the J2 acceleration against a centred potential gradient, and node-drift sign and scale against first-order secular theory within a 1% envelope.
 
@@ -62,4 +66,4 @@ ctest --test-dir build --output-on-failure
 
 the first command writes one day of states at 60-second intervals. the second searches passes above a 10-degree mask. append `x y z vx vy vz` to provide another initial state, in kilometres and kilometres per second; use `two-body` to disable J2. reproduce the figure with Matplotlib and NumPy using `python examples/plot.py`.
 
-this is deliberately a controlled simulator. time zero uses a caller-defined earth orientation; the CLI uses zero Greenwich angle and station height. it has no UTC conversion, precession, nutation, polar motion, drag, lunar or solar gravity, atmospheric refraction, impact detection, or event-completeness guarantee. it is appropriate for inspecting numerical and geometric assumptions, not operational contact prediction.
+time zero uses a caller-defined earth orientation; the CLI uses zero Greenwich angle and station height. it has no UTC conversion, precession, nutation, polar motion, drag, lunar or solar gravity, atmospheric refraction, impact detection, or event-completeness guarantee. it is appropriate for inspecting numerical and geometric assumptions, not operational contact prediction.

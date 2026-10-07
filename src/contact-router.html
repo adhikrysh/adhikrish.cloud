@@ -41,20 +41,18 @@
   }
   .reading { max-width: 680px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
-  nav a { color: #8a8a8a; font-size: 16px; }
+  nav a { color: #8a8a8a; font-size: 15px; }
   a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
   a:hover { color: #787878; }
   a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
   main, article { margin-top: 56px; }
   h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
   @media (max-width: 720px) {
-    body { padding-top: 32px; font-size: 16px; }
-    nav a { font-size: 15px; }
+    body { padding-top: 32px; }
     main, article { margin-top: 48px; }
   }
   @media (max-width: 360px) {
     body { padding-inline: 20px; }
-    nav a { font-size: 14px; }
   }
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
 
@@ -103,11 +101,10 @@
       <div class="readme">
 <p>contact-router is a small C++20 planner for a network whose links
 appear only during scheduled contact windows. it routes a whole bundle,
-a unit of data, across those windows and reserves the actual
-transmission time on each link. this matters for spacecraft networks: a
-link can have enough aggregate capacity and still be unusable because
-the bundle, contact window, or shared radio is unavailable at the needed
-instant.</p>
+a unit of data, across those windows and reserves transmission time on
+each link. in a spacecraft network, aggregate link capacity is
+insufficient when the bundle, contact window, or shared radio is
+unavailable at the required time.</p>
 <p>a route is a sequence of stored bundles, waits, transmissions, and
 propagation delays. the planner models all four explicitly.</p>
 <pre class="text"><code>bundle released
@@ -139,13 +136,12 @@ propagation delay and continues from the receiving node. arrival exactly
 at the bundle expiry is allowed; completing a transmission exactly at a
 contact closing time is also allowed.</p>
 <p>earlier arrival at a node dominates a later one under this model.
-storage is unlimited, waiting is free, and a bundle can always wait for
-the next contact. each resource calendar is scanned in time order and
-uses the first gap that fits, so arriving earlier cannot remove an
-option that arriving later would create. those assumptions are
-load-bearing. add buffer limits, energy cost, congestion pricing, or a
-different service discipline and the one-label earliest-arrival search
-is no longer enough.</p>
+storage is unlimited, waiting is free, and a bundle can wait for the
+next contact. each resource calendar is scanned in time order and uses
+the first gap that fits, so arriving earlier cannot remove an option
+that arriving later would create. buffer limits, energy cost, congestion
+pricing, or a different service discipline can invalidate this one-label
+search.</p>
 <p>the implementation uses integer microseconds throughout. transmission
 duration is <code>ceil(bytes * 1,000,000 / rate)</code> without
 floating-point rounding. it divides into whole seconds and a remainder
@@ -154,11 +150,12 @@ every addition that could exceed the signed time range is checked. a
 contact that would overflow, miss its window, or arrive after expiry is
 not a candidate.</p>
 <p>the search has a configurable contact-examination budget. when it
-reaches that budget, it returns <code>search_limit</code> instead of
-pretending that no route exists. contacts are sorted by ID before
-search, and an equal-arrival label never replaces the existing one.
-together with the CLI's bundle order, that makes ties deterministic even
-if the input rows arrive in a different order.</p>
+reaches that budget, it returns <code>search_limit</code>. a budget stop
+and a completed search with no feasible route have distinct results.
+contacts are sorted by ID before search, and an equal-arrival label
+never replaces the existing one. together with the CLI's bundle order,
+that makes ties deterministic even if the input rows arrive in a
+different order.</p>
 <h2 id="reserve-only-a-complete-route">reserve only a complete
 route</h2>
 <p>searching does not mutate a calendar. after a complete path is found,
@@ -167,33 +164,30 @@ booking, sorts each calendar, records the route, and swaps the copies
 into place. a failed search, a deadline miss, or a search-budget stop
 consumes no capacity. an allocation failure during a later hop also
 leaves the prior plan untouched.</p>
-<p>this is a correctness-first atomic commit and rollback design. <a
+<p><a
 href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/include/contact/router.hpp"
 target="_blank"
 rel="noopener noreferrer"><code>Router::release</code></a> removes a
 planned route's bookings, and a contact cannot be disabled while a
-reservation still uses it. release is planning rollback only: it does
-not claim to undo a transmission that already happened.</p>
-<p>copying the full calendars makes the commit easy to reason about, but
-it costs work proportional to existing bookings on every successful
-reservation. for a much larger plan, a transaction over only the
-affected intervals would be the better data structure.</p>
-<h2 id="one-example-then-the-batch-policy">one example, then the batch
-policy</h2>
+reservation still uses it. release removes planning state only; it
+cannot undo a transmission that already happened.</p>
+<p>copying the full calendars costs work proportional to existing
+bookings on every successful reservation. for large plans, updating only
+the affected intervals would avoid copying the full state.</p>
+<h2 id="example-and-batch-scheduling">example and batch scheduling</h2>
 <p>in the included lunar example, health data has higher priority and
 takes the direct contact. it arrives at 6.3 seconds and holds the lunar
 transmitter from 0 to 5 seconds. the science bundle cannot fit in the
 remaining part of the first relay contact, so it waits for the later
 contact, crosses the relay, and arrives at 44.3 seconds. the image
-bundles have no feasible route after those earlier bookings.</p>
+bundles have no feasible route after those bookings.</p>
 <p>the CLI orders a batch by release time, descending priority, earliest
 expiry, then bundle ID. for each bundle it finds the earliest-arrival
-route given reservations already made. that is a clear, predictable
-scheduling policy, but it is greedy: it does not optimize the whole
-batch for throughput, fairness, or total lateness. a per-bundle optimum
-can block a later bundle whose alternative would have been cheaper.
-choosing a globally optimal batch schedule would require a different
-objective and a joint optimization problem.</p>
+route given reservations already made. this greedy policy does not
+optimize the whole batch for throughput, fairness, or total lateness. a
+per-bundle optimum can block a later bundle whose alternative would have
+been cheaper. global batch scheduling needs a different objective and
+joint optimization.</p>
 <h2 id="build-and-run">build and run</h2>
 <p>requires C++20 and CMake 3.20+. it has no runtime dependencies.</p>
 <pre class="sh"><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -215,15 +209,15 @@ expired-image,no_route,,,</code></pre>
 <p><a
 href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/tests/test_router.cpp"
 target="_blank" rel="noopener noreferrer">the test executable</a>
-compares 2,800 reservations against an independent exhaustive
-simple-path search with a microsecond-by-microsecond slot scan. it also
-exercises waiting, shared-transmitter conflicts, expiry and propagation
+compares 2,800 reservations with an independent exhaustive simple-path
+search and a microsecond-by-microsecond slot scan. it also exercises
+waiting, shared-transmitter conflicts, expiry and propagation
 boundaries, release and contact outages, integer overflow, search
 limits, and deterministic input permutations. <code>ctest</code> runs
 this as one test target.</p>
 <p>there is no fragmentation, receiver-conflict model, buffer limit,
 retransmission, uncertain contact time, or full half-duplex radio model.
-a shared resource is one transmitter calendar. this is a planning
+a shared resource is one transmitter calendar. it is a planning
 simulator, not a Bundle Protocol implementation.</p>
 <p>the API is <a
 href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/include/contact/router.hpp"

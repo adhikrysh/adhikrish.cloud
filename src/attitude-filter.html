@@ -41,20 +41,18 @@
   }
   .reading { max-width: 680px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
-  nav a { color: #8a8a8a; font-size: 16px; }
+  nav a { color: #8a8a8a; font-size: 15px; }
   a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
   a:hover { color: #787878; }
   a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
   main, article { margin-top: 56px; }
   h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
   @media (max-width: 720px) {
-    body { padding-top: 32px; font-size: 16px; }
-    nav a { font-size: 15px; }
+    body { padding-top: 32px; }
     main, article { margin-top: 48px; }
   }
   @media (max-width: 360px) {
     body { padding-inline: 20px; }
-    nav a { font-size: 14px; }
   }
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
 
@@ -106,13 +104,12 @@ while learning the gyroscope's persistent bias. a gyroscope measures
 rotation rate; a star tracker measures orientation from stars.
 integrating the gyro alone also integrates its bias, so even a small
 sensor offset becomes a growing pointing error.</p>
-<p>the engineering problem is keeping the estimated rotation and its
-uncertainty consistent. this filter represents orientation with a unit
-quaternion, learns bias alongside it, rejects implausible tracker
-readings, and moves the uncertainty into the correct coordinates after
-every accepted correction.</p>
-<h2 id="two-sensors-one-evolving-estimate">two sensors, one evolving
-estimate</h2>
+<p>the filter represents orientation with a unit quaternion, learns bias
+alongside it, rejects implausible tracker readings, and moves the
+uncertainty into the correct coordinates after every accepted
+correction.</p>
+<h2 id="prediction-and-measurement-updates">prediction and measurement
+updates</h2>
 <p>the library keeps an orientation, a three-component bias estimate,
 and a covariance matrix describing uncertainty and the relationships
 between errors. gyro rates use radians per second; sample intervals use
@@ -151,9 +148,7 @@ angular disagreement with the prediction. it compares that residual with
 the combined prediction and measurement uncertainty. a rejected reading
 leaves orientation, bias, and covariance unchanged. an accepted reading
 corrects both orientation and bias.</p>
-<h2
-id="represent-uncertainty-in-the-rotations-three-degrees-of-freedom">represent
-uncertainty in the rotation's three degrees of freedom</h2>
+<h2 id="orientation-and-error-state">orientation and error state</h2>
 <p>a quaternion has four coefficients constrained to unit length, but a
 rotation has three degrees of freedom. the filter therefore keeps a
 six-component error state: three local rotation errors and three
@@ -161,14 +156,12 @@ gyro-bias errors. it does not treat four quaternion coefficients as
 independent uncertain quantities.</p>
 <p>the rotation convention is explicit: a quaternion rotates body-frame
 vectors into the inertial frame, and body-rate increments multiply on
-the right. keeping that convention consistent across prediction, tracker
-residuals, and corrections prevents a filter that appears plausible
-while rotating errors in the wrong frame. <a
+the right. <a
 href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/include/attitude/filter.hpp"
 target="_blank" rel="noopener noreferrer">the public interface</a>
 states these units and conventions.</p>
-<h2 id="integrate-noise-over-time-then-reset-its-coordinates">integrate
-noise over time, then reset its coordinates</h2>
+<h2 id="prediction-and-covariance-reset">prediction and covariance
+reset</h2>
 <p><a
 href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/src/filter.cpp#L28"
 target="_blank" rel="noopener noreferrer">the prediction
@@ -182,12 +175,12 @@ frequency.</p>
 forming a matrix inverse. a Joseph-form covariance update combines the
 prior uncertainty and measurement noise in a way that reduces numerical
 loss of symmetry and positive definiteness.</p>
-<p>there is one further step: applying an attitude correction changes
-the origin of the local error coordinates. the covariance must move with
-it. the implementation uses the rotation exponential's right Jacobian,
-the local map between these error coordinates, to reset the covariance,
-including its angle/bias cross terms. normalizing the corrected
-quaternion alone would leave the uncertainty in the old frame.</p>
+<p>applying an attitude correction changes the origin of the local error
+coordinates, so the covariance moves with it. the implementation uses
+the rotation exponential's right Jacobian, the local map between these
+error coordinates, to reset the covariance, including its angle/bias
+cross terms. normalizing the corrected quaternion alone leaves the
+uncertainty in the old frame.</p>
 <p>prediction and correction build and validate a complete candidate
 before changing the stored estimate. invalid measurements or a failed
 covariance factorization therefore cannot leave a partially updated
@@ -195,8 +188,7 @@ filter. <a
 href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/docs/filter.md"
 target="_blank" rel="noopener noreferrer">the equations</a> explain the
 coordinate reset and noise integration.</p>
-<h2 id="what-the-experiment-establishes">what the experiment
-establishes</h2>
+<h2 id="simulation-results">simulation results</h2>
 <p>in the 300-second demonstration, tracker measurements disappear from
 80 to 120 seconds, and one false observation arrives at 150 seconds.
 with seed 42, final attitude error is <strong>0.089°</strong>, compared
@@ -208,8 +200,7 @@ loading="eager" decoding="async" fetchpriority="high" width="1440"
 height="1040" alt="Tracker outage experiment" /></picture></p>
 <p><a
 href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/tests/test_filter.cpp"
-target="_blank" rel="noopener noreferrer">the tests</a> check more than
-the final error:</p>
+target="_blank" rel="noopener noreferrer">the tests</a> cover:</p>
 <ul>
 <li>transition and covariance-reset Jacobians are compared with finite
 differences of independent quaternion rotations.</li>
@@ -219,9 +210,8 @@ solution and two composed half steps.</li>
 false readings, quaternion sign flips, covariance symmetry, and positive
 definiteness.</li>
 </ul>
-<p>these checks can expose a wrong uncertainty model even when one
-trajectory happens to look accurate. the ensemble uncertainty check is a
-broad regression check, not a formal statistical consistency study.</p>
+<p>the ensemble uncertainty check is a broad regression check, not a
+formal statistical consistency study.</p>
 <h2 id="build-and-reproduce">build and reproduce</h2>
 <p>requires C++20, CMake 3.20+, and Eigen. install Eigen with
 <code>brew install eigen</code> on macOS or
