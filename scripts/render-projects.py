@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the checked-in project readmes. Requires Python 3 and Pandoc."""
+"""Render checked-in readmes and public write-ups. Requires Python 3 and Pandoc."""
 
 import html
 import json
@@ -12,10 +12,12 @@ from urllib.parse import urljoin, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = json.loads((ROOT / "content/projects.json").read_text())
+GROUPS = [("spacecraft-simulations", "spacecraft simulations"), ("others", "others")]
+INDEX_DESCRIPTION = "spacecraft simulations and other things i've built."
 READING_CSS = """
   nav { flex-wrap: wrap; }
-  nav .github { margin-left: auto; }
-  .project h1 { font-size: 28px; }
+  nav .external { margin-left: auto; }
+  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
   .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
   .project-meta a { color: inherit; }
   .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
@@ -77,6 +79,8 @@ def prepare_ast(node, project, image_state):
                 if first_image:
                     attributes[2].append(["fetchpriority", "high"])
             elif not urlsplit(url).scheme and not url.startswith("#"):
+                if not project.get("source_commit"):
+                    raise ValueError(f"relative link requires a source commit: {url}")
                 base = (f"https://github.com/adhikrysh/{project['slug']}/"
                         f"blob/{project['source_commit']}/")
                 target[0] = urljoin(base, url)
@@ -93,19 +97,38 @@ def prepare_ast(node, project, image_state):
 
 index_path = ROOT / "projects.html"
 index = index_path.read_text()
-items = []
-for project in sorted(PROJECTS, key=lambda p: p["date"], reverse=True):
-    slug = project["slug"]
-    items.append(f'''        <li>
-          <a href="/projects/{slug}"><span>{slug}</span><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
-          <p>{html.escape(project['description'])}</p>
-        </li>''')
-index = re.sub(
-    r'(<ul class="project-list" aria-label="projects, newest first">).*?(\s*</ul>)',
-    lambda match: match[1] + "\n" + "\n".join(items) + match[2],
+if any(project["group"] not in dict(GROUPS) for project in PROJECTS):
+    raise ValueError("unknown project group")
+sections = []
+for group, label in GROUPS:
+    items = []
+    projects = sorted((p for p in PROJECTS if p["group"] == group),
+                      key=lambda p: p.get("date", ""), reverse=True)
+    for project in projects:
+        slug = project["slug"]
+        title = html.escape(project.get("title", slug))
+        timestamp = (f'<time datetime="{project["date"]}">{readable_date(project["date"])}</time>'
+                     if project.get("date") else "")
+        items.append(f'''            <li>
+              <a href="/src/{slug}"><span>{title}</span>{timestamp}</a>
+              <p>{html.escape(project['description'])}</p>
+            </li>''')
+    sections.append(f'''        <section class="project-group" aria-labelledby="{group}">
+          <h2 id="{group}">{label}</h2>
+          <ul class="project-list" aria-label="{label}">
+{chr(10).join(items)}
+          </ul>
+        </section>''')
+index, count = re.subn(
+    r'<!-- project-index:start -->.*?<!-- project-index:end -->',
+    lambda _: '<!-- project-index:start -->\n      <div class="project-index">\n'
+    + "\n".join(sections) + '\n      </div>\n      <!-- project-index:end -->',
     index, flags=re.DOTALL,
 )
+if count != 1:
+    raise ValueError("project index must have exactly one pair of markers")
 index_path.write_text(index)
+(ROOT / "src.html").write_text(index)
 
 for project in PROJECTS:
     slug = project["slug"]
@@ -127,37 +150,49 @@ for project in PROJECTS:
                 f'type="image/webp">{match[1]}</picture>')
     body = re.sub(r'(<img src="([^"]+)"[^>]*>)', picture, body)
     head = index.split("</head>")[0]
-    head = re.sub(r'^  \.project-list[^\n]*\n', '', head, flags=re.MULTILINE)
-    head = head.replace("projects | adhikrish rk", f"{slug} | adhikrish rk")
-    head = head.replace("personal projects in spacecraft simulation and developer tools.",
+    head = re.sub(r'^  \.(?:project-list|project-index|project-group)[^\n]*\n',
+                  '', head, flags=re.MULTILINE)
+    title = html.escape(project.get("title", slug))
+    head = head.replace("things i've built | adhikrish rk", f"{title} | adhikrish rk")
+    head = head.replace(INDEX_DESCRIPTION,
                         html.escape(project["description"], quote=True))
     head = head.replace('content="website"', 'content="article"')
-    head = head.replace('href="https://adhikrish.cloud/projects"',
-                        f'href="https://adhikrish.cloud/projects/{slug}"')
+    head = head.replace('href="https://adhikrish.cloud/src"',
+                        f'href="https://adhikrish.cloud/src/{slug}"')
     head = head.replace("</style>", READING_CSS + "</style>")
-    repository = f"https://github.com/adhikrysh/{slug}"
+    repository = f"https://github.com/adhikrysh/{slug}" if project.get("source_commit") else None
+    external_url = repository or project.get("website")
+    external_label = "github" if repository else f"visit {slug}"
+    external_link = (f'      <a class="external" href="{html.escape(external_url, quote=True)}" '
+                     f'target="_blank" rel="noopener noreferrer" '
+                     f'aria-label="{external_label} (opens in a new tab)" '
+                     f'title="opens in a new tab">{external_label}</a>' if external_url else "")
+    metadata = ""
+    if project.get("date"):
+        metadata = f'''      <p class="project-meta">
+        <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
+        <span class="last-edited">last edited <a href="{repository}/commit/{project['source_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['edited_date']}">{readable_date(project['edited_date'])}</time></a></span>
+      </p>
+'''
     page = head + f'''</head>
 <body>
   <div class="reading">
     <nav aria-label="site">
       <a href="/">home</a>
-      <a href="/projects">projects</a>
-      <a class="github" href="{repository}" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
+      <a href="/src">things i've built</a>
+{external_link}
     </nav>
     <main class="project">
-      <h1>{slug}</h1>
-      <p class="project-meta">
-        <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
-        <span class="last-edited">last edited <a href="{repository}/commit/{project['source_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['edited_date']}">{readable_date(project['edited_date'])}</time></a></span>
-      </p>
-      <div class="readme">
+      <h1>{title}</h1>
+{metadata}      <div class="readme">
 {body}      </div>
     </main>
   </div>
 </body>
 </html>
 '''
-    output = ROOT / "projects" / f"{slug}.html"
-    output.parent.mkdir(exist_ok=True)
-    output.write_text(page)
-    print(f"rendered {output.relative_to(ROOT)}")
+    for directory in ("src", "projects"):
+        output = ROOT / directory / f"{slug}.html"
+        output.parent.mkdir(exist_ok=True)
+        output.write_text(page)
+    print(f"rendered src/{slug}.html")

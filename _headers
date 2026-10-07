@@ -20,11 +20,11 @@
   Cache-Control: public, max-age=300, must-revalidate
   Link: </assets/inter-latin-c940764593d0.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin
 
-/projects
+/src
   Cache-Control: public, max-age=300, must-revalidate
   Link: </assets/inter-latin-c940764593d0.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin
 
-/projects/*
+/src/*
   Cache-Control: public, max-age=300, must-revalidate
   Link: </assets/inter-latin-c940764593d0.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin
 

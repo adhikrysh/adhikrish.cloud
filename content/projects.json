@@ -1,6 +1,7 @@
 [
   {
     "slug": "command-journal",
+    "group": "spacecraft-simulations",
     "date": "2026-02-02",
     "first_commit": "f93e5b433147978b89375e71301729ad4440f4b6",
     "source_commit": "187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0",
@@ -10,6 +11,7 @@
   },
   {
     "slug": "contact-router",
+    "group": "spacecraft-simulations",
     "date": "2026-01-19",
     "first_commit": "a5c12aba7ae50f46754dcf98396db753f5873baa",
     "source_commit": "eb4dbd7567dc2e57caaecd2f091b320bb8939863",
@@ -24,6 +26,7 @@
   },
   {
     "slug": "attitude-filter",
+    "group": "spacecraft-simulations",
     "date": "2026-01-04",
     "first_commit": "a0c5cfd90e96220ef4f196d753bd88e894dd9303",
     "source_commit": "a811cc6fa58efe89f2c2d69df350f3a68ddc459e",
@@ -38,6 +41,7 @@
   },
   {
     "slug": "orbit-access",
+    "group": "spacecraft-simulations",
     "date": "2025-12-13",
     "first_commit": "fb4249be8b22a8169d055c4ed4d8c62798e4a5c3",
     "source_commit": "51b7470c15b64295bea9514f0f2f439708df2966",
@@ -51,12 +55,11 @@
     }
   },
   {
-    "slug": "agent-squad",
-    "date": "2026-07-28",
-    "first_commit": "145b2baa31065b6ae8724bde588c3f4f461ab883",
-    "source_commit": "39a9f9c4f271e853e5298f93ae4bface8e8a9f7a",
-    "description": "track coding-agent sessions and jump to the terminal that needs you.",
-    "images": {},
-    "edited_date": "2026-08-03"
+    "slug": "tryshipy",
+    "title": "tryshipy (revenue generating)",
+    "group": "others",
+    "description": "turn a ship broker's emails and documents into knowledge, suggested matches, and deal drafts.",
+    "website": "https://tryshipy.com",
+    "images": {}
   }
 ]

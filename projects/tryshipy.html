@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tryshipy (revenue generating) | adhikrish rk</title>
+<meta name="description" content="turn a ship broker&#x27;s emails and documents into knowledge, suggested matches, and deal drafts.">
+<meta property="og:title" content="tryshipy (revenue generating) | adhikrish rk">
+<meta property="og:description" content="turn a ship broker&#x27;s emails and documents into knowledge, suggested matches, and deal drafts.">
+<meta property="og:image" content="https://adhikrish.cloud/og.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://adhikrish.cloud/og.png">
+<meta name="theme-color" content="#080807">
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-7330e902055f.png">
+<link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://adhikrish.cloud/src/tryshipy">
+<style>
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: rgba(255, 100, 0, 0.25); }
+  body {
+    background: #080807;
+    color: #d8d4c8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    letter-spacing: -0.012em;
+    padding: 40px 28px 80px;
+  }
+  .reading { max-width: 680px; margin-inline: auto; }
+  nav { display: flex; gap: 18px; }
+  nav a { color: #8a8a8a; font-size: 16px; }
+  a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
+  a:hover { color: #787878; }
+  a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
+  main, article { margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  @media (max-width: 720px) {
+    body { padding-top: 32px; font-size: 16px; }
+    nav a { font-size: 15px; }
+    main, article { margin-top: 48px; }
+  }
+  @media (max-width: 360px) {
+    body { padding-inline: 20px; }
+    nav a { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+
+  nav { flex-wrap: wrap; }
+  nav .external { margin-left: auto; }
+  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  .project-meta a { color: inherit; }
+  .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
+  .readme { margin-top: 40px; line-height: 1.8; }
+  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme > :first-child { margin-top: 0; }
+  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
+  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
+  .readme ul, .readme ol { padding-left: 24px; }
+  .readme li + li { margin-top: 8px; }
+  .readme a { color: inherit; overflow-wrap: anywhere; }
+  .readme a:hover, .project-meta a:hover { color: #787878; }
+  .readme strong { font-weight: 550; }
+  .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; }
+  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme pre code { font-size: inherit; }
+  .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
+  .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
+  .readme figure { margin-block: 32px; }
+  .readme picture { display: block; }
+  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="reading">
+    <nav aria-label="site">
+      <a href="/">home</a>
+      <a href="/src">things i've built</a>
+      <a class="external" href="https://tryshipy.com" target="_blank" rel="noopener noreferrer" aria-label="visit tryshipy (opens in a new tab)" title="opens in a new tab">visit tryshipy</a>
+    </nav>
+    <main class="project">
+      <h1>tryshipy (revenue generating)</h1>
+      <div class="readme">
+<p><a href="https://tryshipy.com" target="_blank"
+rel="noopener noreferrer">tryshipy</a> is a system for ship brokers. it
+brings emails and uploaded documents into one workflow: understand the
+information, find relevant opportunities, and help the broker move a
+deal forward.</p>
+<p>a ship sale can involve a buyer's requirements, several seller
+offers, vessel documents, and changing terms spread across
+conversations. the system connects those pieces while keeping each
+conclusion tied to its original source.</p>
+<h2 id="the-overall-design">the overall design</h2>
+<pre class="text"><code>email + uploaded documents
+            |
+            v
+         capture
+            |
+            +--&gt; originals
+            |
+            v
+    background processing
+            |
+            v
+    structured knowledge
+            |
+            v
+     suggested matches
+            |
+            v
+       broker review
+            |
+            v
+     deal + recap draft</code></pre>
+<p>capture preserves the original email or file. background workers read
+the conversation and its attachments, then build records of vessels,
+buyer requirements, and seller offers. matching uses those records to
+suggest opportunities. a broker chooses whether to start a deal. the
+system can then draft a recap, a summary of the proposed deal terms, for
+the broker to review.</p>
+<h2 id="keep-the-app-separate-from-processing">keep the app separate
+from processing</h2>
+<p>reading a dashboard and processing a long conversation have different
+needs. the app handles sign-in, access checks, saved results, and broker
+actions. slower work runs in the background, so a document or analysis
+job does not need to finish inside a browser request.</p>
+<pre class="text"><code>broker &lt;-&gt; web app
+              |
+              v
+        access checks
+          /       \
+         v         v
+   saved results  job queue
+                      |
+                      v
+originals -------&gt; workers
+                      |
+                      v
+                updated records</code></pre>
+<p>the saved workflow state records what has finished and what remains.
+a queue tells workers which work to attempt. separating those roles lets
+a failed attempt be retried without treating the queue itself as the
+record of completed work.</p>
+<h2 id="preserve-evidence-as-information-changes">preserve evidence as
+information changes</h2>
+<p>the original evidence and the system's interpretation are separate
+records. a new email can change a vessel's details, an offer, or a
+buyer's requirements. the system can update its interpretation while
+retaining the original sources and their versions.</p>
+<pre class="text"><code>original email or document
+            |
+            v
+     knowledge version
+            |
+            v
+      match assessment
+            |
+            v
+    selected deal evidence
+            |
+            v
+     broker-reviewed recap</code></pre>
+<p>when a broker starts a deal, the selected evidence is captured for
+that decision. later information can prompt a review without silently
+replacing the basis of the original choice. a recap draft carries
+references back to the evidence used to write it.</p>
+<h2 id="make-failures-visible">make failures visible</h2>
+<p>external services, files, and analysis can fail independently.
+background stages record their progress, retry recoverable failures, and
+expose work that needs attention. a missing attachment or failed
+analysis stays visible instead of being treated as a completed
+result.</p>
+<p>this also matters when the same work arrives again. workers check
+durable state and the source version before publishing results, rather
+than assuming that every delivery represents new information.</p>
+<h2 id="keep-access-and-decisions-explicit">keep access and decisions
+explicit</h2>
+<p>access checks follow the source information into the records derived
+from it. keeping companies separate is only part of the boundary;
+private mailbox evidence also needs its own authorization.</p>
+<p>the system proposes matches and drafts terms. the broker starts the
+deal, reviews the evidence, and decides which commercial terms to use or
+share. analysis supports a commercial decision; it does not give the
+system authority to make that decision on the broker's behalf.</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

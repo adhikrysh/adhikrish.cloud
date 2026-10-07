@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>command-journal | adhikrish rk</title>
+<meta name="description" content="recover simulated spacecraft payload commands after a crash.">
+<meta property="og:title" content="command-journal | adhikrish rk">
+<meta property="og:description" content="recover simulated spacecraft payload commands after a crash.">
+<meta property="og:image" content="https://adhikrish.cloud/og.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://adhikrish.cloud/og.png">
+<meta name="theme-color" content="#080807">
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-7330e902055f.png">
+<link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://adhikrish.cloud/src/command-journal">
+<style>
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: rgba(255, 100, 0, 0.25); }
+  body {
+    background: #080807;
+    color: #d8d4c8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    letter-spacing: -0.012em;
+    padding: 40px 28px 80px;
+  }
+  .reading { max-width: 680px; margin-inline: auto; }
+  nav { display: flex; gap: 18px; }
+  nav a { color: #8a8a8a; font-size: 16px; }
+  a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
+  a:hover { color: #787878; }
+  a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
+  main, article { margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  @media (max-width: 720px) {
+    body { padding-top: 32px; font-size: 16px; }
+    nav a { font-size: 15px; }
+    main, article { margin-top: 48px; }
+  }
+  @media (max-width: 360px) {
+    body { padding-inline: 20px; }
+    nav a { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+
+  nav { flex-wrap: wrap; }
+  nav .external { margin-left: auto; }
+  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  .project-meta a { color: inherit; }
+  .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
+  .readme { margin-top: 40px; line-height: 1.8; }
+  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme > :first-child { margin-top: 0; }
+  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
+  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
+  .readme ul, .readme ol { padding-left: 24px; }
+  .readme li + li { margin-top: 8px; }
+  .readme a { color: inherit; overflow-wrap: anywhere; }
+  .readme a:hover, .project-meta a:hover { color: #787878; }
+  .readme strong { font-weight: 550; }
+  .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; }
+  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme pre code { font-size: inherit; }
+  .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
+  .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
+  .readme figure { margin-block: 32px; }
+  .readme picture { display: block; }
+  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="reading">
+    <nav aria-label="site">
+      <a href="/">home</a>
+      <a href="/src">things i've built</a>
+      <a class="external" href="https://github.com/adhikrysh/command-journal" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
+    </nav>
+    <main class="project">
+      <h1>command-journal</h1>
+      <p class="project-meta">
+        <a href="https://github.com/adhikrysh/command-journal/commit/f93e5b433147978b89375e71301729ad4440f4b6" target="_blank" rel="noopener noreferrer"><time datetime="2026-02-02">feb 2, 2026</time></a>
+        <span class="last-edited">last edited <a href="https://github.com/adhikrysh/command-journal/commit/187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
+      </p>
+      <div class="readme">
+<p>run commands on a simulated spacecraft payload and recover unfinished
+work after a process crash. the payload is a register, a stored value
+from 0 to 1023. each command includes a sequence number and the state it
+expects to find.</p>
+<p>it handles a lost acknowledgement: the payload applied a command, but
+the host still marks it pending. recovery asks the payload about that
+exact command before deciding whether to apply it again.</p>
+<h2 id="build-and-try-a-crash">build and try a crash</h2>
+<p>requires C++20, CMake 3.20+, and a POSIX system such as Linux or
+macOS. it has no runtime dependencies.</p>
+<pre class="sh"><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 3
+ctest --test-dir build --output-on-failure
+
+journal_demo_dir=$(mktemp -d)
+./build/command-journal set &quot;$journal_demo_dir&quot; 0 42
+./build/command-journal set &quot;$journal_demo_dir&quot; 42 84 --crash payload_sync || test &quot;$?&quot; -eq 75
+./build/command-journal status &quot;$journal_demo_dir&quot;
+./build/command-journal recover &quot;$journal_demo_dir&quot;</code></pre>
+<p>the deliberate crash exits with code 75. before recovery, the host
+has completed command 1 and the payload has applied command 2. recovery
+records command 2 as complete. the final value is 84 and the payload
+application count is two, not three.</p>
+<p><code>status</code> is read-only. <code>recover</code> and
+<code>set</code> may truncate an incomplete final record before
+continuing. a complete record with a bad checksum is rejected, not
+silently discarded. every command writes JSON to stdout and errors to
+stderr.</p>
+<h2 id="persisted-state">persisted state</h2>
+<p>the host appends an accepted command and calls <code>fsync</code> to
+flush the log to storage before dispatching it. the payload checks the
+expected state, stores the command under its sequence number, and syncs
+before acknowledging it. the host then appends and syncs a completion
+record.</p>
+<p>on restart, the program checks both logs before repairing either one.
+for an accepted but incomplete command, recovery either applies it or
+recognises the identical command already stored by the payload. reusing
+a sequence number with different content is an error.</p>
+<p>files have exclusive write locks. records carry a version, bounded
+length, and CRC32C checksum. interrupted reads and writes are retried.
+after a failed persistence step, the executor refuses more work until it
+is closed and reopened because its in-memory state may no longer match
+disk.</p>
+<h2 id="tests-and-limits">tests and limits</h2>
+<p>the test executable starts fresh processes and stops them at nine
+write or sync boundaries. it then runs recovery twice and checks that
+the accepted state returns without duplicate payload applications. other
+checks cover every prefix of a two-record stream, 464 single-bit
+corruptions, malformed transitions, stale preconditions, concurrent
+writers, and symlink rejection.</p>
+<p>this result depends on the simulated payload durably remembering
+command IDs. a physical actuator that cannot identify a command it
+already applied leaves an ambiguity that the host journal cannot
+resolve. this project does not claim exactly-once control for arbitrary
+hardware.</p>
+<p>the tests cover process death, not power removal or failing storage
+hardware. persistence depends on the filesystem's <code>fsync</code> and
+locking behavior. new state-directory creation and hardware write caches
+need platform-specific work before this can make a power-loss guarantee.
+each journal is limited to 64 MiB and replayed in memory; compaction is
+not implemented.</p>
+<p>the API is <a
+href="https://github.com/adhikrysh/command-journal/blob/187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0/include/journal/executor.hpp"
+target="_blank" rel="noopener noreferrer">executor.hpp</a>, and <a
+href="https://github.com/adhikrysh/command-journal/blob/187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0/docs/format.md"
+target="_blank" rel="noopener noreferrer">the record format</a>
+describes the on-disk records. use <code>--help</code> for every crash
+stage. enable sanitizers with
+<code>-DJOURNAL_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug</code>. JPL's <a
+href="https://fprime.jpl.nasa.gov/v4.3.0/Svc/CmdSequencer/docs/sdd/"
+target="_blank" rel="noopener noreferrer">F Prime command sequencer</a>
+provides context for command validation and sequencing; this project is
+a separate persistence experiment.</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

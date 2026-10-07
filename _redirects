@@ -1,17 +1,20 @@
 /etc /essays 301
 /etc/ /essays 301
 /etc.html /essays 301
+/projects /src 301
+/projects/ /src 301
+/projects.html /src 301
+/src/ /src 301
+/src.html /src 301
+
+/essays/ /essays 301
+
 /etc/:slug.html /essays/:slug 301
 /etc/:slug/ /essays/:slug 301
 /etc/* /essays/:splat 301
-/src /projects 301
-/src/ /projects 301
-/src.html /projects 301
-/src/:slug.html /projects/:slug 301
-/src/:slug/ /projects/:slug 301
-/src/* /projects/:splat 301
-
-/essays/ /essays 301
-/projects/ /projects 301
 /essays/:slug/ /essays/:slug 301
-/projects/:slug/ /projects/:slug 301
+/projects/:slug.html /src/:slug 301
+/projects/:slug/ /src/:slug 301
+/projects/* /src/:splat 301
+/src/:slug.html /src/:slug 301
+/src/:slug/ /src/:slug 301

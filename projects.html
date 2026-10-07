@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>projects | adhikrish rk</title>
-<meta name="description" content="personal projects in spacecraft simulation and developer tools.">
-<meta property="og:title" content="projects | adhikrish rk">
-<meta property="og:description" content="personal projects in spacecraft simulation and developer tools.">
+<title>things i've built | adhikrish rk</title>
+<meta name="description" content="spacecraft simulations and other things i've built.">
+<meta property="og:title" content="things i've built | adhikrish rk">
+<meta property="og:description" content="spacecraft simulations and other things i've built.">
 <meta property="og:image" content="https://adhikrish.cloud/og.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -14,7 +14,7 @@
 <meta name="theme-color" content="#080807">
 <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-7330e902055f.png">
 <link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="canonical" href="https://adhikrish.cloud/projects">
+<link rel="canonical" href="https://adhikrish.cloud/src">
 <style>
 
   @font-face {
@@ -64,35 +64,51 @@
   .project-list time { color: #8a8a8a; font-size: 12px; white-space: nowrap; }
   .project-list span { overflow-wrap: anywhere; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .project-list p { color: #8a8a8a; font-size: 14px; line-height: 1.6; }
+  .project-index { margin-top: 32px; }
+  .project-group + .project-group { margin-top: 48px; }
+  .project-group h2 { color: #8a8a8a; font-size: 17px; font-weight: 380; line-height: 1.6; }
+  .project-group .project-list { margin-top: 16px; }
 </style>
 </head>
 <body>
   <div class="reading">
     <nav aria-label="site"><a href="/">home</a></nav>
     <main>
-      <h1>projects</h1>
-      <ul class="project-list" aria-label="projects, newest first">
-        <li>
-          <a href="/projects/agent-squad"><span>agent-squad</span><time datetime="2026-07-28">jul 28, 2026</time></a>
-          <p>track coding-agent sessions and jump to the terminal that needs you.</p>
-        </li>
-        <li>
-          <a href="/projects/command-journal"><span>command-journal</span><time datetime="2026-02-02">feb 2, 2026</time></a>
-          <p>recover simulated spacecraft payload commands after a crash.</p>
-        </li>
-        <li>
-          <a href="/projects/contact-router"><span>contact-router</span><time datetime="2026-01-19">jan 19, 2026</time></a>
-          <p>route data through scheduled space links without double-booking radios.</p>
-        </li>
-        <li>
-          <a href="/projects/attitude-filter"><span>attitude-filter</span><time datetime="2026-01-04">jan 4, 2026</time></a>
-          <p>estimate spacecraft orientation through star-tracker outages.</p>
-        </li>
-        <li>
-          <a href="/projects/orbit-access"><span>orbit-access</span><time datetime="2025-12-13">dec 13, 2025</time></a>
-          <p>simulate satellite orbits and find ground-station visibility windows.</p>
-        </li>
-      </ul>
+      <h1>things i've built</h1>
+      <!-- project-index:start -->
+      <div class="project-index">
+        <section class="project-group" aria-labelledby="spacecraft-simulations">
+          <h2 id="spacecraft-simulations">spacecraft simulations</h2>
+          <ul class="project-list" aria-label="spacecraft simulations">
+            <li>
+              <a href="/src/command-journal"><span>command-journal</span><time datetime="2026-02-02">feb 2, 2026</time></a>
+              <p>recover simulated spacecraft payload commands after a crash.</p>
+            </li>
+            <li>
+              <a href="/src/contact-router"><span>contact-router</span><time datetime="2026-01-19">jan 19, 2026</time></a>
+              <p>route data through scheduled space links without double-booking radios.</p>
+            </li>
+            <li>
+              <a href="/src/attitude-filter"><span>attitude-filter</span><time datetime="2026-01-04">jan 4, 2026</time></a>
+              <p>estimate spacecraft orientation through star-tracker outages.</p>
+            </li>
+            <li>
+              <a href="/src/orbit-access"><span>orbit-access</span><time datetime="2025-12-13">dec 13, 2025</time></a>
+              <p>simulate satellite orbits and find ground-station visibility windows.</p>
+            </li>
+          </ul>
+        </section>
+        <section class="project-group" aria-labelledby="others">
+          <h2 id="others">others</h2>
+          <ul class="project-list" aria-label="others">
+            <li>
+              <a href="/src/tryshipy"><span>tryshipy (revenue generating)</span></a>
+              <p>turn a ship broker&#x27;s emails and documents into knowledge, suggested matches, and deal drafts.</p>
+            </li>
+          </ul>
+        </section>
+      </div>
+      <!-- project-index:end -->
     </main>
   </div>
 </body>
