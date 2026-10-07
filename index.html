@@ -14,7 +14,6 @@
 <meta name="theme-color" content="#080807">
 <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-7330e902055f.png">
 <link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="prefetch" href="/src">
 <style>
   @font-face {
     font-family: 'Inter';
@@ -132,5 +131,32 @@
       <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer" aria-label="github" title="github">github</a>
     </nav>
   </main>
+<!-- navigation-preload:start -->
+<script>
+(() => {
+  const warmed = new Set();
+  const warm = link => {
+    const href = link?.getAttribute('href');
+    if (!href || !/^\/(?:src(?:\/[a-z0-9-]+)?|)$/.test(href)) return;
+    const url = new URL(href, location.href).href;
+    if (url === location.href || warmed.has(url)) return;
+    warmed.add(url);
+    fetch(url, { credentials: 'same-origin', priority: 'low' })
+      .then(response => {
+        if (!response.ok) throw new Error('preload failed');
+        return response.arrayBuffer();
+      })
+      .catch(() => warmed.delete(url));
+  };
+  const connection = navigator.connection;
+  if (!connection?.saveData && !['slow-2g', '2g'].includes(connection?.effectiveType)) {
+    document.querySelectorAll('a[href^="/src"]').forEach(warm);
+  }
+  for (const type of ['pointerover', 'focusin', 'touchstart']) {
+    document.addEventListener(type, event => warm(event.target.closest?.('a')), { passive: true });
+  }
+})();
+</script>
+<!-- navigation-preload:end -->
 </body>
 </html>

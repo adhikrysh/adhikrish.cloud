@@ -1,6 +1,6 @@
 # adhikrish.cloud
 
-static html and css, deployed from `main` through cloudflare pages. no build step or application javascript is needed.
+static html and css, deployed from `main` through cloudflare pages. a small optional inline script warms the browser's html cache before navigation. every page and link works without javascript.
 
 `/essays` serves `essays.html` for thoughts and notes. `/src` serves `src.html`, titled "things i've built" in the navigation and on the page. its two groups are "spacecraft simulations" and "others". the homepage links read "things i've built", "contact@adhikrish.cloud", "linkedin", and "github". cloudflare pages serves the generated html at extensionless paths; nginx uses the same lookup. legacy `/etc` and `/projects` paths redirect permanently to the canonical paths. `404.html` makes missing pages return a real 404 instead of the homepage.
 
@@ -28,6 +28,6 @@ to test the alternate deployment, build with `docker build -t adhikrish-cloud .`
 
 project plots use lossless WebP where supported, with the original PNGs as fallbacks. the opening plot loads eagerly with high fetch priority because it appears in the initial reading viewport; later images remain lazy. image dimensions reserve their layout space.
 
-the favicon uses one opaque 48px square PNG, cropped from the supplied sunset photograph, to avoid downloading multiple icon formats. its hashed asset is 3,541 bytes. the root `favicon.png` provides the same image at the legacy URL. retain older hashed assets so cached HTML can still request them. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work even though the application itself has no javascript.
+the favicon uses one opaque 48px square PNG, cropped from the supplied sunset photograph, to avoid downloading multiple icon formats. its hashed asset is 3,541 bytes. the root `favicon.png` provides the same image at the legacy URL. retain older hashed assets so cached HTML can still request them. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work.
 
-the homepage gives browsers a low-priority prefetch hint for `/src`. browsers that honor it can load the first navigation from cache. the hint does not replace the normal link or guarantee prefetch on every browser or connection.
+`scripts/navigation-preload.js` fetches linked `/src` html at low priority using the normal browser cache. the homepage warms the index; the index warms its five write-ups. hovering, focusing, or touching a local navigation link also starts its fetch. automatic warming is skipped when the browser reports data-saving mode or a 2g connection. the script consumes html without rendering the destination or running its analytics and bot checks. it does not prefetch images, change links, or override the five-minute cache policy. an immediate click may still arrive before the fetch finishes. the renderer embeds the same script in the homepage, index, and generated reading pages; rerun it after changing the script.

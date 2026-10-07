@@ -45,6 +45,17 @@ READING_CSS = """
 """
 
 
+def preload_navigation(page):
+    """Keep the small cache warmer identical in every served portfolio page."""
+    script = (ROOT / "scripts/navigation-preload.js").read_text().strip()
+    block = f"<!-- navigation-preload:start -->\n<script>\n{script}\n</script>\n<!-- navigation-preload:end -->"
+    page = re.sub(r'<!-- navigation-preload:start -->.*?<!-- navigation-preload:end -->\n?',
+                  '', page, flags=re.DOTALL)
+    if page.count("</body>") != 1:
+        raise ValueError("page must have exactly one closing body tag")
+    return page.replace("</body>", block + "\n</body>")
+
+
 def readable_date(value):
     day = date.fromisoformat(value)
     return f"{day.strftime('%b').lower()} {day.day}, {day.year}"
@@ -127,8 +138,12 @@ index, count = re.subn(
 )
 if count != 1:
     raise ValueError("project index must have exactly one pair of markers")
+index = preload_navigation(index)
 index_path.write_text(index)
 (ROOT / "src.html").write_text(index)
+home_path = ROOT / "index.html"
+home = home_path.read_text().replace('<link rel="prefetch" href="/src">\n', '')
+home_path.write_text(preload_navigation(home))
 
 for project in PROJECTS:
     slug = project["slug"]
@@ -191,6 +206,7 @@ for project in PROJECTS:
 </body>
 </html>
 '''
+    page = preload_navigation(page)
     for directory in ("src", "projects"):
         output = ROOT / directory / f"{slug}.html"
         output.parent.mkdir(exist_ok=True)
