@@ -61,10 +61,10 @@
   {
     "slug": "homeserver",
     "group": "others",
-    "date": "2026-10-09",
-    "first_commit": "15921195ea98212e2e4b6b59768ee17ea008cce1",
-    "source_commit": "15921195ea98212e2e4b6b59768ee17ea008cce1",
-    "note_commit": "15921195ea98212e2e4b6b59768ee17ea008cce1",
+    "date": "2024-12-28",
+    "first_commit": "c56936cb1c1946a3271b8cc10b5b518721bebfcd",
+    "source_commit": "bec7b67f5bf9f098177da1266bd4fc7cb96d4053",
+    "note_commit": "bec7b67f5bf9f098177da1266bd4fc7cb96d4053",
     "description": "an old thinkpad running my photos, files, backups and ai second brain, with no open ports.",
     "images": {},
     "edited_date": "2026-10-09"
