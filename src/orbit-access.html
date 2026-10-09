@@ -99,21 +99,13 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/orbit-access/commit/51b7470c15b64295bea9514f0f2f439708df2966" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
       </p>
       <div class="readme">
-<p>a satellite in low earth orbit does not linger. in this model's
-default scenario it rises over a ground station, crosses the sky in six
-to eight minutes, and sets. miss that window and the data waits for the
-next pass, which may be hours away. four windows a day, about half an
-hour of talking time in total.</p>
-<p>so the most valuable question in a ground station's day is
-deceptively simple: when, exactly, can we see it?</p>
-<p>answering it means arguing with two stubborn facts. the earth is not
-a sphere; it bulges at the equator, and that bulge slowly swings every
-inclined orbit plane around the pole. and the earth will not hold still;
-the station is spinning under the satellite at about 465 metres per
-second at the equator. get either wrong and the antenna points at empty
-sky.</p>
-<p>orbit-access is a small, honest model of that argument.</p>
-<h2 id="what-it-does">what it does</h2>
+<p>a leo pass over a ground station lasts six to eight minutes in this
+model. four a day, about half an hour of contact in total. predict the
+window late and the pass is gone; the next one is hours away.</p>
+<p>the earth makes this annoying. it's oblate, so J2 swings inclined
+orbit planes around the pole, and the station is moving under the
+satellite at about 465 m/s. ignore either one and the dish points at
+empty sky.</p>
 <p>orbit-access propagates a satellite in an inertial frame and computes
 its elevation above a ground station on a rotating, oblate earth. it
 reports intervals above the station's elevation mask.</p>
@@ -144,37 +136,29 @@ second. time is elapsed seconds. vectors live in a right-handed inertial
 frame whose positive z axis is earth's spin axis. library angles are
 radians; the CLI converts its latitude, longitude, and mask arguments
 from degrees. <a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/include/orbit/orbit.hpp"
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/include/orbit/orbit.hpp"
 target="_blank" rel="noopener noreferrer">orbit.hpp</a> defines these
 units and conventions.</p>
-<p>the force model combines central gravity with J2, the dominant
-correction for earth's equatorial bulge. its potential per unit mass
-is:</p>
+<p>the force model combines central gravity with J2. its potential per
+unit mass is:</p>
 <pre class="text"><code>U = -mu/r [1 - J2/2 (R/r)^2
             (3z^2/r^2 - 1)]</code></pre>
-<p><code>U</code> is potential energy per unit mass in km²/s²,
-<code>J2</code> is a dimensionless coefficient, and <code>z</code> is
-the spin-axis component of position in km. <code>mu</code> is the
-gravitational parameter in km³/s², <code>R</code> is the reference
-radius in km, and <code>r</code> is the distance from earth's centre in
-km. <a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/src/dynamics.cpp"
+<p>units are km, km/s and km²/s² throughout. <a
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/src/dynamics.cpp"
 target="_blank" rel="noopener noreferrer">dynamics.cpp</a> evaluates the
 matching acceleration directly. setting J2 to zero leaves the two-body
 model. with J2 enabled, the orbit plane precesses; energy and z angular
 momentum remain conserved, while the full angular-momentum vector does
 not. <a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/docs/numerics.md"
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/docs/numerics.md"
 target="_blank" rel="noopener noreferrer">numerics.md</a> makes that
 distinction explicit because it determines which conservation check is
 valid.</p>
 <h2 id="propagation">propagation</h2>
 <p><a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/src/dynamics.cpp"
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/src/dynamics.cpp"
 target="_blank" rel="noopener noreferrer">dynamics.cpp</a> uses
-Dormand-Prince 5(4), an adaptive Runge-Kutta method. each attempted step
-produces fifth- and fourth-order states; their scaled difference
-estimates local error. position and velocity have separate absolute
+Dormand-Prince 5(4). position and velocity have separate absolute
 tolerances because kilometres and kilometres per second have different
 scales: 1e-8 km, 1e-11 km/s, with 1e-11 relative tolerance. accepted
 steps can grow to 60 s; rejected steps shrink. the propagator either
@@ -183,7 +167,7 @@ budget is exhausted. it does not return a partial trajectory as a
 complete one.</p>
 <h2 id="station-geometry">station geometry</h2>
 <p><a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/src/access.cpp"
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/src/access.cpp"
 target="_blank" rel="noopener noreferrer">access.cpp</a> uses WGS84
 geodetic coordinates for the station. the station's local vertical is
 the ellipsoid normal, which generally differs from its centre-to-station
@@ -203,7 +187,7 @@ a shorter grazing pass can fall entirely between samples, and a tangency
 without an above-mask interval is intentionally omitted.</p>
 <h2 id="numerical-checks">numerical checks</h2>
 <p>the test executable passes seven named checks locally. <a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/tests/test_orbit.cpp"
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/tests/test_orbit.cpp"
 target="_blank" rel="noopener noreferrer">test_orbit.cpp</a> compares
 150 elliptic, forward and backward two-body propagations with an
 independent Kepler-equation solver, requiring position error below 0.5 m
@@ -217,7 +201,7 @@ require the same pass list. they also check WGS84 equatorial and polar
 geometry, overhead and antipodal elevation, clipped intervals,
 tangencies, invalid input, adaptive-step rejection, and exhausted work
 budgets. the <a
-href="https://github.com/adhikrysh/orbit-access/blob/ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc/.github/workflows/check.yml"
+href="https://github.com/adhikrysh/orbit-access/blob/a4437809afea1263f242c32d937857f6489d18da/.github/workflows/check.yml"
 target="_blank" rel="noopener noreferrer">checked-in CI workflow</a>
 runs these tests on Ubuntu with address and undefined-behaviour
 sanitizers and on macOS in release mode.</p>
@@ -241,10 +225,6 @@ precession, nutation, polar motion, drag, lunar or solar gravity,
 atmospheric refraction, impact detection, or event-completeness
 guarantee. it is appropriate for inspecting numerical and geometric
 assumptions, not operational contact prediction.</p>
-<p>the satellite does not care about any of this. it just keeps falling
-around the earth, missing it. the code's job is to know, to the
-hundred-thousandth of a second in this model, when it will be
-overhead.</p>
       </div>
     </main>
   </div>

@@ -99,18 +99,12 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/command-journal/commit/187256d3fd83b8ebf261e0ec6c0c3eb8153d53f0" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
       </p>
       <div class="readme">
-<p>the most dangerous moment in commanding a spacecraft is very short.
-it starts when a command leaves the ground system and ends when someone
-writes down that it left.</p>
-<p>crash inside that gap and you wake up not knowing what happened. did
-the payload act? if you send the command again, maybe it acts twice. if
-you do not, maybe it never acts at all. "fire the thruster for ten
-seconds" is not a command you want to run zero times or two times.</p>
-<p>this is the oldest problem in distributed systems wearing a flight
-suit: two parties, two memories, and a crash at the worst possible
-instant. command-journal is a small experiment in surviving it, with the
-ordering of every write and every sync chosen on purpose.</p>
-<h2 id="what-it-does">what it does</h2>
+<p>the dangerous window in commanding a spacecraft is short: after the
+command goes out, before the ground writes down that it went. crash
+there and on restart nobody knows whether the payload acted. resend and
+maybe it fires twice. don't, and maybe it never fires.</p>
+<p>command-journal is a crash-recovery experiment for that window, with
+every write and every <code>fsync</code> ordered on purpose.</p>
 <p>command-journal models a ground-side command executor that dies
 between sending a command and recording its result. the simulated
 payload is a register from 0 to 1023.</p>
@@ -210,20 +204,17 @@ exercise process death, not sudden power removal or failed storage
 hardware. compaction is absent, so the 64 mib journals bound this
 experiment and do not suit a long-running flight system.</p>
 <p>the <a
-href="https://github.com/adhikrysh/command-journal/blob/790da708941ebba0b77d53a840833e36335f258b/include/journal/executor.hpp"
+href="https://github.com/adhikrysh/command-journal/blob/1dfbb89531113e188c08164108454aa204ab3e8b/include/journal/executor.hpp"
 target="_blank" rel="noopener noreferrer">executor api</a>, <a
-href="https://github.com/adhikrysh/command-journal/blob/790da708941ebba0b77d53a840833e36335f258b/docs/format.md"
+href="https://github.com/adhikrysh/command-journal/blob/1dfbb89531113e188c08164108454aa204ab3e8b/docs/format.md"
 target="_blank" rel="noopener noreferrer">record format</a>, and <a
-href="https://github.com/adhikrysh/command-journal/blob/790da708941ebba0b77d53a840833e36335f258b/tests/test_journal.cpp"
+href="https://github.com/adhikrysh/command-journal/blob/1dfbb89531113e188c08164108454aa204ab3e8b/tests/test_journal.cpp"
 target="_blank" rel="noopener noreferrer">tests</a> describe the
 implementation at this project revision. JPL's <a
 href="https://fprime.jpl.nasa.gov/v4.3.0/Svc/CmdSequencer/docs/sdd/"
 target="_blank" rel="noopener noreferrer">F Prime command sequencer</a>
 covers command validation and sequencing; this project implements a
 separate persistence experiment.</p>
-<p>the takeaway fits on a sticky note: write down what you are about to
-do, make sure it reached disk, and never trust anything that only lived
-in memory when the lights went out.</p>
       </div>
     </main>
   </div>

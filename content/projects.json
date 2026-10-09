@@ -8,7 +8,7 @@
     "description": "recover simulated spacecraft payload commands after a crash.",
     "images": {},
     "edited_date": "2026-10-02",
-    "note_commit": "790da708941ebba0b77d53a840833e36335f258b"
+    "note_commit": "1dfbb89531113e188c08164108454aa204ab3e8b"
   },
   {
     "slug": "contact-router",
@@ -24,7 +24,7 @@
     "webp_images": {
       "/assets/projects/contact-router-9db8e917504b.png": "/assets/projects/contact-router-8e72ef63106e.webp"
     },
-    "note_commit": "d978b03d2e68fc0427ce0cd8b4e8d4f24de62302"
+    "note_commit": "810228641ca17905ffb9dea2f3a0ee62740f6e5a"
   },
   {
     "slug": "attitude-filter",
@@ -40,7 +40,7 @@
     "webp_images": {
       "/assets/projects/attitude-filter-6a50fba41633.png": "/assets/projects/attitude-filter-7befeef9d4fc.webp"
     },
-    "note_commit": "1f9d9353f927f35b4f7b77c15a6955078815002f"
+    "note_commit": "3e2a2e0f7d3f1754757b775f97107fd705ab87d4"
   },
   {
     "slug": "orbit-access",
@@ -56,15 +56,15 @@
     "webp_images": {
       "/assets/projects/orbit-access-b7ea762965f0.png": "/assets/projects/orbit-access-81e42071e79f.webp"
     },
-    "note_commit": "ef7ab241e8ba5e873e9d4aa4d66bd6a2f7ce55bc"
+    "note_commit": "a4437809afea1263f242c32d937857f6489d18da"
   },
   {
     "slug": "homeserver",
     "group": "others",
     "date": "2024-12-28",
     "first_commit": "c56936cb1c1946a3271b8cc10b5b518721bebfcd",
-    "source_commit": "bec7b67f5bf9f098177da1266bd4fc7cb96d4053",
-    "note_commit": "bec7b67f5bf9f098177da1266bd4fc7cb96d4053",
+    "source_commit": "363a832dc74fbc3e2014ebb146f1746c6ecd589f",
+    "note_commit": "363a832dc74fbc3e2014ebb146f1746c6ecd589f",
     "description": "an old thinkpad running my photos, files, backups and ai second brain, with no open ports.",
     "images": {},
     "edited_date": "2026-10-09"
