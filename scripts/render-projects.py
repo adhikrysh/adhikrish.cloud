@@ -9,6 +9,7 @@ import subprocess
 from datetime import date
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = json.loads((ROOT / "content/projects.json").read_text())
@@ -56,6 +57,26 @@ def preload_navigation(page):
     return page.replace("</body>", block + "\n</body>")
 
 
+NOTE_FILE = "note-adhikrish.cloud.md"
+
+
+def load_markdown(project):
+    """Repository-backed entries read their write-up from the repository itself.
+
+    Each public repo carries note-adhikrish.cloud.md. It is fetched at the pinned
+    note_commit, so a later push to the repo never changes this site until someone
+    re-reviews the note and moves the pin. Entries without a repository (shipy)
+    keep a local file in content/projects/.
+    """
+    slug = project["slug"]
+    if project.get("note_commit"):
+        url = (f"https://raw.githubusercontent.com/adhikrysh/{slug}/"
+               f"{project['note_commit']}/{NOTE_FILE}")
+        with urlopen(url, timeout=30) as response:
+            return response.read().decode("utf-8")
+    return (ROOT / "content/projects" / f"{slug}.md").read_text()
+
+
 def readable_date(value):
     day = date.fromisoformat(value)
     return f"{day.strftime('%b').lower()} {day.day}, {day.year}"
@@ -90,10 +111,11 @@ def prepare_ast(node, project, image_state):
                 if first_image:
                     attributes[2].append(["fetchpriority", "high"])
             elif not urlsplit(url).scheme and not url.startswith("#"):
-                if not project.get("source_commit"):
-                    raise ValueError(f"relative link requires a source commit: {url}")
-                base = (f"https://github.com/adhikrysh/{project['slug']}/"
-                        f"blob/{project['source_commit']}/")
+                # Relative links resolve against the commit the note was read from.
+                pin = project.get("note_commit") or project.get("source_commit")
+                if not pin:
+                    raise ValueError(f"relative link requires a pinned commit: {url}")
+                base = f"https://github.com/adhikrysh/{project['slug']}/blob/{pin}/"
                 target[0] = urljoin(base, url)
             if kind == "Link" and urlsplit(target[0]).scheme == "https":
                 attributes[2].extend([
@@ -147,7 +169,7 @@ home_path.write_text(preload_navigation(home))
 
 for project in PROJECTS:
     slug = project["slug"]
-    markdown = (ROOT / "content/projects" / f"{slug}.md").read_text()
+    markdown = load_markdown(project)
     ast = json.loads(pandoc(markdown, "gfm", "json"))
     if ast["blocks"] and ast["blocks"][0]["t"] == "Header" and ast["blocks"][0]["c"][0] == 1:
         ast["blocks"].pop(0)

@@ -99,6 +99,22 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/attitude-filter/commit/a811cc6fa58efe89f2c2d69df350f3a68ddc459e" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
       </p>
       <div class="readme">
+<p>close your eyes and point at the door. you know roughly where it is,
+by feel. now spin slowly for a minute and point again. you are wrong,
+and you have no idea by how much.</p>
+<p>a spacecraft lives that way. its gyroscope is the feel: it reports
+how fast the craft is rotating, many times a second. its star tracker is
+the eyes: it photographs stars and says exactly which way the craft
+points. the trouble is that the eyes blink. bright objects, manoeuvres,
+and faults can all leave the tracker blind for a while, and during that
+time the craft points by feel alone.</p>
+<p>feel has a flaw. a real gyro is wrong by a small, steady amount
+called bias. integrate a steady error and it becomes a growing one. in
+this project's simulation, trusting the gyro alone ends
+<strong>18.57°</strong> off. the filter ends <strong>0.089°</strong>
+off, because it learns the gyro's lie while the eyes are open and keeps
+correcting for it when they close.</p>
+<h2 id="what-it-does">what it does</h2>
 <p>estimate a spacecraft's orientation through star-tracker outages
 while learning the gyroscope's persistent bias. a gyroscope measures
 rotation rate; a star tracker measures orientation from stars.
@@ -157,13 +173,13 @@ independent uncertain quantities.</p>
 <p>the rotation convention is explicit: a quaternion rotates body-frame
 vectors into the inertial frame, and body-rate increments multiply on
 the right. <a
-href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/include/attitude/filter.hpp"
+href="https://github.com/adhikrysh/attitude-filter/blob/1f9d9353f927f35b4f7b77c15a6955078815002f/include/attitude/filter.hpp"
 target="_blank" rel="noopener noreferrer">the public interface</a>
 states these units and conventions.</p>
 <h2 id="prediction-and-covariance-reset">prediction and covariance
 reset</h2>
 <p><a
-href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/src/filter.cpp#L28"
+href="https://github.com/adhikrysh/attitude-filter/blob/1f9d9353f927f35b4f7b77c15a6955078815002f/src/filter.cpp#L28"
 target="_blank" rel="noopener noreferrer">the prediction
 implementation</a> uses a block-matrix exponential to integrate the
 linearized error dynamics and continuous noise over a constant-rate
@@ -185,7 +201,7 @@ uncertainty in the old frame.</p>
 before changing the stored estimate. invalid measurements or a failed
 covariance factorization therefore cannot leave a partially updated
 filter. <a
-href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/docs/filter.md"
+href="https://github.com/adhikrysh/attitude-filter/blob/1f9d9353f927f35b4f7b77c15a6955078815002f/docs/filter.md"
 target="_blank" rel="noopener noreferrer">the equations</a> explain the
 coordinate reset and noise integration.</p>
 <h2 id="simulation-results">simulation results</h2>
@@ -199,7 +215,7 @@ simulation, not a real sensor trial.</p>
 loading="eager" decoding="async" fetchpriority="high" width="1440"
 height="1040" alt="Tracker outage experiment" /></picture></p>
 <p><a
-href="https://github.com/adhikrysh/attitude-filter/blob/a811cc6fa58efe89f2c2d69df350f3a68ddc459e/tests/test_filter.cpp"
+href="https://github.com/adhikrysh/attitude-filter/blob/1f9d9353f927f35b4f7b77c15a6955078815002f/tests/test_filter.cpp"
 target="_blank" rel="noopener noreferrer">the tests</a> cover:</p>
 <ul>
 <li>transition and covariance-reset Jacobians are compared with finite
@@ -237,6 +253,9 @@ operation.</p>
 href="https://ntrs.nasa.gov/citations/20020060647" target="_blank"
 rel="noopener noreferrer">Attitude Error Representations for Kalman
 Filtering</a>.</p>
+<p>the whole project is a lesson in humility for sensors: every
+instrument lies a little, and good estimation is mostly the art of
+learning exactly how.</p>
       </div>
     </main>
   </div>

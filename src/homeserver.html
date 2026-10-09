@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>homeserver | adhikrish rk</title>
+<meta name="description" content="an old thinkpad running my photos, files, backups and ai second brain, with no open ports.">
+<meta property="og:title" content="homeserver | adhikrish rk">
+<meta property="og:description" content="an old thinkpad running my photos, files, backups and ai second brain, with no open ports.">
+<meta property="og:image" content="https://adhikrish.cloud/og.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://adhikrish.cloud/og.png">
+<meta name="theme-color" content="#080807">
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-7330e902055f.png">
+<link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://adhikrish.cloud/src/homeserver">
+<style>
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: rgba(255, 100, 0, 0.25); }
+  body {
+    background: #080807;
+    color: #d8d4c8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    letter-spacing: -0.012em;
+    padding: 40px 28px 80px;
+  }
+  .reading { max-width: 680px; margin-inline: auto; }
+  nav { display: flex; gap: 18px; }
+  nav a { color: #8a8a8a; font-size: 15px; }
+  a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
+  a:hover { color: #787878; }
+  a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
+  main, article { margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  @media (max-width: 720px) {
+    body { padding-top: 32px; }
+    main, article { margin-top: 48px; }
+  }
+  @media (max-width: 360px) {
+    body { padding-inline: 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+
+  nav { flex-wrap: wrap; }
+  nav .external { margin-left: auto; }
+  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  .project-meta a { color: inherit; }
+  .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
+  .readme { margin-top: 40px; line-height: 1.8; }
+  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme > :first-child { margin-top: 0; }
+  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
+  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
+  .readme ul, .readme ol { padding-left: 24px; }
+  .readme li + li { margin-top: 8px; }
+  .readme a { color: inherit; overflow-wrap: anywhere; }
+  .readme a:hover, .project-meta a:hover { color: #787878; }
+  .readme strong { font-weight: 550; }
+  .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; }
+  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme pre code { font-size: inherit; }
+  .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
+  .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
+  .readme figure { margin-block: 32px; }
+  .readme picture { display: block; }
+  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="reading">
+    <nav aria-label="site">
+      <a href="/">home</a>
+      <a href="/src">things i've built</a>
+      <a class="external" href="https://github.com/adhikrysh/homeserver" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
+    </nav>
+    <main class="project">
+      <h1>homeserver</h1>
+      <p class="project-meta">
+        <a href="https://github.com/adhikrysh/homeserver/commit/15921195ea98212e2e4b6b59768ee17ea008cce1" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-09">oct 9, 2026</time></a>
+        <span class="last-edited">code updated <a href="https://github.com/adhikrysh/homeserver/commit/15921195ea98212e2e4b6b59768ee17ea008cce1" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-09">oct 9, 2026</time></a></span>
+      </p>
+      <div class="readme">
+<p>somewhere across the pacific from me, a 2018 thinkpad is running my
+life. it was designed to open spreadsheets for a regional sales manager.
+today it serves every photo i have taken, keeps my files, backs itself
+up to another continent every night, and hosts the second brain that my
+ai agents read before they write a single line of code.</p>
+<p>it has no open ports. nobody on the internet can knock on its door.
+it dug a tunnel outward and lets the world in only through that tunnel,
+one checked visitor at a time.</p>
+<p>this is the story of how an old laptop became infrastructure, and
+what it taught me about owning things.</p>
+<h2 id="the-rent-problem">the rent problem</h2>
+<p>most of us rent our digital lives without noticing the lease.</p>
+<p>your photos live in a company's basement, billed by the gigabyte,
+searchable on their terms. your files are scattered across three clouds
+and a usb stick called <code>final_final_2</code>. your notes live in
+four apps, none of which talk to the others. and your ai assistant, the
+smartest tool you own, has the long-term memory of a goldfish on a
+subscription plan. every conversation starts at zero.</p>
+<p>so you try to self-host, and you immediately meet the three
+horsemen:</p>
+<ul>
+<li><strong>port forwarding</strong>, which turns your home router into
+a welcome mat for every scanner on the internet;</li>
+<li><strong>certificates</strong>, which expire at the worst possible
+moment and never at a convenient one;</li>
+<li><strong>backups</strong>, which everyone has and almost nobody has
+thought about past the first copy.</li>
+</ul>
+<p>i wanted to own three things: my memories, my files, and my thinking.
+this repo is the field journal of doing that with one laptop and a
+stubborn refusal to open a port.</p>
+<h2 id="the-machine">the machine</h2>
+<pre class="text"><code>lenovo thinkpad t480
+  intel core i5-8350U   4 cores / 8 threads
+  ~24 GB ram            usually ~3 GB in use
+  477 GB nvme           ext4 on lvm, ~19% used
+  ubuntu 24.04 lts
+  battery               charge held between 75% and 80%</code></pre>
+<p>a laptop is a quietly excellent server. it sips power, it is silent,
+and it ships with a built-in ups: the battery. holding the charge
+between 75 and 80 percent keeps the cell from cooking itself on a desk
+for years while still giving the machine room to ride out a short
+outage.</p>
+<p>about a dozen containers run on it. the cpu is mostly asleep.</p>
+<h2 id="the-front-door-that-does-not-exist">the front door that does not
+exist</h2>
+<p>the usual way to expose a home server is to open a port on the router
+and point the internet at your house. i wanted the opposite: a server
+that cannot be reached at all, except through a door it opened from the
+inside.</p>
+<pre class="text"><code>your browser
+    |  https
+    v
+cloudflare edge          tls ends here; access policy checked here
+    |  encrypted tunnel (opened outward by the server)
+    v
+cloudflared container    lives on one network: frontend
+    |  http
+    v
+nginx proxy manager      routes by hostname
+    |
+    +--&gt; immich network       (photos)
+    +--&gt; files network        (file browser)
+    +--&gt; backrest network     (backups)
+    +--&gt; kuma network         (uptime)
+    +--&gt; beszel network       (metrics)</code></pre>
+<p><strong>the tunnel.</strong> <code>cloudflared</code> runs in a
+container and dials out to cloudflare, then keeps that connection open.
+inbound requests ride back down it. the home ip never appears in dns,
+and the router forwards nothing. a scanner hitting my house finds a
+residential connection with nothing listening.</p>
+<p><strong>one wildcard, zero dns chores.</strong> a single wildcard
+record points every subdomain at the tunnel. adding a service never
+touches dns; the proxy decides where a hostname goes.</p>
+<p><strong>hub and spoke, not a flat network.</strong> every app gets
+its own docker network. nginx proxy manager is the only container that
+joins all of them, and the tunnel container joins only the frontend
+network. so the photo app cannot talk to the backup app, and the tunnel
+cannot reach any app directly. if one service is compromised, it is
+alone in a small room.</p>
+<p>two lessons this layer taught me the hard way:</p>
+<ul>
+<li><strong>route order is load-bearing.</strong> ssh rides the same
+tunnel on its own hostname, and cloudflare matches routes top to bottom.
+put the wildcard first and every ssh connection gets politely forwarded
+to an http proxy that has no idea what ssh is.</li>
+<li><strong>localhost is a lie inside a container.</strong> the ssh
+route cannot say <code>localhost:22</code>, because inside the tunnel
+container, localhost is the tunnel container. it points at the docker
+host's gateway address on the frontend network instead.</li>
+</ul>
+<p>and one fight i chose not to win: let's encrypt on the proxy. its
+domain challenge gets intercepted by cloudflare's proxying, so it fails.
+the honest fix was to stop fighting. cloudflare's edge certificate
+covers the browser leg, the tunnel encrypts the middle, and the last hop
+is plain http on a private docker network.</p>
+<h2 id="zero-trust-for-real">zero trust, for real</h2>
+<p>"zero trust" gets slapped on everything, so here is what it means on
+this box: being on the right network earns you nothing. every request to
+a protected hostname proves who it is before it reaches the server.</p>
+<pre class="text"><code>request for a protected hostname
+    |
+    v
+cloudflare access
+    |-- a human? -&gt; browser login with an allowed identity
+    |-- a machine? -&gt; service token in request headers
+    |-- neither -&gt; redirected to a login page, never reaches the tunnel
+    v
+tunnel -&gt; proxy -&gt; app</code></pre>
+<p>humans log in through the browser. machines, which cannot click a
+login button, carry service tokens. the photo app's phone client is the
+awkward one: it cannot complete a browser login, so it gets a narrowly
+scoped policy of its own. that is a deliberate tradeoff, written down
+where future me will find it.</p>
+<p>even my terminal uses the tunnel. my laptop runs
+<code>cloudflared access tcp</code> as a login agent, so ssh and a
+finder mount of the server work from any network, with no vpn client to
+forget to start. tailscale is installed as a second road for direct,
+lan-like access between my own devices. two independent paths in means
+one bad day on either does not lock me out.</p>
+<h2 id="fighting-physics">fighting physics</h2>
+<p>for a while i lived about 13,600 km of fibre away from this laptop.
+every page felt like it was being mailed to me.</p>
+<p>so i measured before touching anything:</p>
+<pre class="text"><code>phase            cumulative
+tcp connect          110 ms    &lt;- the network round trip, ~107 ms
+tls handshake        146 ms
+first byte           182 ms    &lt;- the server itself spends ~30 ms</code></pre>
+<p>the server was fast: about 30 ms of work per request. everything else
+was distance and handshakes. light in glass needs about 68 ms just to
+cross 13,600 km once, and no config file argues with that. the only
+thing i could do was stop wasting round trips.</p>
+<ul>
+<li><strong>bbr instead of cubic.</strong> cubic treats packet loss as
+congestion and backs off. on a long, fat pipe that is the wrong
+instinct. bbr models the path's bandwidth and round-trip time directly.
+it pairs with the <code>fq</code> packet scheduler, so that changed
+too.</li>
+<li><strong>tcp fast open on both sides.</strong> a returning client can
+send data in its very first packet, which saves one full round trip on
+every new connection.</li>
+<li><strong>no slow start after idle.</strong> switching browser tabs
+should not drop a connection back to a crawl.</li>
+<li><strong>http/2 was off.</strong> every proxy host had it disabled.
+turning it on let a page's dozens of requests share one connection
+instead of queueing.</li>
+<li><strong>gzip at level 5.</strong> most of the compression of level 9
+for far less cpu. smaller responses fit in fewer round trips.</li>
+</ul>
+<p>the sysctl file, the gzip snippet, and the reasoning are in <a
+href="https://github.com/adhikrysh/homeserver/blob/15921195ea98212e2e4b6b59768ee17ea008cce1/config/"
+target="_blank" rel="noopener noreferrer"><code>config/</code></a> and
+<a
+href="https://github.com/adhikrysh/homeserver/blob/15921195ea98212e2e4b6b59768ee17ea008cce1/docs/latency.md"
+target="_blank"
+rel="noopener noreferrer"><code>docs/latency.md</code></a>. the lesson i
+keep: measure the phases first. without that table i would have spent a
+weekend tuning a server that was already fast.</p>
+<h2 id="reliability-or-designing-for-the-3am-version-of-me">reliability,
+or: designing for the 3am version of me</h2>
+<p>i designed this box assuming that the version of me who has to fix it
+is half asleep at 3am. so the system has to heal the boring failures
+without him.</p>
+<ul>
+<li><strong>everything restarts itself.</strong> every container runs
+with <code>always</code> or <code>unless-stopped</code>.</li>
+<li><strong>startup order is enforced by health, not hope.</strong> the
+tunnel waits until the proxy reports healthy, so the internet never gets
+routed into a proxy that is still booting.</li>
+<li><strong>pinned databases.</strong> immich's postgres image is pinned
+by digest and initialised with data checksums, so silent corruption
+becomes a loud error.</li>
+<li><strong>monitoring that tests the app, not the proxy.</strong>
+uptime kuma joins each app's network, so it can check the app directly
+as well as through the proxy. "the proxy is up" and "the photos load"
+are different claims, and only one of them matters.</li>
+<li><strong>metrics with a memory.</strong> beszel records cpu, memory,
+disk, network, temperature and per-container usage, and holds the alert
+rules. its agent reads docker through a read-only socket.</li>
+<li><strong>the os patches itself.</strong> unattended-upgrades applies
+security updates.</li>
+</ul>
+<h2 id="backups-that-respect-the-restore">backups that respect the
+restore</h2>
+<p>a backup you cannot restore is a very expensive placebo. the pipeline
+runs every night as three steps, each feeding the next:</p>
+<pre class="text"><code>01:30  backup_configs.sh
+         pg_dumpall of the photo database
+         proxy, monitoring, and file-browser config
+         root-only configs read through docker exec
+         beszel&#39;s sqlite db via an online snapshot
+         every compose file and env file
+                 |
+                 v
+       one folder on the data share
+                 |
+02:00  backrest (restic) -&gt; backblaze b2, encrypted
+03:00  prune; integrity check monthly
+       keep 30 daily and 12 monthly snapshots</code></pre>
+<p>three bugs shaped that script, and each one taught something:</p>
+<ul>
+<li><strong>permissions.</strong> some apps write their config as
+root-only files, so a plain copy as my user died with "permission
+denied". the script now reads them through <code>docker exec</code>,
+which runs as root inside the container.</li>
+<li><strong>live databases.</strong> copying a sqlite file while it is
+being written can capture a torn page. the script uses python's
+<code>sqlite3</code> online backup api, which takes a consistent
+snapshot while the app keeps running.</li>
+<li><strong>the circular password.</strong> the backup tool's config
+contains the repository password, and that config is itself backed up
+into the encrypted repository. a copy that only exists inside the vault
+it unlocks is no recovery path. the password is escrowed outside the
+system entirely.</li>
+</ul>
+<p>the script is in <a
+href="https://github.com/adhikrysh/homeserver/blob/15921195ea98212e2e4b6b59768ee17ea008cce1/scripts/backup_configs.sh"
+target="_blank"
+rel="noopener noreferrer"><code>scripts/backup_configs.sh</code></a>.</p>
+<h2 id="what-lives-here">what lives here</h2>
+<pre class="text"><code>/srv/sambashare/data
+  photos/           ~32 GB   originals, organised by shoot
+  library/          ~24 GB   the photo app&#39;s upload store and thumbnails
+  server-configs/            the nightly config bundle
+  archives/                  long-term keepsakes</code></pre>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>app</th>
+<th>what it does</th>
+<th>how it is reached</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>immich</td>
+<td>photo library with machine-learning search for faces and objects,
+run on the server itself</td>
+<td>tunnel + access</td>
+</tr>
+<tr>
+<td>filebrowser</td>
+<td>web file manager over the data share</td>
+<td>tunnel + access</td>
+</tr>
+<tr>
+<td>samba</td>
+<td>the same share in finder and explorer</td>
+<td>lan and tailnet only</td>
+</tr>
+<tr>
+<td>backrest</td>
+<td>restic ui and scheduler, data mounted read-only</td>
+<td>proxy only</td>
+</tr>
+<tr>
+<td>uptime kuma</td>
+<td>uptime checks, direct and through the proxy</td>
+<td>proxy only</td>
+</tr>
+<tr>
+<td>beszel</td>
+<td>host and container metrics</td>
+<td>proxy and lan</td>
+</tr>
+<tr>
+<td>nginx proxy manager</td>
+<td>hostname routing</td>
+<td>the hub</td>
+</tr>
+<tr>
+<td>cloudflared</td>
+<td>the outbound tunnel</td>
+<td>the only door</td>
+</tr>
+</tbody>
+</table></div>
+<p>the photo app mounts my archive read-only. it can index every photo i
+own and cannot delete a single one.</p>
+<p>there is also a small graveyard. n8n, open webui and logseq each ran
+here for a while. their configs are still in the backup bundle, but they
+did not earn their ram, so they are off. turning things off is part of
+running things.</p>
+<h2 id="the-second-brain">the second brain</h2>
+<p>the most important thing on this machine is a folder of markdown.</p>
+<p>i was tired of learning the same thing twice. the fix was a second
+brain my agents and i both read and write, built on obsidian and stored
+on google drive. yes, after a whole section about renting, my thinking
+lives on google drive. ownership here means plain markdown files i hold
+a copy of, in a format that will outlive any app. the server mounts the
+folder with an <code>rclone</code> systemd user service, so every
+machine, human or agent, sees the same files.</p>
+<pre class="text"><code>obsidian/
+  skills/          shared agent instructions and skills
+  technicals/      concepts, systems, project notes, practice
+  space/           space technology research
+  startups/        startup lessons
+  meeting-notes/   raw transcripts, used only as source material
+  private/         never used in public or work contexts</code></pre>
+<p>the design rules are small and strict:</p>
+<ul>
+<li><strong>separate vaults by audience.</strong> a vault is a boundary.
+private reflections live in a vault agents are told never to use in
+public or work contexts.</li>
+<li><strong>navigation is a tree you can walk.</strong> each vault has a
+<code>home.md</code> that points to folder indexes, and each index lists
+its notes with one line on what each explains. an agent can find
+anything with <code>rg</code> in a few hops.</li>
+<li><strong>notes are written for a stranger.</strong> every note
+assumes the reader has no context: first principles, causal order, one
+concrete example, the misconceptions that were corrected, and the
+questions still open.</li>
+<li><strong>search before writing.</strong> update the note that owns an
+idea instead of creating a near-duplicate.</li>
+<li><strong>archive, never delete.</strong> superseded thinking moves to
+an archive. how i used to be wrong is useful data.</li>
+</ul>
+<p>the quiet trick is that the agents' instructions live inside the
+second brain. claude code and codex both read the same instruction file
+and the same skills, symlinked out of <code>obsidian/skills/</code>. i
+edit one file and both agents change their behaviour on every
+machine.</p>
+<p>one skill turns a technical conversation into a durable note. it does
+not save a transcript. it reconstructs the learning arc: the first
+question, the model i started with, where that model broke, and what
+replaced it. before it writes, it runs three separate checks: the vault
+root has a home note, the vault really contains notes, and exactly one
+vault root exists. a path can resolve and still be wrong: an empty
+mount, an unreadable folder, a vault nested inside another vault. if any
+check fails, the skill changes nothing and says so. an agent that writes
+confidently into the wrong place is worse than one that stops.</p>
+<h2 id="working-with-agents">working with agents</h2>
+<p>the server is also where my agents live. a systemd user service
+starts a tmux session at boot, so sessions survive me closing my laptop.
+my terminal app shows each tmux window as a tab, and tmux passes the
+agents' notifications and clipboard straight through to my mac.</p>
+<p>two tools grew out of running many agents at once, and both are
+public:</p>
+<ul>
+<li><a href="https://github.com/adhikrysh/agent-squad" target="_blank"
+rel="noopener noreferrer">agent-squad</a>: a read-only terminal
+dashboard of every claude code and codex session, sorted so the ones
+waiting on me float to the top.</li>
+<li><a href="https://github.com/adhikrysh/ghostty-agent-workspace"
+target="_blank" rel="noopener noreferrer">ghostty-agent-workspace</a>: a
+one-command terminal layout for working alongside agents.</li>
+</ul>
+<p>the philosophy behind how they are instructed is simple. an agent
+should make me think harder, not think for me. it should show its
+reasoning, separate what it verified from what it assumed, and never
+dress a guess up as a fact. it should reach for a command-line tool
+before an api, an api before an mcp server, and a browser only as a last
+resort. it should hand cheap, independent work to cheaper models and
+then check their work, because delegation without verification is just
+hope with extra steps.</p>
+<h2 id="what-an-old-laptop-taught-me">what an old laptop taught me</h2>
+<ul>
+<li><strong>reduce the attack surface to one door, then guard that
+door.</strong> no open ports beats a clever firewall.</li>
+<li><strong>measure the phases before you optimise.</strong> most of my
+latency was physics, and the table proved it in one command.</li>
+<li><strong>health beats existence.</strong> a running container is not
+a working service.</li>
+<li><strong>backups are a restore plan with a schedule
+attached.</strong> design for the night you need them, including where
+the password lives.</li>
+<li><strong>knowledge compounds only if it is written for a
+stranger.</strong> the stranger is usually me, six months later.</li>
+</ul>
+<p>the configs, scripts and runbooks are in this repository, with
+secrets removed. the laptop is still on a desk somewhere across the
+pacific, doing its job.</p>
+      </div>
+    </main>
+  </div>
+<!-- navigation-preload:start -->
+<script>
+(() => {
+  const warmed = new Set();
+  const warm = link => {
+    const href = link?.getAttribute('href');
+    if (!href || !/^\/(?:src(?:\/[a-z0-9-]+)?|)$/.test(href)) return;
+    const url = new URL(href, location.href).href;
+    if (url === location.href || warmed.has(url)) return;
+    warmed.add(url);
+    fetch(url, { credentials: 'same-origin', priority: 'low' })
+      .then(response => {
+        if (!response.ok) throw new Error('preload failed');
+        return response.arrayBuffer();
+      })
+      .catch(() => warmed.delete(url));
+  };
+  const connection = navigator.connection;
+  if (!connection?.saveData && !['slow-2g', '2g'].includes(connection?.effectiveType)) {
+    document.querySelectorAll('a[href^="/src"]').forEach(warm);
+  }
+  for (const type of ['pointerover', 'focusin', 'touchstart']) {
+    document.addEventListener(type, event => warm(event.target.closest?.('a')), { passive: true });
+  }
+})();
+</script>
+<!-- navigation-preload:end -->
+</body>
+</html>

@@ -99,6 +99,21 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/contact-router/commit/eb4dbd7567dc2e57caaecd2f091b320bb8939863" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
       </p>
       <div class="readme">
+<p>imagine a postal service where the roads only exist at scheduled
+times. the road to the moon relay opens at 2:00 and closes at 2:20. the
+relay's road home opens at 3:10. two of the roads share the same truck,
+so if one is busy the other waits. and every parcel has a deadline after
+which nobody wants it.</p>
+<p>that is a space network. links between spacecraft and ground stations
+appear when geometry allows and vanish when it does not. the internet's
+assumption, that a path exists right now, does not hold. data has to be
+stored, carried, and forwarded on a schedule, and the scarce thing is
+not bandwidth on paper but the actual minutes when a specific radio can
+actually talk.</p>
+<p>contact-router plans that delivery: it finds the earliest arrival for
+each bundle and books the radio time so two routes never claim the same
+transmitter at once.</p>
+<h2 id="what-it-does">what it does</h2>
 <p>contact-router is a small C++20 planner for a network whose links
 appear only during scheduled contact windows. it routes a whole bundle,
 a unit of data, across those windows and reserves transmission time on
@@ -165,7 +180,7 @@ into place. a failed search, a deadline miss, or a search-budget stop
 consumes no capacity. an allocation failure during a later hop also
 leaves the prior plan untouched.</p>
 <p><a
-href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/include/contact/router.hpp"
+href="https://github.com/adhikrysh/contact-router/blob/d978b03d2e68fc0427ce0cd8b4e8d4f24de62302/include/contact/router.hpp"
 target="_blank"
 rel="noopener noreferrer"><code>Router::release</code></a> removes a
 planned route's bookings, and a contact cannot be disabled while a
@@ -207,7 +222,7 @@ image,no_route,,,
 expired-image,no_route,,,</code></pre>
 <h2 id="verification-and-boundaries">verification and boundaries</h2>
 <p><a
-href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/tests/test_router.cpp"
+href="https://github.com/adhikrysh/contact-router/blob/d978b03d2e68fc0427ce0cd8b4e8d4f24de62302/tests/test_router.cpp"
 target="_blank" rel="noopener noreferrer">the test executable</a>
 compares 2,800 reservations with an independent exhaustive simple-path
 search and a microsecond-by-microsecond slot scan. it also exercises
@@ -220,10 +235,10 @@ retransmission, uncertain contact time, or full half-duplex radio model.
 a shared resource is one transmitter calendar. it is a planning
 simulator, not a Bundle Protocol implementation.</p>
 <p>the API is <a
-href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/include/contact/router.hpp"
+href="https://github.com/adhikrysh/contact-router/blob/d978b03d2e68fc0427ce0cd8b4e8d4f24de62302/include/contact/router.hpp"
 target="_blank" rel="noopener noreferrer">router.hpp</a>; the search and
 commit code are in <a
-href="https://github.com/adhikrysh/contact-router/blob/eb4dbd7567dc2e57caaecd2f091b320bb8939863/src/router.cpp"
+href="https://github.com/adhikrysh/contact-router/blob/d978b03d2e68fc0427ce0cd8b4e8d4f24de62302/src/router.cpp"
 target="_blank" rel="noopener noreferrer">router.cpp</a>. reproduce the
 reservation plot with Matplotlib and
 <code>python examples/plot.py</code>. enable sanitizers with
@@ -231,6 +246,9 @@ reservation plot with Matplotlib and
 href="https://www.nasa.gov/communicating-with-missions/delay-disruption-tolerant-networking/"
 target="_blank" rel="noopener noreferrer">delay/disruption tolerant
 networking overview</a> gives the broader store-and-forward context.</p>
+<p>the greedy planner is honest about being greedy. the interesting
+future work is the part a single shortest path cannot see: what one
+bundle's perfect route costs the next one.</p>
       </div>
     </main>
   </div>
