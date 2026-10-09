@@ -99,53 +99,59 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/orbit-access/commit/51b7470c15b64295bea9514f0f2f439708df2966" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
       </p>
       <div class="readme">
-<p>a leo satellite gives a ground station about six to eight minutes a
-pass, a few passes a day. miss the window and you wait hours. the earth
-doesn't help: it's fat at the equator, so J2 drags inclined orbits
-around, and the station is spinning under the satellite at ~465 m/s. get
-either wrong and the dish is pointing at a cloud.</p>
-<p>this propagates an orbit with J2, puts a WGS84 station on a spinning
-earth, and finds every window above the elevation mask.</p>
-<pre class="text"><code>state at t0 -&gt; adaptive J2 propagation -&gt; WGS84 station + earth spin
+<p>a ground station only gets a few minutes of contact per pass with a
+satellite in low earth orbit. in this model's default case that's four
+passes a day of six to eight minutes each, about half an hour of contact
+in total, so the pass times need to be predicted accurately. two effects
+dominate the error: earth's oblateness (J2), which precesses inclined
+orbit planes, and earth's rotation, which moves the station under the
+orbit at ~465 m/s at the equator.</p>
+<p>orbit-access propagates a satellite state with J2, places a WGS84
+station on a rotating earth, and reports every interval above the
+elevation mask.</p>
+<pre class="text"><code>state at t0 -&gt; adaptive J2 propagation -&gt; WGS84 station + earth rotation
             -&gt; elevation above mask -&gt; bracket -&gt; bisect -&gt; pass</code></pre>
-<p>default run (circular, 7,000 km, 51.6°, station at 1.35° N 103.82° E)
-gives four passes above 10° in a day: 390.278, 449.958, 455.508 and
-404.475 s. model outputs, not a forecast for anything real.</p>
+<p>the default run (circular orbit, 7,000 km radius, 51.6° inclination,
+station at 1.35° N 103.82° E) finds four passes above 10° in one day:
+390.278, 449.958, 455.508 and 404.475 s. these are outputs of this
+model, not predictions for a real spacecraft.</p>
 <p><picture><source srcset="/assets/projects/orbit-access-81e42071e79f.webp" type="image/webp"><img src="/assets/projects/orbit-access-b7ea762965f0.png"
 loading="eager" decoding="async" fetchpriority="high" width="1440"
 height="1280" alt="One-day comparison" /></picture></p>
-<h2 id="how">how</h2>
-<p>dynamics are central gravity plus J2 in <a
-href="https://github.com/adhikrysh/orbit-access/blob/0981aca1d0a3829d5001792cb1d3cd61a05aa075/src/dynamics.cpp"
-target="_blank" rel="noopener noreferrer">dynamics.cpp</a>, integrated
-with Dormand-Prince 5(4) using separate tolerances for km and km/s (1e-8
-km, 1e-11 km/s). it either reaches the requested time or throws, it
-never quietly hands back half a trajectory.</p>
-<p>with J2 on, energy and z angular momentum are conserved but the full
-angular momentum vector isn't, which matters because it decides which
-conservation test is even valid (<a
-href="https://github.com/adhikrysh/orbit-access/blob/0981aca1d0a3829d5001792cb1d3cd61a05aa075/docs/numerics.md"
+<h2 id="design">design</h2>
+<p>the force model is central gravity plus J2 (<a
+href="https://github.com/adhikrysh/orbit-access/blob/7b9f012189141fbba194d3565db2dd6deb257921/src/dynamics.cpp"
+target="_blank" rel="noopener noreferrer">dynamics.cpp</a>), integrated
+with Dormand-Prince 5(4) using separate absolute tolerances for position
+and velocity (1e-8 km, 1e-11 km/s). the propagator either reaches the
+requested time or throws; it never returns a partial trajectory.</p>
+<p>with J2 enabled, energy and the z component of angular momentum are
+conserved but the full angular momentum vector is not. that determines
+which conservation checks are valid tests of the integrator (<a
+href="https://github.com/adhikrysh/orbit-access/blob/7b9f012189141fbba194d3565db2dd6deb257921/docs/numerics.md"
 target="_blank" rel="noopener noreferrer">numerics.md</a>).</p>
-<p>the station uses the WGS84 ellipsoid normal as up, not the line from
-earth's centre, rotated with an explicit Greenwich angle. passes are
-found by sampling every 10 s, then bisecting each crossing to 1e-5 s,
-re-propagating from the same endpoint every time instead of
-interpolating. a pass shorter than the sample step can still sneak
-through between samples, and that's stated, not hidden.</p>
-<h2 id="tests">tests</h2>
-<p>150 elliptic two-body runs against an independent Kepler solver
-(under 0.5 m and 0.5 mm/s), conservation over long runs, J2 acceleration
-against a numerical potential gradient, node drift within 1% of secular
-theory, analytic rise and set times, and the same pass list when the
-sample step drops from 31 s to 7 s. <a
-href="https://github.com/adhikrysh/orbit-access/blob/0981aca1d0a3829d5001792cb1d3cd61a05aa075/.github/workflows/check.yml"
-target="_blank" rel="noopener noreferrer">ci</a> runs it under asan and
-ubsan.</p>
+<p>the station's local vertical is the WGS84 ellipsoid normal rather
+than the geocentric direction, rotated into the inertial frame with an
+explicit Greenwich angle. passes are found by sampling elevation every
+10 s and bisecting each visibility change to 1e-5 s, re-propagating from
+the same left endpoint each time instead of interpolating elevation. a
+grazing pass shorter than the sample step can still be missed, and the
+documentation says so.</p>
+<h2 id="verification">verification</h2>
+<p>150 elliptic two-body propagations against an independent Kepler
+solver (under 0.5 m and 0.5 mm/s), long-run conservation, the J2
+acceleration against a numerical potential gradient, node drift within
+1% of first-order secular theory, analytic rise and set times, and an
+identical pass list when the sample step drops from 31 s to 7 s. <a
+href="https://github.com/adhikrysh/orbit-access/blob/7b9f012189141fbba194d3565db2dd6deb257921/.github/workflows/check.yml"
+target="_blank" rel="noopener noreferrer">ci</a> runs the suite under
+asan and ubsan.</p>
 <pre class="sh"><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release &amp;&amp; cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/orbit-access passes 86400 1.3521 103.8198 10 j2</code></pre>
-<p>no drag, no moon, no sun, no UTC or polar motion, no refraction. good
-for poking at the numerics, not for booking a real antenna.</p>
+<p>not modelled: drag, lunar and solar gravity, utc and polar motion,
+refraction. it's a tool for examining the numerics and geometry, not for
+operational contact scheduling.</p>
       </div>
     </main>
   </div>
