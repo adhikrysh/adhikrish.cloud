@@ -96,7 +96,7 @@
       <h1>homeserver</h1>
       <p class="project-meta">
         <a href="https://github.com/adhikrysh/homeserver/commit/c56936cb1c1946a3271b8cc10b5b518721bebfcd" target="_blank" rel="noopener noreferrer"><time datetime="2024-12-28">dec 28, 2024</time></a>
-        <span class="last-edited">code updated <a href="https://github.com/adhikrysh/homeserver/commit/4cfdb19b187c16253d928b6b101463a4fe0f666f" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-09">oct 9, 2026</time></a></span>
+        <span class="last-edited">code updated <a href="https://github.com/adhikrysh/homeserver/commit/48a0a1985d23181ba76f8cbdca1df8bea92f39a7" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-09">oct 9, 2026</time></a></span>
       </p>
       <div class="readme">
 <p>bought a thinkpad t480 in dec 2024 and it somehow ended up running my
@@ -151,16 +151,42 @@ first byte      182 ms</code></pre>
 negotiate. so i cut round trips instead: bbr + <code>fq</code>, tcp fast
 open, no slow start after idle, shorter keepalives, gzip at 5, and
 http/2, which was somehow off on every proxy host. details in <a
-href="https://github.com/adhikrysh/homeserver/blob/4cfdb19b187c16253d928b6b101463a4fe0f666f/docs/latency.md"
+href="https://github.com/adhikrysh/homeserver/blob/48a0a1985d23181ba76f8cbdca1df8bea92f39a7/docs/latency.md"
 target="_blank"
 rel="noopener noreferrer"><code>docs/latency.md</code></a>.</p>
+<h2 id="dns">dns</h2>
+<p>adguard home is the dns resolver for my devices, so ads and trackers
+die at dns before anything even loads them. it also caches, which
+matters more than the blocking: a cold lookup was ~123ms and a cached
+one ~3ms, and with the pacific in the way i'll take every free 120ms i
+can get. its config is root-only, so the nightly backup reads it through
+<code>docker exec</code>.</p>
+<h2 id="music">music</h2>
+<p>my music runs on navidrome, which speaks the subsonic api, so
+basically any subsonic app on my phone or laptop just works against it.
+the library is mounted read-only, it rescans every hour, and sessions
+last a day so i'm not logging in every time i open the app. navidrome
+itself is only on the lan and the tailnet, never public. next to it
+there's a small shim i wrote that talks to navidrome's api and is the
+only thing allowed to write into the library.</p>
 <h2 id="keeping-it-up">keeping it up</h2>
-<p>assume 3am me is asleep and not coming. containers restart
-themselves, the tunnel waits for the proxy's healthcheck, immich's
-postgres is pinned by digest with checksums on, and unattended-upgrades
-does patches. uptime kuma checks each app directly and through the
-proxy, because a green proxy in front of a dead app is just lying to
-you. beszel watches cpu, memory, disk and temps per container.</p>
+<p>assume 3am me is asleep and not coming, so the boring failures have
+to fix themselves:</p>
+<ul>
+<li>every container is <code>always</code> or
+<code>unless-stopped</code>, so a crash or a reboot just comes back</li>
+<li>the tunnel waits for the proxy's healthcheck, so traffic never lands
+on a half-booted nginx</li>
+<li>immich's postgres is pinned by digest with data checksums on, so
+upgrades don't surprise me and corruption is loud</li>
+<li>uptime kuma checks each app directly and through the proxy, because
+a green proxy in front of a dead app is just lying to you</li>
+<li>beszel watches cpu, memory, disk and temps for the host and every
+container</li>
+<li>unattended-upgrades does the security patches</li>
+<li>tcp keepalives at a minute instead of two hours, so a dead
+connection gets noticed and reopened fast instead of hanging</li>
+</ul>
 <h2 id="backups">backups</h2>
 <pre class="text"><code>01:30  backup_configs.sh -&gt; server-configs
 02:00  backrest (restic) -&gt; backblaze b2
@@ -172,15 +198,16 @@ through <code>sqlite3.backup()</code>. and the restic password was
 living in a config that got backed up into the repo that needs the
 password to open. very secure, very useless. it lives outside the system
 now. <a
-href="https://github.com/adhikrysh/homeserver/blob/4cfdb19b187c16253d928b6b101463a4fe0f666f/scripts/backup_configs.sh"
+href="https://github.com/adhikrysh/homeserver/blob/48a0a1985d23181ba76f8cbdca1df8bea92f39a7/scripts/backup_configs.sh"
 target="_blank"
 rel="noopener noreferrer"><code>scripts/backup_configs.sh</code></a></p>
 <h2 id="whats-on-it">what's on it</h2>
 <p>~32 GB of photos that immich mounts read-only (it can index
 everything and delete nothing), ~24 GB of immich uploads and thumbnails
 with face search running locally, filebrowser and samba over the same
-share, plus backrest, uptime kuma and beszel. n8n, open webui and logseq
-lived here for a bit, didn't earn their ram, got evicted.</p>
+share, navidrome for music, adguard for dns, plus backrest, uptime kuma
+and beszel. n8n, open webui and logseq lived here for a bit, didn't earn
+their ram, got evicted.</p>
 <h2 id="second-brain">second brain</h2>
 <p>obsidian, plain markdown on google drive, mounted on the box with an
 <code>rclone</code> user service so every machine and agent reads the
@@ -199,10 +226,22 @@ symlinked out of <code>obsidian/skills/</code>, so one edit changes both
 agents everywhere. one skill turns a long technical convo into a note
 and refuses to write unless the vault actually checks out (home note
 exists, notes exist, exactly one <code>.obsidian</code>).</p>
-<h2 id="agents">agents</h2>
-<p>tmux starts at boot so sessions outlive my laptop lid. two tools came
-out of running too many agents at once: <a
-href="https://github.com/adhikrysh/agent-squad" target="_blank"
+<h2 id="long-running-agents">long-running agents</h2>
+<p>this is honestly what the box does most now. claude code and codex
+run on the thinkpad, not on my laptop. tmux starts at boot as a systemd
+user service with lingering on, so sessions don't care whether i'm
+logged in, and an agent can grind through a six-hour task while my
+laptop is closed in a bag.</p>
+<p>i attach from the mac over the tailnet (direct wireguard, ~190ms) or
+the tunnel, and every tmux window shows up as a tab in cmux. clipboard
+and notifications pass through tmux to the mac, so an agent finishing or
+asking for permission actually pings me. the only thing crossing the
+pacific is my typing. the agents, their files and their git checkouts
+all live next to each other on the box.</p>
+<p>the agents read their instructions and skills from the second brain,
+so a fresh session on any machine starts with the same rules. and
+because i usually have too many running at once, two tools came out of
+this: <a href="https://github.com/adhikrysh/agent-squad" target="_blank"
 rel="noopener noreferrer">agent-squad</a>, a dashboard of every claude
 code and codex session sorted by who's waiting on me, and <a
 href="https://github.com/adhikrysh/ghostty-agent-workspace"
