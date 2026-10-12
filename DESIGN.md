@@ -123,7 +123,7 @@ text and rules define the form language. text links use one-pixel underlines wit
 
 ### Navigation
 
-navigation links use muted grey and one-pixel underlines. the homepage's "things i've built", "contact@adhikrish.cloud", "linkedin", and "github" links form a wrapping row with 14px gaps, 20px after the last paragraph. all homepage links use the same muted color and 15px type at every viewport width. the full email address stays visible; links wrap when the viewport or enlarged text needs room. their hit areas stay at least 32px tall and wide. hovered links turn a darker grey; keyboard focus has a visible outline. links animate only their color over 220ms and disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation.
+navigation links use muted grey and one-pixel underlines. the homepage's "things i've built", "contact@adhikrish.cloud", "linkedin", and "github" links form a wrapping row with 14px gaps, 20px after the last paragraph. all homepage links use the same muted color and 15px type at every viewport width. the full email address stays visible; links wrap when the viewport or enlarged text needs room. their hit areas stay at least 32px tall and wide. hovered links turn a darker grey; keyboard focus has a visible outline. links animate only their color over 220ms and disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation. the index's "other stuff" link to public github repositories sits at the far end of its navigation the same way.
 
 ### Index Entries
 

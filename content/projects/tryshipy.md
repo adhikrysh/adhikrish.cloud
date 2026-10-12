@@ -1,4 +1,4 @@
-# shipy (revenue generating)
+# shipy
 
 [shipy](https://tryshipy.com) is an ai operating system for ship brokers. it turns private email and documents into source-backed commercial records and a workspace for reviewing evidence and moving deals forward.
 

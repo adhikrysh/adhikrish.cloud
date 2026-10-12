@@ -16,8 +16,6 @@ PROJECTS = json.loads((ROOT / "content/projects.json").read_text())
 GROUPS = [("spacecraft-simulations", "spacecraft simulations"), ("others", "others")]
 INDEX_DESCRIPTION = "spacecraft simulations and other things i've built."
 READING_CSS = """
-  nav { flex-wrap: wrap; }
-  nav .external { margin-left: auto; }
   .project h1 { font-size: 28px; overflow-wrap: anywhere; }
   .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
   .project-meta a { color: inherit; }

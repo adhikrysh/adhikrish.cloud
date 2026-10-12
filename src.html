@@ -62,6 +62,8 @@
   .project-list time { color: #8a8a8a; font-size: 12px; white-space: nowrap; }
   .project-list span { overflow-wrap: anywhere; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .project-list p { color: #8a8a8a; font-size: 14px; line-height: 1.6; }
+  nav { flex-wrap: wrap; }
+  nav .external { margin-left: auto; }
   .project-index { margin-top: 32px; }
   .project-group + .project-group { margin-top: 48px; }
   .project-group h2 { color: #8a8a8a; font-size: 17px; font-weight: 380; line-height: 1.6; }
@@ -70,7 +72,10 @@
 </head>
 <body>
   <div class="reading">
-    <nav aria-label="site"><a href="/">home</a></nav>
+    <nav aria-label="site">
+      <a href="/">home</a>
+      <a class="external" href="https://github.com/adhikrysh?tab=repositories" target="_blank" rel="noopener noreferrer" aria-label="other stuff on github (opens in a new tab)" title="opens in a new tab">other stuff</a>
+    </nav>
     <main>
       <h1>things i've built</h1>
       <!-- project-index:start -->
@@ -104,7 +109,7 @@
               <p>an old thinkpad running my photos, files, backups and ai second brain, with no open ports.</p>
             </li>
             <li>
-              <a href="/src/tryshipy"><span>shipy (revenue generating)</span></a>
+              <a href="/src/tryshipy"><span>shipy</span></a>
               <p>ai operating system for ship brokers.</p>
             </li>
           </ul>
