@@ -188,7 +188,7 @@ for project in PROJECTS:
     head = re.sub(r'^  \.(?:project-list|project-index|project-group)[^\n]*\n',
                   '', head, flags=re.MULTILINE)
     title = html.escape(project.get("title", slug))
-    head = head.replace("things i've built | adhikrish rk", f"{title} | adhikrish rk")
+    head = head.replace("some things i've built | adhikrish rk", f"{title} | adhikrish rk")
     head = head.replace(INDEX_DESCRIPTION,
                         html.escape(project["description"], quote=True))
     head = head.replace('content="website"', 'content="article"')
@@ -214,7 +214,7 @@ for project in PROJECTS:
   <div class="reading">
     <nav aria-label="site">
       <a href="/">home</a>
-      <a href="/src">things i've built</a>
+      <a href="/src">some things i've built</a>
 {external_link}
     </nav>
     <main class="project">
