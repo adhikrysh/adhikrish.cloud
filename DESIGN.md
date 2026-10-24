@@ -105,7 +105,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 
 ## Layout
 
-the desktop homepage places a vertically centered, left-aligned text block with a maximum width of 720px and a 15% left inset. its three paragraphs share 17px type, weight 380, 1.9 line height, and 20px gaps. text wraps naturally. at 720px and below, body type remains 17px, and the text and navigation remain left-aligned, with 40px vertical and 28px horizontal padding. below 360px, horizontal padding becomes 20px. mobile centers the complete block vertically within the small viewport height. the homepage has no display heading or emphasized navigation link.
+the desktop homepage places a vertically centered, left-aligned text block with a maximum width of 720px and a 15% left inset. its four paragraphs share 17px type, weight 380, 1.9 line height, and 20px gaps. text wraps naturally. at 720px and below, body type remains 17px, and the text and navigation remain left-aligned, with 40px vertical and 28px horizontal padding. below 360px, horizontal padding becomes 20px. mobile centers the complete block vertically within the small viewport height. the homepage has no display heading or emphasized navigation link.
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. the /src index and generated reading pages keep 17px body text and 15px navigation at every viewport width. below 720px, the main gap becomes 48px. below 360px, horizontal padding is 20px.
 
