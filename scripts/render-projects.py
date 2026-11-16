@@ -133,12 +133,16 @@ if any(project["group"] not in dict(GROUPS) for project in PROJECTS):
 sections = []
 for group, label in GROUPS:
     items = []
+    # Keep explicitly pinned entries first; other entries follow their displayed date.
     projects = sorted((p for p in PROJECTS if p["group"] == group),
-                      key=lambda p: p.get("date", ""), reverse=True)
+                      key=lambda p: (p.get("pinned", False), p.get("date", "")), reverse=True)
     for project in projects:
         slug = project["slug"]
         title = html.escape(project.get("title", slug))
-        timestamp = (f'<time datetime="{project["date"]}">{readable_date(project["date"])}</time>'
+        # Imported projects show their import date rather than an inferred start date.
+        date_label = html.escape(project.get("date_label", ""))
+        date_prefix = f"{date_label} " if date_label else ""
+        timestamp = (f'<time datetime="{project["date"]}">{date_prefix}{readable_date(project["date"])}</time>'
                      if project.get("date") else "")
         items.append(f'''            <li>
               <a href="/src/{slug}"><span>{title}</span>{timestamp}</a>
@@ -188,7 +192,7 @@ for project in PROJECTS:
     head = re.sub(r'^  \.(?:project-list|project-index|project-group)[^\n]*\n',
                   '', head, flags=re.MULTILINE)
     title = html.escape(project.get("title", slug))
-    head = head.replace("some things i've built | adhikrish rk", f"{title} | adhikrish rk")
+    head = head.replace("things i've built | adhikrish rk", f"{title} | adhikrish rk")
     head = head.replace(INDEX_DESCRIPTION,
                         html.escape(project["description"], quote=True))
     head = head.replace('content="website"', 'content="article"')
@@ -204,8 +208,16 @@ for project in PROJECTS:
                      f'title="opens in a new tab">{external_label}</a>' if external_url else "")
     metadata = ""
     if project.get("date"):
+        # An import date describes the repository, not the old root commit's date.
+        date_label = html.escape(project.get("date_label", ""))
+        date_prefix = f"{date_label} " if date_label else ""
+        date_url = repository if date_label == "imported" else f"{repository}/commit/{project['first_commit']}"
+        import_note = ('        <span class="last-edited">older local work imported to github; '
+                       'this date does not mark the start of development.</span>\n'
+                       if date_label == "imported" else "")
         metadata = f'''      <p class="project-meta">
-        <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>
+        <a href="{date_url}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{date_prefix}{readable_date(project['date'])}</time></a>
+{import_note}\
         <span class="last-edited">code updated <a href="{repository}/commit/{project['source_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['edited_date']}">{readable_date(project['edited_date'])}</time></a></span>
       </p>
 '''
@@ -214,7 +226,7 @@ for project in PROJECTS:
   <div class="reading">
     <nav aria-label="site">
       <a href="/">home</a>
-      <a href="/src">some things i've built</a>
+      <a href="/src">things i've built</a>
 {external_link}
     </nav>
     <main class="project">

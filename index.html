@@ -61,6 +61,20 @@
   .text p + p {
     margin-top: 20px;
   }
+  .text a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    transition: color 220ms ease;
+  }
+  .text a:hover {
+    color: #8a8a8a;
+  }
+  .text a:focus-visible {
+    outline: 1px solid #ffffff;
+    outline-offset: 3px;
+  }
   .links {
     margin-top: 20px;
     display: flex;
@@ -123,11 +137,12 @@
       <p>i believe space is <em>the</em> problem of our lifetime, and the answer to most of the others</p>
       <!-- Place the current exploration between the space interest and the invitation. -->
       <p>i'm experimenting with formal verification for critical systems</p>
-      <p>if you're building in this field too, i'd love to chat</p>
+      <p>if you're building in this field too, i'd love to <a href="https://x.com/messages/compose?recipient_id=4626702200" target="_blank" rel="noopener noreferrer" aria-label="chat on x (opens in a new tab)" title="opens in a new tab">chat</a></p>
     </div>
 
-    <nav class="links" aria-label="some things i've built and social links">
-      <a href="/src">some things i've built</a>
+    <nav class="links" aria-label="site and social links">
+      <a href="/src">things i've built</a>
+      <a href="/txt">things i've written</a>
       <a href="mailto:contact@adhikrish.cloud" aria-label="email contact@adhikrish.cloud" title="contact@adhikrish.cloud">contact@adhikrish.cloud</a>
       <a href="https://www.linkedin.com/in/adhikrish/" target="_blank" rel="noopener noreferrer" aria-label="linkedin" title="linkedin">linkedin</a>
       <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer" aria-label="github" title="github">github</a>

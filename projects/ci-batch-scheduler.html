@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ci-batch-scheduler | adhikrish rk</title>
+<meta name="description" content="batch code-checking jobs onto fewer machines while meeting their deadlines.">
+<meta property="og:title" content="ci-batch-scheduler | adhikrish rk">
+<meta property="og:description" content="batch code-checking jobs onto fewer machines while meeting their deadlines.">
+<meta property="og:image" content="https://adhikrish.cloud/og.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://adhikrish.cloud/og.png">
+<meta name="theme-color" content="#080807">
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-7330e902055f.png">
+<link rel="preload" href="/assets/inter-latin-c940764593d0.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://adhikrish.cloud/src/ci-batch-scheduler">
+<style>
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: rgba(255, 100, 0, 0.25); }
+  body {
+    background: #080807;
+    color: #d8d4c8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    letter-spacing: -0.012em;
+    padding: 40px 28px 80px;
+  }
+  .reading { max-width: 680px; margin-inline: auto; }
+  nav { display: flex; gap: 18px; }
+  nav a { color: #8a8a8a; font-size: 15px; }
+  a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
+  a:hover { color: #787878; }
+  a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
+  main, article { margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  @media (max-width: 720px) {
+    body { padding-top: 32px; }
+    main, article { margin-top: 48px; }
+  }
+  @media (max-width: 360px) {
+    body { padding-inline: 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+  nav { flex-wrap: wrap; }
+  nav .external { margin-left: auto; }
+
+  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  .project-meta a { color: inherit; }
+  .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
+  .readme { margin-top: 40px; line-height: 1.8; }
+  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme > :first-child { margin-top: 0; }
+  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
+  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
+  .readme ul, .readme ol { padding-left: 24px; }
+  .readme li + li { margin-top: 8px; }
+  .readme a { color: inherit; overflow-wrap: anywhere; }
+  .readme a:hover, .project-meta a:hover { color: #787878; }
+  .readme strong { font-weight: 550; }
+  .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; }
+  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme pre code { font-size: inherit; }
+  .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
+  .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
+  .readme figure { margin-block: 32px; }
+  .readme picture { display: block; }
+  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="reading">
+    <nav aria-label="site">
+      <a href="/">home</a>
+      <a href="/src">things i've built</a>
+      <a class="external" href="https://github.com/adhikrysh/ci-batch-scheduler" target="_blank" rel="noopener noreferrer" aria-label="github (opens in a new tab)" title="opens in a new tab">github</a>
+    </nav>
+    <main class="project">
+      <h1>ci-batch-scheduler</h1>
+      <p class="project-meta">
+        <a href="https://github.com/adhikrysh/ci-batch-scheduler/commit/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a" target="_blank" rel="noopener noreferrer"><time datetime="2026-09-16">sep 16, 2026</time></a>
+        <span class="last-edited">code updated <a href="https://github.com/adhikrysh/ci-batch-scheduler/commit/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a" target="_blank" rel="noopener noreferrer"><time datetime="2026-09-16">sep 16, 2026</time></a></span>
+      </p>
+      <div class="readme">
+<p>starting a new machine for every code-checking job repeats both
+machine startup and checks that several jobs need. this rust simulator
+groups jobs from the same repository so they can share that work while
+each job still finishes before its deadline.</p>
+<h2 id="deciding-when-to-launch">deciding when to launch</h2>
+<p>a batch takes the machine's startup time plus the duration of its
+distinct checks. subtract that duration from the earliest deadline among
+its jobs to find the last moment it can launch. until then, its
+membership can change as new jobs arrive.</p>
+<p>the scheduler keeps a feasible plan for every waiting job. it
+replaces a grouping only when doing so improves its score: fewer virtual
+machines first, then less total machine execution time. once a batch
+launches, its membership is fixed. the planner sees only jobs that have
+already arrived.</p>
+<h2 id="why-regrouping-matters">why regrouping matters</h2>
+<p>suppose startup takes 10 seconds and checks x, y, and z take 20, 10,
+and 10 seconds. jobs A and B arrive at time zero needing x and y. both
+must finish by time 60. together they take 40 seconds, so their planned
+launch is time 20.</p>
+<p>at time 20, job C arrives needing y and z, with a deadline of time
+80. putting all three together would take 50 seconds and miss the
+earlier deadlines. keeping A and B together and running C separately
+costs 70 machine-seconds.</p>
+<p>moving B into C's batch changes the result. A takes 30 seconds; B and
+C share y and also take 30 seconds. both batches can launch at time 30
+and finish at time 60. the same two machines now do 60 seconds of
+work.</p>
+<h2 id="bounded-search">bounded search</h2>
+<p>jobs needing identical checks share one search entry. for up to 12
+distinct check sets, the planner searches every partition of those sets.
+larger queues receive a bounded improvement search; above 64 sets it
+keeps the heuristic plan. exhausting the search budget leaves a feasible
+schedule in place.</p>
+<p>the <a
+href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/src/planner.rs"
+target="_blank" rel="noopener noreferrer">planner</a> owns these
+grouping decisions. the <a
+href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/src/scheduler.rs"
+target="_blank" rel="noopener noreferrer">scheduler</a> owns waiting
+jobs, timers, and launches. separating them keeps future arrivals
+outside the planner's view.</p>
+<h2 id="results-and-limits">results and limits</h2>
+<p>on the supplied evaluation workload, immediate launch uses 154
+virtual machines and 4,484 machine-seconds. regrouping uses 46 machines
+and 1,728 machine-seconds, with no missed deadlines. those inputs are
+private; the repository includes a smaller runnable example and
+generated tests.</p>
+<p>the <a
+href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/tests/scheduling.rs"
+target="_blank" rel="noopener noreferrer">public tests</a> compare 500
+small cases with an independent exhaustive solver, check both policies
+on 256 generated streams, and verify that changing future jobs cannot
+change past launch decisions.</p>
+<p>the default policy does not win on every workload. a broader
+synthetic comparison found that regrouping only to save machines used
+fewer machines overall, while the default saved more execution time. the
+<a
+href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/docs/design.md"
+target="_blank" rel="noopener noreferrer">design notes</a> explain that
+tradeoff.</p>
+<p>this is a simulation with known check durations and unlimited
+concurrent machines. an operating service would also need machine
+quotas, durable launch records, retries, and a margin for checks that
+overrun their estimates.</p>
+      </div>
+    </main>
+  </div>
+<!-- navigation-preload:start -->
+<script>
+(() => {
+  const warmed = new Set();
+  const warm = link => {
+    const href = link?.getAttribute('href');
+    if (!href || !/^\/(?:src(?:\/[a-z0-9-]+)?|)$/.test(href)) return;
+    const url = new URL(href, location.href).href;
+    if (url === location.href || warmed.has(url)) return;
+    warmed.add(url);
+    fetch(url, { credentials: 'same-origin', priority: 'low' })
+      .then(response => {
+        if (!response.ok) throw new Error('preload failed');
+        return response.arrayBuffer();
+      })
+      .catch(() => warmed.delete(url));
+  };
+  const connection = navigator.connection;
+  if (!connection?.saveData && !['slow-2g', '2g'].includes(connection?.effectiveType)) {
+    document.querySelectorAll('a[href^="/src"]').forEach(warm);
+  }
+  for (const type of ['pointerover', 'focusin', 'touchstart']) {
+    document.addEventListener(type, event => warm(event.target.closest?.('a')), { passive: true });
+  }
+})();
+</script>
+<!-- navigation-preload:end -->
+</body>
+</html>

@@ -97,7 +97,7 @@ the palette stays nearly monochrome; the orange selection is the only warm inter
 **Character:** compact sans-serif type with modest negative tracking. hierarchy comes from size, weight, and spacing rather than a second face.
 
 ### Hierarchy
-- **Page title:** used by the essays and "some things i've built" indexes.
+- **Page title:** used by the "things i've written" and "things i've built" indexes.
 - **Project title:** used at the start of each project page.
 - **Project heading:** used for readme h2 elements.
 - **Body:** normal reading copy; project readmes increase line height to 1.8.
@@ -109,7 +109,7 @@ the desktop homepage places a vertically centered, left-aligned text block with 
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. the /src index and generated reading pages keep 17px body text and 15px navigation at every viewport width. below 720px, the main gap becomes 48px. below 360px, horizontal padding is 20px.
 
-the "some things i've built" index at `/src` separates "spacecraft simulations" and "others" with plain muted headings and a 48px gap between groups. the first group starts 32px below the page title, with 16px between its heading and list. index entries align the title at left and any first-commit date at right. descriptions sit beneath their entries in muted text. standalone write-ups omit the date.
+the "things i've built" index at `/src` separates "spacecraft simulations" and "others" with plain muted headings and a 48px gap between groups. the first group starts 32px below the page title, with 16px between its heading and list. index entries align the title at left and any first-commit date at right. descriptions sit beneath their entries in muted text. standalone write-ups omit the date.
 
 ## Elevation & Depth
 
@@ -123,7 +123,7 @@ text and rules define the form language. text links use one-pixel underlines wit
 
 ### Navigation
 
-navigation links use muted grey and one-pixel underlines. the homepage's "some things i've built", "contact@adhikrish.cloud", "linkedin", and "github" links form a wrapping row with 14px gaps, 20px after the last paragraph. all homepage links use the same muted color and 15px type at every viewport width. the full email address stays visible; links wrap when the viewport or enlarged text needs room. their hit areas stay at least 32px tall and wide. hovered links turn a darker grey; keyboard focus has a visible outline. links animate only their color over 220ms and disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation. the index's "other stuff" link to public github repositories sits at the far end of its navigation the same way.
+navigation links use muted grey and one-pixel underlines. the homepage's "things i've built", "things i've written", "contact@adhikrish.cloud", "linkedin", and "github" links form a wrapping row with 14px gaps, 20px after the last paragraph. all homepage links use the same muted color and 15px type at every viewport width. the full email address stays visible; links wrap when the viewport or enlarged text needs room. their hit areas stay at least 32px tall and wide. hovered links turn a darker grey; keyboard focus has a visible outline. links animate only their color over 220ms and disable that transition for reduced-motion users. the project github link sits at the far end of the wrapping project navigation. the index's "more stuff" link to public github repositories sits at the far end of its navigation the same way. in the homepage text, "chat" in the last paragraph opens an x direct message in a new tab; it keeps the paragraph color with the same one-pixel underline and turns muted grey on hover.
 
 ### Index Entries
 
