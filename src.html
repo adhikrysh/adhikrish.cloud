@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>things i've built | adhikrish rk</title>
-<meta name="description" content="spacecraft simulations and other things i've built.">
+<meta name="description" content="things i've built.">
 <meta property="og:title" content="things i've built | adhikrish rk">
-<meta property="og:description" content="spacecraft simulations and other things i've built.">
+<meta property="og:description" content="things i've built.">
 <meta property="og:image" content="https://adhikrish.cloud/og.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -39,7 +39,7 @@
     letter-spacing: -0.012em;
     padding: 40px 28px 80px;
   }
-  .reading { max-width: 680px; margin-inline: auto; }
+  .reading { max-width: 640px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
   nav a { color: #8a8a8a; font-size: 15px; }
   a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
@@ -56,18 +56,14 @@
   }
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
   .project-list { list-style: none; margin-top: 32px; }
-  .project-list li + li { margin-top: 16px; }
+  .project-list li + li { margin-top: 20px; }
   .project-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 24px; color: #d8d4c8; padding-block: 8px; text-decoration: none; }
   .project-list a:hover { color: #787878; }
-  .project-list time { color: #8a8a8a; font-size: 12px; white-space: nowrap; }
+  .project-list time, .project-list small { color: #8a8a8a; font-size: 12px; white-space: nowrap; }
   .project-list span { overflow-wrap: anywhere; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .project-list p { color: #8a8a8a; font-size: 14px; line-height: 1.6; }
   nav { flex-wrap: wrap; }
   nav .external { margin-left: auto; }
-  .project-index { margin-top: 32px; }
-  .project-group + .project-group { margin-top: 48px; }
-  .project-group h2 { color: #8a8a8a; font-size: 17px; font-weight: 380; line-height: 1.6; }
-  .project-group .project-list { margin-top: 16px; }
 </style>
 </head>
 <body>
@@ -79,50 +75,40 @@
     <main>
       <h1>things i've built</h1>
       <!-- project-index:start -->
-      <div class="project-index">
-        <section class="project-group" aria-labelledby="spacecraft-simulations">
-          <h2 id="spacecraft-simulations">spacecraft simulations</h2>
-          <ul class="project-list" aria-label="spacecraft simulations">
-            <li>
-              <a href="/src/command-journal"><span>command-journal</span><time datetime="2026-02-02">feb 2, 2026</time></a>
-              <p>recover simulated spacecraft payload commands after a crash.</p>
-            </li>
-            <li>
-              <a href="/src/contact-router"><span>contact-router</span><time datetime="2026-01-19">jan 19, 2026</time></a>
-              <p>route data through scheduled space links without double-booking radios.</p>
-            </li>
-            <li>
-              <a href="/src/attitude-filter"><span>attitude-filter</span><time datetime="2026-01-04">jan 4, 2026</time></a>
-              <p>estimate spacecraft orientation through star-tracker outages.</p>
-            </li>
-            <li>
-              <a href="/src/orbit-access"><span>orbit-access</span><time datetime="2025-12-13">dec 13, 2025</time></a>
-              <p>simulate satellite orbits and find ground-station visibility windows.</p>
-            </li>
-          </ul>
-        </section>
-        <section class="project-group" aria-labelledby="others">
-          <h2 id="others">others</h2>
-          <ul class="project-list" aria-label="others">
-            <li>
-              <a href="/src/ci-batch-scheduler"><span>ci-batch-scheduler</span><time datetime="2026-09-16">sep 16, 2026</time></a>
-              <p>batch code-checking jobs onto fewer machines while meeting their deadlines.</p>
-            </li>
-            <li>
-              <a href="/src/agent-squad"><span>agent-squad</span><time datetime="2026-07-28">jul 28, 2026</time></a>
-              <p>find which Claude Code and Codex sessions need attention and jump to their terminals.</p>
-            </li>
-            <li>
-              <a href="/src/homeserver"><span>homeserver</span><time datetime="2024-12-28">dec 28, 2024</time></a>
-              <p>an old thinkpad running my photos, files, backups and ai second brain, with no open ports.</p>
-            </li>
-            <li>
-              <a href="/src/tryshipy"><span>shipy</span></a>
-              <p>ai operating system for ship brokers.</p>
-            </li>
-          </ul>
-        </section>
-      </div>
+      <ul class="project-list">
+          <li>
+            <a href="/src/fourplusone"><span>fourplusone</span><time datetime="2026-11-07">nov 7, 2026</time></a>
+            <p>a live map of your repo that flags what your coding agent decided without telling you.</p>
+          </li>
+          <li>
+            <a href="/src/tryshipy"><span>shipy</span><small>revenue generating</small></a>
+            <p>ai operating system for ship brokers.</p>
+          </li>
+          <li>
+            <a href="/src/command-journal"><span>command-journal</span><time datetime="2026-02-02">feb 2, 2026</time></a>
+            <p>recover simulated spacecraft payload commands after a crash.</p>
+          </li>
+          <li>
+            <a href="/src/contact-router"><span>contact-router</span><time datetime="2026-01-19">jan 19, 2026</time></a>
+            <p>route data through scheduled space links without double-booking radios.</p>
+          </li>
+          <li>
+            <a href="/src/attitude-filter"><span>attitude-filter</span><time datetime="2026-01-04">jan 4, 2026</time></a>
+            <p>estimate spacecraft orientation through star-tracker outages.</p>
+          </li>
+          <li>
+            <a href="/src/orbit-access"><span>orbit-access</span><time datetime="2025-12-13">dec 13, 2025</time></a>
+            <p>simulate satellite orbits and find ground-station visibility windows.</p>
+          </li>
+          <li>
+            <a href="/src/homeserver"><span>homeserver</span><time datetime="2024-12-28">dec 28, 2024</time></a>
+            <p>an old thinkpad running my photos, files, backups and ai second brain, with no open ports.</p>
+          </li>
+          <li>
+            <a href="/src/ci-batch-scheduler"><span>ci-batch-scheduler</span><time datetime="2026-09-16">sep 16, 2026</time></a>
+            <p>batch code-checking jobs onto fewer machines while meeting their deadlines.</p>
+          </li>
+      </ul>
       <!-- project-index:end -->
     </main>
   </div>

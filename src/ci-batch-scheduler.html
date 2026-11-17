@@ -39,7 +39,7 @@
     letter-spacing: -0.012em;
     padding: 40px 28px 80px;
   }
-  .reading { max-width: 680px; margin-inline: auto; }
+  .reading { max-width: 640px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
   nav a { color: #8a8a8a; font-size: 15px; }
   a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
@@ -58,31 +58,53 @@
   nav { flex-wrap: wrap; }
   nav .external { margin-left: auto; }
 
-  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .project h1 { font-size: 30px; overflow-wrap: anywhere; }
   .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
   .project-meta a { color: inherit; }
   .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
-  .readme { margin-top: 40px; line-height: 1.8; }
-  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme { margin-top: 44px; line-height: 1.75; }
+  .readme p, .readme ul, .readme ol { margin-block: 24px; }
   .readme > :first-child { margin-top: 0; }
-  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
-  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
-  .readme ul, .readme ol { padding-left: 24px; }
-  .readme li + li { margin-top: 8px; }
+  /* The opening paragraph says why the project exists; it reads as the lede. */
+  .readme > p:first-child { font-size: 19px; line-height: 1.65; color: #efebe0; }
+  .readme h2 { font-size: 20px; font-weight: 550; line-height: 1.4; color: #efebe0; letter-spacing: -0.02em;
+               margin: 56px 0 16px; padding-top: 28px; border-top: 1px solid #1f1f1c; }
+  .readme h2 + p { margin-top: 0; }
+  .readme h3 { font-size: 17px; font-weight: 550; line-height: 1.5; margin: 32px 0 12px; }
+  .readme ul, .readme ol { padding-left: 22px; }
+  .readme li + li { margin-top: 10px; }
+  .readme li::marker { color: #6a6a66; }
   .readme a { color: inherit; overflow-wrap: anywhere; }
   .readme a:hover, .project-meta a:hover { color: #787878; }
-  .readme strong { font-weight: 550; }
+  .readme strong { font-weight: 550; color: #efebe0; }
   .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
-  .readme :not(pre) > code { overflow-wrap: anywhere; }
-  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; padding: 1px 5px; background: #151513; border-radius: 3px; }
+  .readme pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px 18px; margin-block: 28px;
+                background: #121210; border: 1px solid #252522; border-radius: 4px; line-height: 1.7; font-size: 13px; }
   .readme pre code { font-size: inherit; }
   .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
   .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
-  .readme figure { margin-block: 32px; }
+  .readme figure { margin-block: 36px; }
   .readme picture { display: block; }
-  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme img { display: block; max-width: 100%; height: auto; border-radius: 4px; }
   .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  /* Inline svg diagrams: drawn in the page palette, scroll sideways on narrow phones instead of shrinking text. */
+  .readme figure.diagram { overflow-x: auto; }
+  .readme figure.diagram svg { display: block; width: 100%; min-width: 560px; height: auto; }
+  .readme .d-box { fill: #121210; stroke: #3a3a35; }
+  .readme .d-store { fill: #0d0d0b; stroke: #3a3a35; }
+  .readme .d-t { fill: #e6e2d6; font-size: 13px; font-weight: 550; }
+  .readme .d-s { fill: #8a8a8a; font-size: 11px; }
+  .readme .d-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 400; }
+  .readme .d-line { stroke: #6a6a66; stroke-width: 1.2; fill: none; }
+  .readme .d-dash { stroke-dasharray: 4 4; }
+  .readme .d-arrow { fill: #6a6a66; }
+  .readme .d-warn { fill: #d9a441; font-size: 11px; }
+  @media (max-width: 720px) {
+    .project h1 { font-size: 26px; }
+    .readme > p:first-child { font-size: 18px; }
+  }
 </style>
 </head>
 <body>
@@ -99,70 +121,122 @@
         <span class="last-edited">code updated <a href="https://github.com/adhikrysh/ci-batch-scheduler/commit/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a" target="_blank" rel="noopener noreferrer"><time datetime="2026-09-16">sep 16, 2026</time></a></span>
       </p>
       <div class="readme">
-<p>starting a new machine for every code-checking job repeats both
-machine startup and checks that several jobs need. this rust simulator
-groups jobs from the same repository so they can share that work while
-each job still finishes before its deadline.</p>
-<h2 id="deciding-when-to-launch">deciding when to launch</h2>
-<p>a batch takes the machine's startup time plus the duration of its
-distinct checks. subtract that duration from the earliest deadline among
-its jobs to find the last moment it can launch. until then, its
-membership can change as new jobs arrive.</p>
-<p>the scheduler keeps a feasible plan for every waiting job. it
-replaces a grouping only when doing so improves its score: fewer virtual
-machines first, then less total machine execution time. once a batch
-launches, its membership is fixed. the planner sees only jobs that have
-already arrived.</p>
+<p>the simple way to run ci is a fresh machine for every job. when a
+bunch of jobs from the same repo land close together, you pay machine
+startup over and over and run shared checks more than once. this rust
+simulator batches those jobs onto shared machines while still finishing
+every job before its deadline. on the evaluation workload it cut
+machines from 154 to 46 and machine time from 4,484 to 1,728 seconds,
+with no missed deadlines.</p>
+<figure class="diagram">
+<svg viewBox="0 0 600 196" role="img" aria-label="results on the evaluation workload: machines 154 versus 46; machine-seconds 4,484 versus 1,728">
+<defs><marker id="ci-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="d-t" x="10" y="16" text-anchor="start">machines</text><text class="d-s" x="10" y="41" text-anchor="start">simple way</text><rect class="d-store" x="110" y="24" width="400" height="26" rx="4"/><text class="d-t" x="518" y="42" text-anchor="start">154</text><text class="d-s" x="10" y="75" text-anchor="start">batched</text><rect class="d-box" x="110" y="58" width="120" height="26" rx="4"/><text class="d-t" x="238" y="76" text-anchor="start">46</text><text class="d-t" x="10" y="114" text-anchor="start">machine-seconds</text><text class="d-s" x="10" y="139" text-anchor="start">simple way</text><rect class="d-store" x="110" y="122" width="400" height="26" rx="4"/><text class="d-t" x="518" y="140" text-anchor="start">4,484</text><text class="d-s" x="10" y="173" text-anchor="start">batched</text><rect class="d-box" x="110" y="156" width="154" height="26" rx="4"/><text class="d-t" x="272" y="174" text-anchor="start">1,728</text>
+</svg>
+<figcaption>evaluation workload, no missed deadlines. bar lengths are to scale within each group.</figcaption>
+</figure>
+
+<h2 id="how-it-decides-when-to-launch">how it decides when to
+launch</h2>
+<p>a batch takes the machine's startup time plus the time to run each
+distinct check once. subtract that from the earliest deadline among its
+jobs, and you get the last moment the batch can launch. until then, jobs
+can still move in and out of it.</p>
+<figure class="diagram">
+<svg viewBox="0 0 600 145" role="img" aria-label="launch deadline rule: the latest launch is the earliest deadline minus startup and one run of each distinct check">
+<defs><marker id="ci-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="d-s" x="220" y="22" text-anchor="middle">latest launch, 20 s</text><text class="d-s" x="580" y="22" text-anchor="end">earliest deadline, 60 s</text><line class="d-line" x1="220" y1="28" x2="220" y2="38" marker-end="url(#ci-a1)"/><line class="d-line" x1="580" y1="28" x2="580" y2="38" marker-end="url(#ci-a1)"/><text class="d-s" x="130" y="62" text-anchor="middle">jobs can still move</text><text class="d-s" x="130" y="77" text-anchor="middle">in and out</text><rect class="d-box" x="220" y="40" width="90" height="50" rx="4"/><text class="d-t" x="265.0" y="62" text-anchor="middle">startup</text><text class="d-s" x="265.0" y="79" text-anchor="middle">10 s</text>
+<rect class="d-box" x="310" y="40" width="180" height="50" rx="4"/><text class="d-t" x="400.0" y="62" text-anchor="middle">check x</text><text class="d-s" x="400.0" y="79" text-anchor="middle">20 s</text>
+<rect class="d-box" x="490" y="40" width="90" height="50" rx="4"/><text class="d-t" x="535.0" y="62" text-anchor="middle">check y</text><text class="d-s" x="535.0" y="79" text-anchor="middle">10 s</text>
+<line class="d-line" x1="40" y1="115" x2="580" y2="115"/><line class="d-line" x1="40" y1="111" x2="40" y2="119"/><text class="d-s" x="40" y="135" text-anchor="middle">0 s</text><line class="d-line" x1="220" y1="111" x2="220" y2="119"/><text class="d-s" x="220" y="135" text-anchor="middle">20 s</text><line class="d-line" x1="310" y1="111" x2="310" y2="119"/><text class="d-s" x="310" y="135" text-anchor="middle">30 s</text><line class="d-line" x1="490" y1="111" x2="490" y2="119"/><text class="d-s" x="490" y="135" text-anchor="middle">50 s</text><line class="d-line" x1="580" y1="111" x2="580" y2="119"/><text class="d-s" x="580" y="135" text-anchor="middle">60 s</text>
+</svg>
+<figcaption>the latest launch for jobs a and b below: deadline 60 s, minus 10 s startup, minus checks x (20 s) and y (10 s), gives 20 s.</figcaption>
+</figure>
+
+<p>the scheduler always keeps a plan where every waiting job makes its
+deadline. it only swaps to a new grouping if that scores better: fewer
+machines first, then less total machine time. once a batch launches,
+it's fixed. the planner only ever sees jobs that have already
+arrived.</p>
 <h2 id="why-regrouping-matters">why regrouping matters</h2>
-<p>suppose startup takes 10 seconds and checks x, y, and z take 20, 10,
-and 10 seconds. jobs A and B arrive at time zero needing x and y. both
-must finish by time 60. together they take 40 seconds, so their planned
-launch is time 20.</p>
-<p>at time 20, job C arrives needing y and z, with a deadline of time
-80. putting all three together would take 50 seconds and miss the
-earlier deadlines. keeping A and B together and running C separately
-costs 70 machine-seconds.</p>
-<p>moving B into C's batch changes the result. A takes 30 seconds; B and
-C share y and also take 30 seconds. both batches can launch at time 30
-and finish at time 60. the same two machines now do 60 seconds of
-work.</p>
-<h2 id="bounded-search">bounded search</h2>
-<p>jobs needing identical checks share one search entry. for up to 12
-distinct check sets, the planner searches every partition of those sets.
-larger queues receive a bounded improvement search; above 64 sets it
-keeps the heuristic plan. exhausting the search budget leaves a feasible
-schedule in place.</p>
+<p>say startup takes 10 seconds, and checks x, y and z take 20, 10 and
+10 seconds. jobs A and B arrive at time 0, needing x and y. both must
+finish by time 60. together they take 40 seconds, so they're planned to
+launch at time 20.</p>
+<figure class="diagram">
+<svg viewBox="0 0 600 115" role="img" aria-label="the example jobs: a and b arrive at 0 needing x and y with deadline 60; c arrives at 20 needing y and z with deadline 80">
+<defs><marker id="ci-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="10" width="180" height="64" rx="4"/><text class="d-t" x="100.0" y="32" text-anchor="middle">job A</text><text class="d-s" x="100.0" y="49" text-anchor="middle">arrives 0, due 60</text><text class="d-s" x="100.0" y="64" text-anchor="middle">needs x and y</text>
+<rect class="d-box" x="210" y="10" width="180" height="64" rx="4"/><text class="d-t" x="300.0" y="32" text-anchor="middle">job B</text><text class="d-s" x="300.0" y="49" text-anchor="middle">arrives 0, due 60</text><text class="d-s" x="300.0" y="64" text-anchor="middle">needs x and y</text>
+<rect class="d-box" x="410" y="10" width="180" height="64" rx="4"/><text class="d-t" x="500.0" y="32" text-anchor="middle">job C</text><text class="d-s" x="500.0" y="49" text-anchor="middle">arrives 20, due 80</text><text class="d-s" x="500.0" y="64" text-anchor="middle">needs y and z</text>
+<text class="d-s" x="300" y="100" text-anchor="middle">startup 10 s   check x 20 s   check y 10 s   check z 10 s</text>
+</svg>
+<figcaption>the three jobs in the example below.</figcaption>
+</figure>
+
+<p>at time 20, job C arrives needing y and z, with a deadline of 80.
+putting all three together would take 50 seconds and miss the earlier
+deadlines. keeping A and B together and running C on its own costs 70
+machine-seconds.</p>
+<p>moving B into C's batch changes that. A alone takes 30 seconds. B and
+C share y and also take 30 seconds. both batches launch at time 30 and
+finish at time 60, and the same two machines now do 60 seconds of work
+instead of 70.</p>
+<figure class="diagram">
+<svg viewBox="0 0 600 210" role="img" aria-label="regrouping: before, a and b together take 40 s and c alone takes 30 s for 70 machine-seconds; after, a alone and b with c each take 30 s for 60 machine-seconds, both launching at 30 and finishing at 60">
+<defs><marker id="ci-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="d-s" x="10" y="16" text-anchor="start">one box per machine, drawn to scale in machine-seconds</text><text class="d-t" x="10" y="60" text-anchor="start">before</text><rect class="d-box" x="70" y="30" width="280" height="50" rx="4"/><text class="d-t" x="210.0" y="52" text-anchor="middle">A + B</text><text class="d-s" x="210.0" y="69" text-anchor="middle">launch 20, 40 s</text>
+<rect class="d-box" x="350" y="30" width="210" height="50" rx="4"/><text class="d-t" x="455.0" y="52" text-anchor="middle">C alone</text><text class="d-s" x="455.0" y="69" text-anchor="middle">30 s</text>
+<text class="d-s" x="560" y="100" text-anchor="end">70 machine-seconds</text><text class="d-t" x="10" y="155" text-anchor="start">after</text><rect class="d-box" x="70" y="125" width="210" height="50" rx="4"/><text class="d-t" x="175.0" y="147" text-anchor="middle">A alone</text><text class="d-s" x="175.0" y="164" text-anchor="middle">launch 30, 30 s</text>
+<rect class="d-box" x="280" y="125" width="210" height="50" rx="4"/><text class="d-t" x="385.0" y="147" text-anchor="middle">B + C</text><text class="d-s" x="385.0" y="164" text-anchor="middle">launch 30, 30 s</text>
+<text class="d-s" x="490" y="195" text-anchor="end">60 machine-seconds, both finish at 60</text>
+</svg>
+<figcaption>the same three jobs before and after moving b into c's batch.</figcaption>
+</figure>
+
+<h2 id="keeping-the-search-bounded">keeping the search bounded</h2>
+<p>jobs that need exactly the same checks are treated as one entry. with
+up to 12 distinct sets of checks, the planner tries every possible
+grouping. bigger queues get a limited improvement search, and above 64
+sets it keeps the quick heuristic plan. running out of search budget
+always leaves a working schedule in place.</p>
 <p>the <a
 href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/src/planner.rs"
-target="_blank" rel="noopener noreferrer">planner</a> owns these
-grouping decisions. the <a
+target="_blank" rel="noopener noreferrer">planner</a> decides groupings.
+the <a
 href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/src/scheduler.rs"
 target="_blank" rel="noopener noreferrer">scheduler</a> owns waiting
-jobs, timers, and launches. separating them keeps future arrivals
-outside the planner's view.</p>
-<h2 id="results-and-limits">results and limits</h2>
-<p>on the supplied evaluation workload, immediate launch uses 154
-virtual machines and 4,484 machine-seconds. regrouping uses 46 machines
-and 1,728 machine-seconds, with no missed deadlines. those inputs are
-private; the repository includes a smaller runnable example and
-generated tests.</p>
+jobs, timers and launches. keeping them separate means the planner can
+never peek at future arrivals.</p>
+<figure class="diagram">
+<svg viewBox="0 0 600 170" role="img" aria-label="planner and scheduler split: the scheduler owns waiting jobs, timers and launches and hands the planner only jobs that have arrived; the planner decides groupings and never sees future arrivals">
+<defs><marker id="ci-a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="20" width="240" height="70" rx="4"/><text class="d-t" x="130.0" y="42" text-anchor="middle">scheduler</text><text class="d-s d-mono" x="130.0" y="59" text-anchor="middle">src/scheduler.rs</text><text class="d-s" x="130.0" y="74" text-anchor="middle">owns waiting jobs, timers, launches</text>
+<rect class="d-box" x="350" y="20" width="240" height="70" rx="4"/><text class="d-t" x="470.0" y="42" text-anchor="middle">planner</text><text class="d-s d-mono" x="470.0" y="59" text-anchor="middle">src/planner.rs</text><text class="d-s" x="470.0" y="74" text-anchor="middle">decides groupings</text>
+<line class="d-line" x1="252" y1="38" x2="348" y2="38" marker-end="url(#ci-a5)"/><text class="d-s" x="300" y="32" text-anchor="middle">waiting jobs</text><line class="d-line" x1="348" y1="64" x2="252" y2="64" marker-end="url(#ci-a5)"/><text class="d-s" x="300" y="78" text-anchor="middle">groupings</text><rect class="d-box" x="350" y="115" width="240" height="44" rx="4"/><text class="d-t" x="470.0" y="137" text-anchor="middle">future arrivals</text><text class="d-s d-warn" x="470.0" y="154" text-anchor="middle">never seen by the planner</text>
+</svg>
+<figcaption>who owns what. the planner only ever sees jobs that have already arrived.</figcaption>
+</figure>
+
+<h2 id="testing">testing</h2>
 <p>the <a
 href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/tests/scheduling.rs"
 target="_blank" rel="noopener noreferrer">public tests</a> compare 500
-small cases with an independent exhaustive solver, check both policies
-on 256 generated streams, and verify that changing future jobs cannot
-change past launch decisions.</p>
-<p>the default policy does not win on every workload. a broader
-synthetic comparison found that regrouping only to save machines used
-fewer machines overall, while the default saved more execution time. the
-<a
+small cases against an independent brute-force solver, run both policies
+on 256 generated job streams, and check that changing future jobs can
+never change a launch decision already made. the evaluation inputs are
+private, so the repository includes a smaller runnable example.</p>
+<h2 id="limits">limits</h2>
+<p>the default policy doesn't win everywhere. in a broader synthetic
+comparison, regrouping only to save machines used fewer machines
+overall, while the default saved more machine time. the <a
 href="https://github.com/adhikrysh/ci-batch-scheduler/blob/d9ed1cdbe9cc8df23a836d6dba9ab0142175840a/docs/design.md"
 target="_blank" rel="noopener noreferrer">design notes</a> explain that
 tradeoff.</p>
 <p>this is a simulation with known check durations and unlimited
-concurrent machines. an operating service would also need machine
-quotas, durable launch records, retries, and a margin for checks that
-overrun their estimates.</p>
+machines. a real service would also need machine quotas, durable launch
+records, retries and some slack for checks that run longer than
+expected.</p>
       </div>
     </main>
   </div>

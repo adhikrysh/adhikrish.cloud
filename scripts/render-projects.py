@@ -9,38 +9,58 @@ import subprocess
 from datetime import date
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
-from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = json.loads((ROOT / "content/projects.json").read_text())
-GROUPS = [("spacecraft-simulations", "spacecraft simulations"), ("others", "others")]
-INDEX_DESCRIPTION = "spacecraft simulations and other things i've built."
+INDEX_DESCRIPTION = "things i've built."
 READING_CSS = """
-  .project h1 { font-size: 28px; overflow-wrap: anywhere; }
+  .project h1 { font-size: 30px; overflow-wrap: anywhere; }
   .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
   .project-meta a { color: inherit; }
   .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
-  .readme { margin-top: 40px; line-height: 1.8; }
-  .readme p, .readme ul, .readme ol { margin-block: 20px; }
+  .readme { margin-top: 44px; line-height: 1.75; }
+  .readme p, .readme ul, .readme ol { margin-block: 24px; }
   .readme > :first-child { margin-top: 0; }
-  .readme h2 { font-size: 20px; font-weight: 450; line-height: 1.4; margin: 48px 0 20px; letter-spacing: -0.02em; }
-  .readme h3 { font-size: 17px; font-weight: 450; line-height: 1.5; margin: 32px 0 16px; }
-  .readme ul, .readme ol { padding-left: 24px; }
-  .readme li + li { margin-top: 8px; }
+  /* The opening paragraph says why the project exists; it reads as the lede. */
+  .readme > p:first-child { font-size: 19px; line-height: 1.65; color: #efebe0; }
+  .readme h2 { font-size: 20px; font-weight: 550; line-height: 1.4; color: #efebe0; letter-spacing: -0.02em;
+               margin: 56px 0 16px; padding-top: 28px; border-top: 1px solid #1f1f1c; }
+  .readme h2 + p { margin-top: 0; }
+  .readme h3 { font-size: 17px; font-weight: 550; line-height: 1.5; margin: 32px 0 12px; }
+  .readme ul, .readme ol { padding-left: 22px; }
+  .readme li + li { margin-top: 10px; }
+  .readme li::marker { color: #6a6a66; }
   .readme a { color: inherit; overflow-wrap: anywhere; }
   .readme a:hover, .project-meta a:hover { color: #787878; }
-  .readme strong { font-weight: 550; }
+  .readme strong { font-weight: 550; color: #efebe0; }
   .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
-  .readme :not(pre) > code { overflow-wrap: anywhere; }
-  .readme pre { max-width: 100%; overflow-x: auto; padding: 16px; margin-block: 28px; background: #121210; border: 1px solid #252522; line-height: 1.7; font-size: 13px; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; padding: 1px 5px; background: #151513; border-radius: 3px; }
+  .readme pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px 18px; margin-block: 28px;
+                background: #121210; border: 1px solid #252522; border-radius: 4px; line-height: 1.7; font-size: 13px; }
   .readme pre code { font-size: inherit; }
   .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
   .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
-  .readme figure { margin-block: 32px; }
+  .readme figure { margin-block: 36px; }
   .readme picture { display: block; }
-  .readme img { display: block; max-width: 100%; height: auto; }
+  .readme img { display: block; max-width: 100%; height: auto; border-radius: 4px; }
   .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  /* Inline svg diagrams: drawn in the page palette, scroll sideways on narrow phones instead of shrinking text. */
+  .readme figure.diagram { overflow-x: auto; }
+  .readme figure.diagram svg { display: block; width: 100%; min-width: 560px; height: auto; }
+  .readme .d-box { fill: #121210; stroke: #3a3a35; }
+  .readme .d-store { fill: #0d0d0b; stroke: #3a3a35; }
+  .readme .d-t { fill: #e6e2d6; font-size: 13px; font-weight: 550; }
+  .readme .d-s { fill: #8a8a8a; font-size: 11px; }
+  .readme .d-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 400; }
+  .readme .d-line { stroke: #6a6a66; stroke-width: 1.2; fill: none; }
+  .readme .d-dash { stroke-dasharray: 4 4; }
+  .readme .d-arrow { fill: #6a6a66; }
+  .readme .d-warn { fill: #d9a441; font-size: 11px; }
+  @media (max-width: 720px) {
+    .project h1 { font-size: 26px; }
+    .readme > p:first-child { font-size: 18px; }
+  }
 """
 
 
@@ -55,24 +75,9 @@ def preload_navigation(page):
     return page.replace("</body>", block + "\n</body>")
 
 
-NOTE_FILE = "note-adhikrish.cloud.md"
-
-
 def load_markdown(project):
-    """Repository-backed entries read their write-up from the repository itself.
-
-    Each public repo carries note-adhikrish.cloud.md. It is fetched at the pinned
-    note_commit, so a later push to the repo never changes this site until someone
-    re-reviews the note and moves the pin. Entries without a repository (shipy)
-    keep a local file in content/projects/.
-    """
-    slug = project["slug"]
-    if project.get("note_commit"):
-        url = (f"https://raw.githubusercontent.com/adhikrysh/{slug}/"
-               f"{project['note_commit']}/{NOTE_FILE}")
-        with urlopen(url, timeout=30) as response:
-            return response.read().decode("utf-8")
-    return (ROOT / "content/projects" / f"{slug}.md").read_text()
+    """Every write-up is authored here, in content/projects/<slug>.md."""
+    return (ROOT / "content/projects" / f"{project['slug']}.md").read_text()
 
 
 def readable_date(value):
@@ -109,8 +114,8 @@ def prepare_ast(node, project, image_state):
                 if first_image:
                     attributes[2].append(["fetchpriority", "high"])
             elif not urlsplit(url).scheme and not url.startswith("#"):
-                # Relative links resolve against the commit the note was read from.
-                pin = project.get("note_commit") or project.get("source_commit")
+                # Relative links resolve against the source commit the write-up was checked against.
+                pin = project.get("source_commit")
                 if not pin:
                     raise ValueError(f"relative link requires a pinned commit: {url}")
                 base = f"https://github.com/adhikrysh/{project['slug']}/blob/{pin}/"
@@ -128,33 +133,25 @@ def prepare_ast(node, project, image_state):
 
 index_path = ROOT / "projects.html"
 index = index_path.read_text()
-if any(project["group"] not in dict(GROUPS) for project in PROJECTS):
-    raise ValueError("unknown project group")
-sections = []
-for group, label in GROUPS:
-    items = []
-    # Keep explicitly pinned entries first; other entries follow their displayed date.
-    projects = sorted((p for p in PROJECTS if p["group"] == group),
-                      key=lambda p: (p.get("pinned", False), p.get("date", "")), reverse=True)
-    for project in projects:
-        slug = project["slug"]
-        title = html.escape(project.get("title", slug))
-        timestamp = (f'<time datetime="{project["date"]}">{readable_date(project["date"])}</time>'
-                     if project.get("date") else "")
-        items.append(f'''            <li>
-              <a href="/src/{slug}"><span>{title}</span>{timestamp}</a>
-              <p>{html.escape(project['description'])}</p>
-            </li>''')
-    sections.append(f'''        <section class="project-group" aria-labelledby="{group}">
-          <h2 id="{group}">{label}</h2>
-          <ul class="project-list" aria-label="{label}">
-{chr(10).join(items)}
-          </ul>
-        </section>''')
+items = []
+# The order in content/projects.json is the order on the page.
+for project in PROJECTS:
+    slug = project["slug"]
+    title = html.escape(project.get("title", slug))
+    if project.get("date"):
+        aside = f'<time datetime="{project["date"]}">{readable_date(project["date"])}</time>'
+    elif project.get("status"):
+        aside = f'<small>{html.escape(project["status"])}</small>'
+    else:
+        aside = ""
+    items.append(f'''          <li>
+            <a href="/src/{slug}"><span>{title}</span>{aside}</a>
+            <p>{html.escape(project['description'])}</p>
+          </li>''')
 index, count = re.subn(
     r'<!-- project-index:start -->.*?<!-- project-index:end -->',
-    lambda _: '<!-- project-index:start -->\n      <div class="project-index">\n'
-    + "\n".join(sections) + '\n      </div>\n      <!-- project-index:end -->',
+    lambda _: '<!-- project-index:start -->\n      <ul class="project-list">\n'
+    + "\n".join(items) + '\n      </ul>\n      <!-- project-index:end -->',
     index, flags=re.DOTALL,
 )
 if count != 1:
@@ -186,7 +183,7 @@ for project in PROJECTS:
                 f'type="image/webp">{match[1]}</picture>')
     body = re.sub(r'(<img src="([^"]+)"[^>]*>)', picture, body)
     head = index.split("</head>")[0]
-    head = re.sub(r'^  \.(?:project-list|project-index|project-group)[^\n]*\n',
+    head = re.sub(r'^  \.project-list[^\n]*\n',
                   '', head, flags=re.MULTILINE)
     title = html.escape(project.get("title", slug))
     head = head.replace("things i've built | adhikrish rk", f"{title} | adhikrish rk")
@@ -204,6 +201,8 @@ for project in PROJECTS:
                      f'aria-label="{external_label} (opens in a new tab)" '
                      f'title="opens in a new tab">{external_label}</a>' if external_url else "")
     metadata = ""
+    if project.get("status"):
+        metadata = f'      <p class="project-meta">{html.escape(project["status"])}</p>\n'
     if project.get("date"):
         metadata = f'''      <p class="project-meta">
         <a href="{repository}/commit/{project['first_commit']}" target="_blank" rel="noopener noreferrer"><time datetime="{project['date']}">{readable_date(project['date'])}</time></a>

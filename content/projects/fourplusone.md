@@ -1,0 +1,231 @@
+# fourplusone
+
+it's easy to lose mental alignment with your codebase when you build with agents. they're post-trained on their own harness, they spawn subagents, and a lot happens that never makes it into the summary.
+
+fourplusone keeps a live picture of the system and every decision behind it, updated after each turn: the 4+1 views on top, a turn-by-turn log underneath, hidden decisions flagged. it all lives in one file in your repo, `fourplusone.md`, mostly as diagrams. keep it open on a split screen next to the terminal and it updates as the agent works.
+
+## where 4+1 comes from
+
+the views come from philippe kruchten. he came up with them in 1995, when he was at rational software, in a paper called "architectural blueprints: the 4+1 view model of software architecture". he was designing huge systems, a telephone exchange at alcatel and an air traffic control system, and he was annoyed by something you've definitely seen: every architecture doc tries to explain the whole system with one box-and-arrow diagram.
+
+look at one of those properly and you can't tell what anything is. is a box a running program? a file? a machine? a bunch of features grouped together? and the arrows, are they calls, imports, data moving around? usually it's a bit of everything, so everyone walks away with a different system in their head.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 200" role="img" aria-label="one diagram that mixes a feature, a source file, a computer and a team's area, joined by arrows that could mean anything">
+<defs><marker id="fp-p1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="44" width="120" height="44" rx="4"/><text class="d-t" x="70" y="71" text-anchor="middle">checkout</text>
+<rect class="d-box" x="166" y="44" width="124" height="44" rx="4"/><text class="d-t d-mono" x="228" y="71" text-anchor="middle">payments.py</text>
+<rect class="d-box" x="326" y="44" width="110" height="44" rx="4"/><text class="d-t" x="381" y="71" text-anchor="middle">server-2</text>
+<rect class="d-box" x="472" y="44" width="118" height="44" rx="4"/><text class="d-t" x="531" y="71" text-anchor="middle">billing</text>
+<line class="d-line" x1="130" y1="66" x2="164" y2="66" marker-end="url(#fp-p1)"/><text class="d-warn" x="147" y="36" text-anchor="middle">calls?</text>
+<line class="d-line" x1="290" y1="66" x2="324" y2="66" marker-end="url(#fp-p1)"/><text class="d-warn" x="307" y="36" text-anchor="middle">imports?</text>
+<line class="d-line" x1="436" y1="66" x2="470" y2="66" marker-end="url(#fp-p1)"/><text class="d-warn" x="453" y="36" text-anchor="middle">data?</text>
+<text class="d-s" x="70" y="108" text-anchor="middle">a feature?</text><text class="d-s" x="228" y="108" text-anchor="middle">a source file?</text><text class="d-s" x="381" y="108" text-anchor="middle">a computer?</text><text class="d-s" x="531" y="108" text-anchor="middle">a team's area?</text>
+<path class="d-line" d="M70,88 L70,150 L531,150 L531,92" marker-end="url(#fp-p1)"/><text class="d-warn" x="300" y="170" text-anchor="middle">depends on? talks to? runs before?</text>
+</svg>
+<figcaption>kruchten's complaint, drawn. every box is a different kind of thing and no arrow says what it means.</figcaption>
+</figure>
+
+his fix was simple. stop asking one picture to do everything. split it into a few views, each one for a specific person with a specific question, and inside a view a box means exactly one thing.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 300" role="img" aria-label="kruchten's figure 1 redrawn: logical view for end users, development view for programmers, process view for integrators, physical view for system engineers, joined by scenarios">
+<line class="d-line d-dash" x1="300" y1="150" x2="130" y2="60"/><line class="d-line d-dash" x1="300" y1="150" x2="470" y2="60"/><line class="d-line d-dash" x1="300" y1="150" x2="130" y2="240"/><line class="d-line d-dash" x1="300" y1="150" x2="470" y2="240"/>
+<rect class="d-box" x="20" y="20" width="220" height="80" rx="4"/><text class="d-t" x="130" y="50" text-anchor="middle">logical view</text><text class="d-s" x="130" y="70" text-anchor="middle">for end users</text><text class="d-s" x="130" y="87" text-anchor="middle">cares about: functionality</text>
+<rect class="d-box" x="360" y="20" width="220" height="80" rx="4"/><text class="d-t" x="470" y="50" text-anchor="middle">development view</text><text class="d-s" x="470" y="70" text-anchor="middle">for programmers</text><text class="d-s" x="470" y="87" text-anchor="middle">cares about: managing the software</text>
+<rect class="d-box" x="20" y="200" width="220" height="80" rx="4"/><text class="d-t" x="130" y="230" text-anchor="middle">process view</text><text class="d-s" x="130" y="250" text-anchor="middle">for integrators</text><text class="d-s" x="130" y="267" text-anchor="middle">cares about: performance, scale</text>
+<rect class="d-box" x="360" y="200" width="220" height="80" rx="4"/><text class="d-t" x="470" y="230" text-anchor="middle">physical view</text><text class="d-s" x="470" y="250" text-anchor="middle">for system engineers</text><text class="d-s" x="470" y="267" text-anchor="middle">cares about: topology, networks</text>
+<rect class="d-box" x="195" y="115" width="210" height="70" rx="4"/><text class="d-t" x="300" y="145" text-anchor="middle">scenarios, the +1</text><text class="d-s" x="300" y="165" text-anchor="middle">tie the four together</text>
+</svg>
+<figcaption>kruchten's figure 1, redrawn. every view says who it's for and what they care about.</figcaption>
+</figure>
+
+so the five are basically:
+
+- **logical: what does it actually do?** the core ideas of the problem and how they relate. this is the one users and product people care about.
+- **process: what's running at the same time, and how do those things talk?** concurrency, load, and what happens when something dies.
+- **development: how is the code laid out?** modules, layers, who owns what.
+- **physical: what runs on which machine?**
+- **scenarios, the +1: does it actually hang together?** a few of the flows that matter most, walked through all four.
+
+## the thinking behind it
+
+kruchten took perry and wolf's definition of an architecture: its elements, their forms, and the rationale. what the pieces are, the patterns they follow, and why. the smart move is that he applies it to each view on its own. so every view has to say what its boxes and arrows mean, and why it's built that way. one system can even use a different style in each view.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 170" role="img" aria-label="every view has three parts: elements, forms, and rationale">
+<defs><marker id="fp-w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="60" width="140" height="50" rx="4"/><text class="d-t" x="80" y="82" text-anchor="middle">one view</text><text class="d-s" x="80" y="99" text-anchor="middle">any of the four</text>
+<rect class="d-box" x="250" y="8" width="340" height="44" rx="4"/><text class="d-t" x="420" y="27" text-anchor="middle">elements</text><text class="d-s" x="420" y="43" text-anchor="middle">what its boxes and arrows are</text>
+<rect class="d-box" x="250" y="63" width="340" height="44" rx="4"/><text class="d-t" x="420" y="82" text-anchor="middle">forms</text><text class="d-s" x="420" y="98" text-anchor="middle">the patterns and styles they follow</text>
+<rect class="d-box" x="250" y="118" width="340" height="44" rx="4"/><text class="d-t" x="420" y="137" text-anchor="middle">rationale</text><text class="d-s" x="420" y="153" text-anchor="middle">why it's this way, which requirement it serves</text>
+<line class="d-line" x1="150" y1="78" x2="248" y2="32" marker-end="url(#fp-w1)"/><line class="d-line" x1="150" y1="85" x2="248" y2="85" marker-end="url(#fp-w1)"/><line class="d-line" x1="150" y1="92" x2="248" y2="138" marker-end="url(#fp-w1)"/>
+</svg>
+<figcaption>perry and wolf's definition, applied to every view separately.</figcaption>
+</figure>
+
+the scenarios are the clever part. they're redundant on purpose. they repeat what the other four already say, which is why it's +1 and not a fifth view. but the redundancy is the whole point. while you're designing, walking a flow through the views shows you parts that need to exist. afterwards, if a flow can't be walked through them, one of your views is wrong.
+
+he also didn't believe in designing an architecture in one straight pass. he wanted rounds, driven by scenarios: pick the riskiest ones, sketch something rough, walk them through, fix the views, build it, measure it, go again.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 235" role="img" aria-label="the scenario-driven loop: pick critical scenarios, sketch a strawman, walk them through, update the four views, build and measure, then repeat">
+<defs><marker id="fp-l1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="20" width="185" height="50" rx="4"/><text class="d-t" x="102" y="42" text-anchor="middle">1  pick scenarios</text><text class="d-s" x="102" y="59" text-anchor="middle">the most critical or risky</text>
+<rect class="d-box" x="208" y="20" width="185" height="50" rx="4"/><text class="d-t" x="300" y="42" text-anchor="middle">2  sketch a strawman</text><text class="d-s" x="300" y="59" text-anchor="middle">a rough first architecture</text>
+<rect class="d-box" x="406" y="20" width="185" height="50" rx="4"/><text class="d-t" x="498" y="42" text-anchor="middle">3  walk them through</text><text class="d-s" x="498" y="59" text-anchor="middle">script each flow, step by step</text>
+<rect class="d-box" x="406" y="140" width="185" height="50" rx="4"/><text class="d-t" x="498" y="162" text-anchor="middle">4  update the views</text><text class="d-s" x="498" y="179" text-anchor="middle">place every part you found</text>
+<rect class="d-box" x="208" y="140" width="185" height="50" rx="4"/><text class="d-t" x="300" y="162" text-anchor="middle">5  build and measure</text><text class="d-s" x="300" y="179" text-anchor="middle">test it, find the flaws</text>
+<line class="d-line" x1="195" y1="45" x2="206" y2="45" marker-end="url(#fp-l1)"/><line class="d-line" x1="393" y1="45" x2="404" y2="45" marker-end="url(#fp-l1)"/>
+<line class="d-line" x1="498" y1="70" x2="498" y2="138" marker-end="url(#fp-l1)"/><line class="d-line" x1="406" y1="165" x2="395" y2="165" marker-end="url(#fp-l1)"/>
+<path class="d-line" d="M208,165 L102,165 L102,72" marker-end="url(#fp-l1)"/><text class="d-s" x="112" y="120">next round</text>
+<text class="d-s" x="10" y="220">after two or three rounds, no new parts turn up and the architecture settles.</text>
+</svg>
+<figcaption>the scenario-driven loop from the paper. the rough prototype grows into the real system round by round.</figcaption>
+</figure>
+
+and he wasn't dogmatic about it. one machine? skip the physical view. one process? skip the process view. the scenarios, though, are always worth doing.
+
+## why it's the right model for coding agents
+
+kruchten's problem is back, it just moves faster now. the agent's end-of-turn summary is that one confident diagram. it reads clean and tells you almost nothing about what actually happened. and there are two minds building one system: your picture of it and the agent's. both drift away from the real code every turn.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 190" role="img" aria-label="the developer's picture and the agent's picture of the system drift apart; fourplusone.md describes the actual system so both stay in line with it">
+<defs><marker id="fp-m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="20" width="170" height="50" rx="4"/><text class="d-t" x="95" y="42" text-anchor="middle">developer's picture</text><text class="d-s" x="95" y="59" text-anchor="middle">what they think exists</text>
+<rect class="d-box" x="420" y="20" width="170" height="50" rx="4"/><text class="d-t" x="505" y="42" text-anchor="middle">agent's picture</text><text class="d-s" x="505" y="59" text-anchor="middle">what it acts on</text>
+<rect class="d-store" x="215" y="120" width="170" height="50" rx="4"/><text class="d-t" x="300" y="142" text-anchor="middle">the actual system</text><text class="d-s" x="300" y="159" text-anchor="middle">the code as it is</text>
+<rect class="d-box" x="225" y="20" width="150" height="50" rx="4"/><text class="d-t" x="300" y="42" text-anchor="middle">fourplusone.md</text><text class="d-s" x="300" y="59" text-anchor="middle">the views + the log</text>
+<line class="d-line" x1="300" y1="118" x2="300" y2="72" marker-end="url(#fp-m1)"/><text class="d-s" x="308" y="100">read every turn</text>
+<line class="d-line" x1="225" y1="45" x2="182" y2="45" marker-end="url(#fp-m1)"/><line class="d-line" x1="375" y1="45" x2="418" y2="45" marker-end="url(#fp-m1)"/>
+<line class="d-line d-dash" x1="95" y1="70" x2="213" y2="140"/><line class="d-line d-dash" x1="505" y1="70" x2="387" y2="140"/><text class="d-warn" x="40" y="130">drifts</text><text class="d-warn" x="522" y="130">drifts</text>
+</svg>
+<figcaption>without one shared description, your picture and the agent's both drift from the code. fourplusone rebuilds that description from what actually happened, every turn.</figcaption>
+</figure>
+
+so fourplusone basically runs kruchten's paper on every turn. it reads what the agent actually did, every command, edit and result, not what it says it did. it keeps the four views current, every view says what its boxes and arrows mean, and it walks the important scenarios through them. when a flow doesn't fit, it tells you which view broke.
+
+## the five views, on fourplusone itself
+
+here's fourplusone describing its own code. this is real output, not a mockup.
+
+**logical: what it is.** boxes are the ideas, arrows mean "produces" or "consumes".
+
+<figure class="diagram">
+<svg viewBox="0 0 600 190" role="img" aria-label="logical view: turn snapshot to per-repo queue to observer to fourplusone.md, with the system prompt feeding the observer">
+<defs><marker id="fp-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="40" width="120" height="50" rx="4"/><text class="d-t" x="70" y="62" text-anchor="middle">turn snapshot</text><text class="d-s" x="70" y="79" text-anchor="middle">what the agent did</text>
+<rect class="d-box" x="160" y="40" width="120" height="50" rx="4"/><text class="d-t" x="220" y="62" text-anchor="middle">per-repo queue</text><text class="d-s" x="220" y="79" text-anchor="middle">turns waiting</text>
+<rect class="d-box" x="310" y="40" width="120" height="50" rx="4"/><text class="d-t" x="370" y="62" text-anchor="middle">observer</text><text class="d-s" x="370" y="79" text-anchor="middle">claude -p, sonnet</text>
+<rect class="d-box" x="460" y="40" width="130" height="50" rx="4"/><text class="d-t" x="525" y="62" text-anchor="middle">fourplusone.md</text><text class="d-s" x="525" y="79" text-anchor="middle">views + sessions</text>
+<rect class="d-box" x="310" y="130" width="120" height="50" rx="4"/><text class="d-t" x="370" y="152" text-anchor="middle">system prompt</text><text class="d-s" x="370" y="169" text-anchor="middle">the 4+1 rules</text>
+<line class="d-line" x1="130" y1="65" x2="158" y2="65" marker-end="url(#fp-a1)"/><line class="d-line" x1="280" y1="65" x2="308" y2="65" marker-end="url(#fp-a1)"/><line class="d-line" x1="430" y1="65" x2="458" y2="65" marker-end="url(#fp-a1)"/><line class="d-line" x1="370" y1="130" x2="370" y2="92" marker-end="url(#fp-a1)"/>
+</svg>
+<figcaption>a snapshot of each turn waits in a queue until the observer turns it into the doc, following the 4+1 rules.</figcaption>
+</figure>
+
+**process: what runs.** boxes are things that start and stop, arrows are how they kick each other off. this is where races hide, and it caught one in its own code.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 215" role="img" aria-label="process view: stop hook starts observe.sh, which saves the turn to the queue and starts worker.sh in the background; worker.sh takes a lock and runs the claude -p observer, which edits fourplusone.md">
+<defs><marker id="fp-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="4" y="30" width="92" height="50" rx="4"/><text class="d-t" x="50" y="52" text-anchor="middle">stop hook</text><text class="d-s" x="50" y="69" text-anchor="middle">turn ends</text>
+<rect class="d-box" x="126" y="30" width="92" height="50" rx="4"/><text class="d-t" x="172" y="52" text-anchor="middle">observe.sh</text><text class="d-s" x="172" y="69" text-anchor="middle">returns at once</text>
+<rect class="d-box" x="248" y="30" width="92" height="50" rx="4"/><text class="d-t" x="294" y="52" text-anchor="middle">worker.sh</text><text class="d-s" x="294" y="69" text-anchor="middle">background</text>
+<rect class="d-box" x="370" y="30" width="92" height="50" rx="4"/><text class="d-t" x="416" y="52" text-anchor="middle">claude -p</text><text class="d-s" x="416" y="69" text-anchor="middle">the observer</text>
+<rect class="d-box" x="488" y="30" width="110" height="50" rx="4"/><text class="d-t" x="543" y="60" text-anchor="middle">fourplusone.md</text>
+<rect class="d-store" x="126" y="135" width="92" height="44" rx="14"/><text class="d-t" x="172" y="155" text-anchor="middle">queue</text><text class="d-s" x="172" y="170" text-anchor="middle">one file per turn</text>
+<rect class="d-store" x="248" y="135" width="92" height="44" rx="14"/><text class="d-t" x="294" y="155" text-anchor="middle">lock</text><text class="d-s" x="294" y="170" text-anchor="middle">one per repo</text>
+<line class="d-line" x1="96" y1="55" x2="124" y2="55" marker-end="url(#fp-a2)"/><line class="d-line" x1="218" y1="55" x2="246" y2="55" marker-end="url(#fp-a2)"/><line class="d-line" x1="340" y1="55" x2="368" y2="55" marker-end="url(#fp-a2)"/><line class="d-line" x1="462" y1="55" x2="486" y2="55" marker-end="url(#fp-a2)"/>
+<line class="d-line" x1="172" y1="80" x2="172" y2="133" marker-end="url(#fp-a2)"/><text class="d-s" x="178" y="111">save turn</text>
+<line class="d-line" x1="294" y1="80" x2="294" y2="133" marker-end="url(#fp-a2)"/><text class="d-s" x="300" y="111">mkdir</text>
+<text class="d-warn" x="4" y="205">⚠ flagged: a turn could get stranded between the worker's last queue check and freeing the lock.</text>
+</svg>
+<figcaption>the ⚠ is a real flag from an early version: a race the agent never mentioned. it's fixed now, the worker checks the queue once more after it lets go of the lock.</figcaption>
+</figure>
+
+**development: where the code lives.** boxes are files, arrows are calls.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 190" role="img" aria-label="development view: .claude-plugin registers hooks/hooks.json, which calls scripts/observe.sh, which calls scripts/extract-turn.sh and scripts/worker.sh; worker.sh reads prompts/fourplusone.md">
+<defs><marker id="fp-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="4" y="14" width="124" height="40" rx="4"/><text class="d-t d-mono" x="66" y="38" text-anchor="middle">.claude-plugin/</text>
+<rect class="d-box" x="4" y="100" width="124" height="40" rx="4"/><text class="d-t d-mono" x="66" y="124" text-anchor="middle">hooks/hooks.json</text>
+<rect class="d-box" x="158" y="100" width="140" height="40" rx="4"/><text class="d-t d-mono" x="228" y="124" text-anchor="middle">scripts/observe.sh</text>
+<rect class="d-box" x="330" y="40" width="166" height="40" rx="4"/><text class="d-t d-mono" x="413" y="64" text-anchor="middle">scripts/extract-turn.sh</text>
+<rect class="d-box" x="330" y="134" width="166" height="40" rx="4"/><text class="d-t d-mono" x="413" y="158" text-anchor="middle">scripts/worker.sh</text>
+<rect class="d-box" x="504" y="128" width="94" height="52" rx="4"/><text class="d-t d-mono" x="551" y="150" text-anchor="middle">prompts/</text><text class="d-t d-mono" x="551" y="167" text-anchor="middle">fourplusone.md</text>
+<line class="d-line d-dash" x1="66" y1="54" x2="66" y2="98" marker-end="url(#fp-a3)"/><text class="d-s" x="72" y="80">registers</text>
+<line class="d-line" x1="128" y1="120" x2="156" y2="120" marker-end="url(#fp-a3)"/>
+<line class="d-line" x1="298" y1="112" x2="328" y2="72" marker-end="url(#fp-a3)"/>
+<line class="d-line" x1="298" y1="128" x2="328" y2="148" marker-end="url(#fp-a3)"/>
+<line class="d-line" x1="496" y1="154" x2="502" y2="154" marker-end="url(#fp-a3)"/>
+</svg>
+<figcaption>three shell scripts and one prompt. the plugin manifest registers the hook, and the worker hands the prompt to the observer.</figcaption>
+</figure>
+
+**physical: what runs where.** pretty boring here: it's all your laptop, plus one model call.
+
+<figure class="diagram">
+<svg viewBox="0 0 600 170" role="img" aria-label="physical view: everything runs on the developer's laptop, which calls the anthropic api once per turn">
+<defs><marker id="fp-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-store" x="4" y="10" width="380" height="150" rx="6"/><text class="d-t" x="20" y="34">developer laptop</text>
+<rect class="d-box" x="20" y="50" width="108" height="44" rx="4"/><text class="d-t" x="74" y="77" text-anchor="middle">claude code</text>
+<rect class="d-box" x="140" y="50" width="108" height="44" rx="4"/><text class="d-t" x="194" y="77" text-anchor="middle">hook + worker</text>
+<rect class="d-box" x="260" y="50" width="108" height="44" rx="4"/><text class="d-t" x="314" y="77" text-anchor="middle">your repo</text>
+<text class="d-s d-mono" x="20" y="124">.git/fourplusone/  queue, lock, log</text><text class="d-s" x="20" y="144">fourplusone.md is kept out of git with .git/info/exclude</text>
+<rect class="d-box" x="440" y="60" width="150" height="50" rx="4"/><text class="d-t" x="515" y="82" text-anchor="middle">anthropic api</text><text class="d-s" x="515" y="99" text-anchor="middle">one sonnet call per turn</text>
+<line class="d-line" x1="384" y1="85" x2="438" y2="85" marker-end="url(#fp-a4)"/>
+</svg>
+<figcaption>everything is local except the model call, which runs on your claude code plan.</figcaption>
+</figure>
+
+**scenarios: a normal turn.**
+
+<figure class="diagram">
+<svg viewBox="0 0 640 300" role="img" aria-label="scenario: a normal turn, from the agent's turn ending to the observer editing fourplusone.md">
+<defs><marker id="fp-a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<line class="d-line d-dash" x1="55" y1="44" x2="55" y2="292"/><line class="d-line d-dash" x1="160" y1="44" x2="160" y2="292"/><line class="d-line d-dash" x1="265" y1="44" x2="265" y2="292"/><line class="d-line d-dash" x1="370" y1="44" x2="370" y2="292"/><line class="d-line d-dash" x1="475" y1="44" x2="475" y2="292"/><line class="d-line d-dash" x1="584" y1="44" x2="584" y2="292"/>
+<rect class="d-box" x="7" y="10" width="96" height="34" rx="4"/><text class="d-t" x="55" y="32" text-anchor="middle">agent</text>
+<rect class="d-box" x="112" y="10" width="96" height="34" rx="4"/><text class="d-t" x="160" y="32" text-anchor="middle">observe.sh</text>
+<rect class="d-box" x="217" y="10" width="96" height="34" rx="4"/><text class="d-t" x="265" y="32" text-anchor="middle">queue</text>
+<rect class="d-box" x="322" y="10" width="96" height="34" rx="4"/><text class="d-t" x="370" y="32" text-anchor="middle">worker.sh</text>
+<rect class="d-box" x="427" y="10" width="96" height="34" rx="4"/><text class="d-t" x="475" y="32" text-anchor="middle">observer</text>
+<rect class="d-box" x="532" y="10" width="104" height="34" rx="4"/><text class="d-t" x="584" y="32" text-anchor="middle">fourplusone.md</text>
+<line class="d-line" x1="55" y1="78" x2="158" y2="78" marker-end="url(#fp-a5)"/><text class="d-s" x="107" y="71" text-anchor="middle">1  turn ends</text>
+<line class="d-line" x1="160" y1="112" x2="263" y2="112" marker-end="url(#fp-a5)"/><text class="d-s" x="212" y="105" text-anchor="middle">2  save the turn</text>
+<line class="d-line" x1="160" y1="146" x2="368" y2="146" marker-end="url(#fp-a5)"/><text class="d-s" x="265" y="139" text-anchor="middle">3  start in background</text>
+<line class="d-line d-dash" x1="160" y1="180" x2="57" y2="180" marker-end="url(#fp-a5)"/><text class="d-s" x="107" y="173" text-anchor="middle">4  return at once</text>
+<line class="d-line" x1="370" y1="214" x2="267" y2="214" marker-end="url(#fp-a5)"/><text class="d-s" x="317" y="207" text-anchor="middle">5  take oldest turn</text>
+<line class="d-line" x1="370" y1="248" x2="473" y2="248" marker-end="url(#fp-a5)"/><text class="d-s" x="422" y="241" text-anchor="middle">6  run claude -p</text>
+<line class="d-line" x1="475" y1="282" x2="582" y2="282" marker-end="url(#fp-a5)"/><text class="d-s" x="529" y="275" text-anchor="middle">7  edit the doc</text>
+</svg>
+<figcaption>the agent never waits. the hook hands off at step 4 and everything slow happens in the background.</figcaption>
+</figure>
+
+## the session log
+
+every turn gets an entry: what you asked, what the agent actually did, and a ⚠ on anything it decided or assumed without telling you. here's a real one, trimmed:
+
+> - **asked:** "approved, go with all your recommendations" (decisions 1–9).
+> - **did:** tried to write `tests/e2e.sh`. the harness blocked it as a "sensitive file". nothing on disk.
+> - **⚠** structure checks are looser than the "exact headings" it promised.
+> - **⚠** the script refuses to run if fourplusone is installed globally. could not verify; `plugin list` was blocked.
+
+## how it works
+
+the stop hook copies the turn into a queue and returns straight away, so the agent never waits on it. a background worker picks it up. there's one worker per repo, and it holds a lock (a folder made with `mkdir`, which either works or fails in one step) so two turns never write the file at the same time. the observer is a separate `claude -p` running sonnet, and it's only allowed to read your repo and edit `fourplusone.md`. the hook ignores the observer's own session, so it never ends up watching itself. no api key needed: it runs on your claude code plan.
+
+## try it
+
+```text
+/plugin marketplace add adhikrysh/fourplusone
+/plugin install fourplusone@fourplusone
+```
+
+you need `git` and `jq`. open the markdown preview of `fourplusone.md` next to your terminal and it refreshes every time it changes.
+
+## limits
+
+claude code only right now, codex is next. it sees what the agent says and does, not its private reasoning. and it won't notice your own edits until a later turn touches that code.

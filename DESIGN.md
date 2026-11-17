@@ -109,7 +109,7 @@ the desktop homepage places a vertically centered, left-aligned text block with 
 
 indexes and project pages use a centered reading column with a 680px maximum width. the desktop gutter is 28px and the top gutter is 40px. the /src index and generated reading pages keep 17px body text and 15px navigation at every viewport width. below 720px, the main gap becomes 48px. below 360px, horizontal padding is 20px.
 
-the "things i've built" index at `/src` separates "spacecraft simulations" and "others" with plain muted headings and a 48px gap between groups. the first group starts 32px below the page title, with 16px between its heading and list. index entries align the title at left and any first-commit date at right. descriptions sit beneath their entries in muted text. standalone write-ups omit the date.
+the "things i've built" index at `/src` is one flat list starting 32px below the page title, with 20px between entries. index entries align the title at left and any first-commit date, or a status such as "revenue generating", at right. descriptions sit beneath their entries in muted text. standalone write-ups omit the date.
 
 ## Elevation & Depth
 
@@ -143,3 +143,6 @@ reading pages at `/src/:slug` render checked-in markdown as static html. reposit
 - **Don't** add browser-side rendering scripts for project content.
 - **Don't** replace the flat reading surface with cards, shadows, gradients, or decorative color.
 - **Don't** let long code expand the page width; preserve internal horizontal scrolling.
+
+
+reading pages use a 640px column. the opening paragraph is the lede: 19px (18px on phones) in a brighter cream. section headings are 20px at weight 550 with a one-pixel divider and 28px of padding above them, so a reader can scan the page. paragraphs sit 24px apart at 1.75 line height. code blocks wrap instead of scrolling sideways.

@@ -1,148 +1,139 @@
 # shipy
 
-[shipy](https://tryshipy.com) is an ai operating system for ship brokers. it turns private email and documents into source-backed commercial records and a workspace for reviewing evidence and moving deals forward.
+ship brokers do most of their deals over email, so the details end up buried in long threads and attachments. [shipy](https://tryshipy.com) is an ai operating system for brokers. it reads that email, turns it into deal records that point back to the exact source, and gives them one place to check the evidence and move deals forward. it's live and generating revenue.
 
-- **evidence.** encrypted, versioned originals stay separate from the system's interpretation. derived records link to the exact source versions behind them.
-- **jobs.** postgres stores claims, progress, and completion. sqs wakes workers with identifiers; a repeated delivery converges on the same job.
-- **publication.** a worker must still own its claim and be working on the current source revision. late work cannot overwrite newer correspondence.
-- **reconciliation.** retries handle a delivery that fails. reconciliation finds pending work whose wake-up was lost, including a database commit followed by a failed queue publication.
+## the core rules
 
-the web app runs on cloudflare; aws runs processing and storage. clef handles relevance classification through workers ai, and fireworks handles structured extraction.
+- **evidence.** the original emails and files are encrypted, versioned and kept apart from the system's interpretation of them. every record links to the exact source versions behind it.
+- **jobs.** postgres stores who's working on what, how far they got and whether it's done. queues only wake workers up with an id, and a repeated message lands on the same job instead of creating a new one.
+- **publishing.** a worker can only publish while it still owns the job and is working on the latest version of the source. late work can't overwrite a newer email.
+- **reconciliation.** retries handle a message that fails. a scheduled job finds work whose wake-up got lost, like a database write that succeeded followed by a queue message that didn't.
 
-## the app and the private backend
+<figure class="diagram">
+<svg viewBox="0 0 600 270" role="img" aria-label="evidence kept apart from interpretation, jobs in postgres woken by queue ids, publishing guarded, and a scheduled job that finds lost wake-ups">
+<defs><marker id="shipy-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-store" x="10" y="10" width="200" height="50" rx="14"/><text class="d-t" x="110" y="32" text-anchor="middle">evidence</text><text class="d-s" x="110" y="49" text-anchor="middle">encrypted, versioned originals</text>
+<rect class="d-box" x="390" y="10" width="200" height="50" rx="4"/><text class="d-t" x="490" y="32" text-anchor="middle">broker records</text><text class="d-s" x="490" y="49" text-anchor="middle">the system&#x27;s interpretation</text>
+<line class="d-line d-dash" x1="388" y1="35" x2="212" y2="35" marker-end="url(#shipy-a2)"/>
+<text class="d-s" x="300" y="28" text-anchor="middle">links to source versions</text>
+<rect class="d-store" x="10" y="130" width="120" height="50" rx="14"/><text class="d-t" x="70" y="152" text-anchor="middle">queue</text><text class="d-s" x="70" y="169" text-anchor="middle">wakes with an id</text>
+<rect class="d-box" x="180" y="130" width="120" height="50" rx="4"/><text class="d-t" x="240" y="152" text-anchor="middle">worker</text><text class="d-s" x="240" y="169" text-anchor="middle">owns the job</text>
+<rect class="d-box" x="350" y="130" width="170" height="50" rx="4"/><text class="d-t" x="435" y="152" text-anchor="middle">publish</text><text class="d-s" x="435" y="169" text-anchor="middle">job owned, source latest</text>
+<line class="d-line" x1="130" y1="155" x2="178" y2="155" marker-end="url(#shipy-a2)"/>
+<line class="d-line" x1="300" y1="155" x2="348" y2="155" marker-end="url(#shipy-a2)"/>
+<line class="d-line" x1="470" y1="130" x2="470" y2="62" marker-end="url(#shipy-a2)"/>
+<rect class="d-store" x="180" y="210" width="120" height="50" rx="14"/><text class="d-t" x="240" y="232" text-anchor="middle">postgres</text><text class="d-s" x="240" y="249" text-anchor="middle">job state</text>
+<line class="d-line" x1="240" y1="180" x2="240" y2="208" marker-end="url(#shipy-a2)"/>
+<rect class="d-box" x="10" y="210" width="134" height="50" rx="4"/><text class="d-t" x="77" y="232" text-anchor="middle">scheduled job</text><text class="d-s" x="77" y="249" text-anchor="middle">finds lost wake-ups</text>
+<line class="d-line d-dash" x1="70" y1="210" x2="70" y2="182" marker-end="url(#shipy-a2)"/>
+</svg>
+<figcaption>the four rules, drawn. evidence stays apart from its interpretation, queues carry only ids, postgres holds job state, publishing is guarded, and a scheduled job catches lost wake-ups.</figcaption>
+</figure>
 
-next.js runs on cloudflare workers through opennext. the worker serves the app, checks the workos session and organization membership, and authorizes each product request. ordinary reads and writes use hyperdrive's postgres connection pool.
+## what happens to an email
 
-```text
-browser
-   |
-   v
-cloudflare worker
-(next.js + opennext)
-   |
-   +--> workos: sessions
-   |
-   +--> hyperdrive: pooled sql
-   |       |
-   |       v
-   |    cloudflare tunnel
-   |    (ecs fargate connector)
-   |       |
-   |       v
-   |    private rds / postgres
-   |
-   +--> iam-authorized lambdas
-   |    uploads, sources, ask
-   |
-   +--> sqs: id-only work
-```
+<figure class="diagram">
+<svg viewBox="0 0 600 180" role="img" aria-label="email pipeline: gmail or imap, capture, attachments extracted, relevance check, structured extraction, knowledge version, broker records">
+<defs><marker id="shipy-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="10" width="128" height="50" rx="4"/><text class="d-t" x="74" y="39.5" text-anchor="middle">gmail / imap</text>
+<rect class="d-box" x="162" y="10" width="128" height="50" rx="4"/><text class="d-t" x="226" y="32" text-anchor="middle">capture</text><text class="d-s" x="226" y="49" text-anchor="middle">s3 + postgres</text>
+<rect class="d-box" x="314" y="10" width="128" height="50" rx="4"/><text class="d-t" x="378" y="32" text-anchor="middle">attachments</text><text class="d-s" x="378" y="49" text-anchor="middle">extracted</text>
+<rect class="d-box" x="466" y="10" width="128" height="50" rx="4"/><text class="d-t" x="530" y="32" text-anchor="middle">relevance check</text><text class="d-s" x="530" y="49" text-anchor="middle">clef, workers ai</text>
+<line class="d-line" x1="138" y1="35" x2="160" y2="35" marker-end="url(#shipy-a1)"/>
+<line class="d-line" x1="290" y1="35" x2="312" y2="35" marker-end="url(#shipy-a1)"/>
+<line class="d-line" x1="442" y1="35" x2="464" y2="35" marker-end="url(#shipy-a1)"/>
+<path class="d-line" d="M530,60 L530,90 L94,90 L94,116" fill="none" marker-end="url(#shipy-a1)"/>
+<text class="d-s" x="312" y="84" text-anchor="middle">relevant mail only</text>
+<rect class="d-box" x="6" y="118" width="176" height="50" rx="4"/><text class="d-t" x="94" y="140" text-anchor="middle">structured extraction</text><text class="d-s" x="94" y="157" text-anchor="middle">fireworks</text>
+<rect class="d-box" x="212" y="118" width="176" height="50" rx="4"/><text class="d-t" x="300" y="140" text-anchor="middle">knowledge version</text><text class="d-s" x="300" y="157" text-anchor="middle">immutable</text>
+<rect class="d-box" x="418" y="118" width="176" height="50" rx="4"/><text class="d-t" x="506" y="140" text-anchor="middle">broker records</text><text class="d-s" x="506" y="157" text-anchor="middle">built by plain code</text>
+<line class="d-line" x1="182" y1="143" x2="210" y2="143" marker-end="url(#shipy-a1)"/>
+<line class="d-line" x1="388" y1="143" x2="416" y2="143" marker-end="url(#shipy-a1)"/>
+</svg>
+<figcaption>what happens to an email, step by step. the relevance check runs first so unrelated mail stops before the expensive extraction step.</figcaption>
+</figure>
 
-the tunnel connector runs inside the aws private network. rds accepts connections from that connector and the backend lambdas; the database has no public endpoint. hyperdrive pools database connections so short-lived web requests can reuse them.
+shipy reads the whole thread, so a later reply updates how the conversation is understood.
 
-private source reads, upload controls, and the ask interface use iam-signed lambda calls. mailbox imports, document extraction, and long analysis run outside the web request. the public demo form uses a separate d1 database; product and workflow data live in postgres.
+the relevance check runs first so unrelated mail stops before the expensive step. [clef](https://developers.cloudflare.com/workers-ai/models/clef-flash/) returns how likely an email is to matter, and shipy records the decision. relevant mail goes to fireworks for extraction, where the output has to match a schema and point at sources the broker is allowed to see. plain code, not a model, then turns that into the records brokers work with.
 
-## an email through the processing system
+queue messages carry ids, never email bodies or mailbox passwords. if an attachment fails to extract, that gap stays visible instead of disappearing.
 
-gmail and imap have separate synchronization adapters but feed a shared whole-thread processing path. processing uses the whole thread; later replies update the interpretation of that conversation.
+when a broker starts a deal, the evidence behind it is frozen. a later email can suggest a new recap, but it can't rewrite what an earlier decision was based on.
 
-```text
-gmail / imap
-      |
-      v
-discovery + capture lambdas
-      |
-      +--> s3: original evidence
-      +--> postgres: job state
-      |
-      v
-attachment extraction lambdas
-      |
-      v
-relevance lambda
-      |
-      +--> cf worker gateway
-      |       |
-      |       v
-      |    clef / workers ai
-      |
-      v
-knowledge extraction lambda
-      |
-      +--> fireworks: inference
-      |
-      v
-knowledge artifacts in s3
-      + versions in postgres
-      |
-      v
-deterministic record projection
-      |
-      v
-broker workspace
-```
+## where it runs
 
-separate sqs queues connect the email-processing stages. messages carry identifiers and correlation metadata. workers retrieve the authorized source content from storage; the queue carries neither email bodies nor mailbox credentials.
+the web app is next.js on cloudflare workers. sessions go through workos. database connections are pooled by hyperdrive and reach a private postgres on aws through a cloudflare tunnel, so the database has no public address.
 
-for one incoming email, the capture worker preserves the original message and records its thread revision. attachment workers extract the associated files. the next stage waits until capture is complete and each attachment has either a usable result or an explicit failure. a failed attachment remains a visible evidence gap.
+<figure class="diagram">
+<svg viewBox="0 0 600 175" role="img" aria-label="where the web app runs: browser to next.js on cloudflare workers, sessions through workos, hyperdrive and a cloudflare tunnel to a private postgres on aws">
+<defs><marker id="shipy-a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="10" width="120" height="50" rx="4"/><text class="d-t" x="70" y="39.5" text-anchor="middle">browser</text>
+<rect class="d-box" x="180" y="10" width="170" height="50" rx="4"/><text class="d-t" x="265" y="32" text-anchor="middle">next.js</text><text class="d-s" x="265" y="49" text-anchor="middle">on cloudflare workers</text>
+<rect class="d-box" x="405" y="10" width="150" height="50" rx="4"/><text class="d-t" x="480" y="32" text-anchor="middle">hyperdrive</text><text class="d-s" x="480" y="49" text-anchor="middle">pools connections</text>
+<line class="d-line" x1="130" y1="35" x2="178" y2="35" marker-end="url(#shipy-a3)"/>
+<line class="d-line" x1="350" y1="35" x2="403" y2="35" marker-end="url(#shipy-a3)"/>
+<rect class="d-box" x="405" y="110" width="150" height="50" rx="4"/><text class="d-t" x="480" y="132" text-anchor="middle">cloudflare tunnel</text><text class="d-s" x="480" y="149" text-anchor="middle">no public address</text>
+<line class="d-line" x1="480" y1="60" x2="480" y2="108" marker-end="url(#shipy-a3)"/>
+<rect class="d-box" x="180" y="110" width="170" height="50" rx="4"/><text class="d-t" x="265" y="132" text-anchor="middle">private postgres</text><text class="d-s" x="265" y="149" text-anchor="middle">on aws</text>
+<line class="d-line" x1="403" y1="135" x2="352" y2="135" marker-end="url(#shipy-a3)"/>
+<rect class="d-box" x="10" y="110" width="120" height="50" rx="4"/><text class="d-t" x="70" y="132" text-anchor="middle">workos</text><text class="d-s" x="70" y="149" text-anchor="middle">sessions</text>
+<line class="d-line d-dash" x1="200" y1="60" x2="90" y2="108" marker-end="url(#shipy-a3)"/>
+</svg>
+<figcaption>the web path. the database is never exposed: hyperdrive reaches it only through a cloudflare tunnel.</figcaption>
+</figure>
 
-the relevance lambda calls [clef](https://developers.cloudflare.com/workers-ai/models/clef-flash/) through an authenticated cloudflare worker gateway. clef returns class probabilities; shipy records the relevance decision. unrelated mail can stop before the more expensive extraction stage. the gateway exposes only the permitted models; the backend does not need a cloudflare account api token.
+processing runs on aws lambdas in private subnets. each stage has its own queue, with its own concurrency and retry settings, so a slow model provider builds up a backlog without blocking the web app or other stages. a shared controller (backed by dynamodb) hands out fireworks capacity, so workers wait their turn instead of all hitting the provider at once.
 
-relevant evidence goes to structured extraction through fireworks. the output must satisfy a schema and refer to the authorized sources. the system publishes an immutable knowledge version, then deterministic code projects its contents into broker-facing records.
+<figure class="diagram">
+<svg viewBox="0 0 600 105" role="img" aria-label="processing on aws: a queue and a lambda for each stage, with a dynamodb controller handing out fireworks capacity">
+<defs><marker id="shipy-a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-store" x="10" y="10" width="115" height="50" rx="14"/><text class="d-t" x="67.5" y="32" text-anchor="middle">stage queue</text><text class="d-s" x="67.5" y="49" text-anchor="middle">ids only</text>
+<rect class="d-box" x="165" y="10" width="115" height="50" rx="4"/><text class="d-t" x="222.5" y="32" text-anchor="middle">lambda</text><text class="d-s" x="222.5" y="49" text-anchor="middle">private subnet</text>
+<rect class="d-box" x="320" y="10" width="115" height="50" rx="4"/><text class="d-t" x="377.5" y="32" text-anchor="middle">controller</text><text class="d-s" x="377.5" y="49" text-anchor="middle">dynamodb</text>
+<rect class="d-box" x="475" y="10" width="115" height="50" rx="4"/><text class="d-t" x="532.5" y="32" text-anchor="middle">fireworks</text><text class="d-s" x="532.5" y="49" text-anchor="middle">model provider</text>
+<line class="d-line" x1="125" y1="35" x2="163" y2="35" marker-end="url(#shipy-a4)"/>
+<line class="d-line" x1="280" y1="35" x2="318" y2="35" marker-end="url(#shipy-a4)"/>
+<line class="d-line" x1="435" y1="35" x2="473" y2="35" marker-end="url(#shipy-a4)"/>
+<text class="d-s" x="300" y="88" text-anchor="middle">repeated for every stage, each with its own queue, concurrency and retries</text>
+</svg>
+<figcaption>the processing path. a slow model provider backs up its own queue, and workers wait their turn at the controller.</figcaption>
+</figure>
 
-## storage
+uploads go straight from the browser to s3 through a short-lived signed form. a lambda then checks the stored file against what was approved and pins its exact version before any processing starts.
 
-**s3 preserves evidence and artifacts.** original emails, attachments, and uploads live in private, versioned buckets encrypted with aws key management service (kms). derived knowledge uses separate storage. records pin object versions and checksums, so an update cannot silently replace the bytes behind an earlier conclusion.
+<figure class="diagram">
+<svg viewBox="0 0 600 330" role="img" aria-label="upload flow: browser uploads to s3 with a short-lived signed form, a lambda checks the file against what was approved and pins its exact version, then processing starts">
+<defs><marker id="shipy-a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="180" y="10" width="240" height="50" rx="4"/><text class="d-t" x="300" y="39.5" text-anchor="middle">browser</text>
+<rect class="d-store" x="180" y="96" width="240" height="50" rx="14"/><text class="d-t" x="300" y="118" text-anchor="middle">s3</text><text class="d-s" x="300" y="135" text-anchor="middle">file stored</text>
+<rect class="d-box" x="180" y="182" width="240" height="50" rx="4"/><text class="d-t" x="300" y="204" text-anchor="middle">lambda</text><text class="d-s" x="300" y="221" text-anchor="middle">checks file against what was approved</text>
+<rect class="d-box" x="180" y="268" width="240" height="50" rx="4"/><text class="d-t" x="300" y="290" text-anchor="middle">processing</text><text class="d-s" x="300" y="307" text-anchor="middle">starts after the version is pinned</text>
+<line class="d-line" x1="300" y1="60" x2="300" y2="94" marker-end="url(#shipy-a5)"/>
+<text class="d-s" x="312" y="82" text-anchor="start">short-lived signed form</text>
+<line class="d-line" x1="300" y1="146" x2="300" y2="180" marker-end="url(#shipy-a5)"/>
+<line class="d-line" x1="300" y1="232" x2="300" y2="266" marker-end="url(#shipy-a5)"/>
+<text class="d-s" x="312" y="254" text-anchor="start">pins exact version</text>
+</svg>
+<figcaption>the upload path. the file goes straight to s3, and nothing is processed until the lambda has pinned an exact version.</figcaption>
+</figure>
 
-**rds postgres owns state and relationships.** it records organizations, private mailbox and upload ownership, source revisions, processing jobs, claims, published versions, and deals. transactions keep a published version and its current pointer consistent. a worker may publish only while it still owns the claim and its source revision remains current.
+## privacy
 
-when a broker starts a deal, the system freezes the selected evidence versions. later correspondence can produce a new version and a new recap proposal without rewriting the basis of an earlier decision. authorization follows the evidence into the derived records and source viewer.
+access follows the person, not just their company. private mailboxes and uploads also need the owner's permission.
 
-## document uploads
+the "ask" feature runs in its own lambda with no access to the database, file storage or queues. it only receives records the server already authorised, and the model never writes sql. gmail access is read-only, and the broker makes every commercial decision and sends every email.
 
-the app authorizes an upload and asks a lambda to create a short-lived upload intent. the browser sends the file directly to s3 using a presigned form. its conditions constrain the object, size, type, checksum, and encryption.
+<figure class="diagram">
+<svg viewBox="0 0 600 70" role="img" aria-label="ask feature: the server authorises records, the ask lambda has no database, file or queue access, and the model never writes sql">
+<defs><marker id="shipy-a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect class="d-box" x="10" y="10" width="128" height="50" rx="4"/><text class="d-t" x="74" y="32" text-anchor="middle">server</text><text class="d-s" x="74" y="49" text-anchor="middle">authorises records</text>
+<rect class="d-box" x="230" y="10" width="160" height="50" rx="4"/><text class="d-t" x="310" y="32" text-anchor="middle">ask lambda</text><text class="d-s" x="310" y="49" text-anchor="middle">no db, files or queues</text>
+<rect class="d-box" x="460" y="10" width="130" height="50" rx="4"/><text class="d-t" x="525" y="32" text-anchor="middle">model</text><text class="d-s" x="525" y="49" text-anchor="middle">never writes sql</text>
+<line class="d-line" x1="138" y1="35" x2="228" y2="35" marker-end="url(#shipy-a6)"/>
+<line class="d-line" x1="390" y1="35" x2="458" y2="35" marker-end="url(#shipy-a6)"/>
+</svg>
+<figcaption>the ask feature is walled off. it only sees records the server already authorised.</figcaption>
+</figure>
 
-```text
-browser -> worker -> lambda
-                        |
-                        v
-                 upload intent
-                 signed form
-                        |
-                        v
-browser -------------> s3
-                        |
-                        v
-                 finalize lambda
-                        |
-                        v
-                postgres version
-                + job
-                        |
-                        v
-                scheduled lambda
-                        |
-                        v
-                broker records
-```
-
-finalization verifies the stored object against the intent and pins its exact s3 version before creating the processing job. a scheduled lambda claims that job and reuses the attachment extraction and knowledge publication components. file bytes bypass the web app, while authorization and completion stay server-controlled.
-
-## queues and inference capacity
-
-capture, attachments, classification, extraction, and downstream work have separate queues and lambdas. each stage can have its own concurrency and retry policy. a slow inference service can build a backlog without occupying web requests or blocking unrelated attachment work. the knowledge queue uses fifo (first in, first out) groups per thread, keeping ordered work separate from unrelated threads.
-
-postgres claims and expiring leases decide who may process a job. repeated queue deliveries converge on the same durable work. stale revisions cannot overwrite newer results. bounded retries and dead-letter queues isolate persistent failures.
-
-database commits and queue publication are separate operations. if a commit succeeds and queue publication fails, the saved job has no wake-up message. the scheduled reconciler scans saved state and republishes eligible unfinished work. it also discovers missed provider changes; provider checkpoints advance only after the work they cover is durable.
-
-background fireworks calls share a capacity controller backed by dynamodb. workers reserve capacity before calling the provider, defer when the budget is busy, and back off when throttled. conditional updates prevent concurrent workers from spending the same budget. adding lambda concurrency alone does not increase database or model-provider capacity. those limits govern how fast the queues drain.
-
-## privacy, operations, and release boundaries
-
-the ingestion, processing, upload, and source-reading lambdas run in private subnets. an s3 gateway endpoint keeps their object-storage traffic on the aws network; outbound provider requests leave through a nat gateway. iam roles limit each component's aws permissions, and credentials stay in secret stores or encrypted credential records.
-
-the request layer derives access from the authenticated user. an organization boundary alone is insufficient: private mailbox and upload evidence also need owner authorization. ask receives only the server-authorized records needed for its request and returns structured filters or an answer. ask runs in a separate lambda with no database, evidence-store, or queue access. the model does not write sql. gmail access is read-only, and the broker controls commercial decisions and sending.
-
-cloudwatch tracks queue age, dead-letter depth, function errors, and stalled work. structured logs connect stages through identifiers and error categories without recording source content or credentials.
-
-cloudformation defines the aws infrastructure. the web app and backend have separate releases, and backend rollout separates code and infrastructure, database migrations, consumer activation, and external inference activation. that separation keeps deploying code distinct from immediately starting expensive work against private evidence.
+logs link the stages together by id and never record email content or credentials.
