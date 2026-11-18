@@ -182,7 +182,7 @@ ${items.join("\n")}
 }
 
 /** Rows a page shows. A tab grouped by a value (people by topic) is one page: its groups are collapsed, and pages would split a topic. */
-export const PAGE = 50;
+const PAGE = 50;
 
 export async function tabPage(design: Design, database: D1Database, tab: Tab, q: string, at: number): Promise<string> {
   const groupBy = tab.group ? field(tab, tab.group) : undefined;

@@ -1,31 +1,38 @@
 # adhikrish.cloud (public site)
 
-static html and css in `site/`, deployed by cloudflare pages from `main` whenever `public/` or `design/` changes. a small optional inline script warms the browser's html cache before navigation. every page and link works without javascript.
+static html and css in `site/`, deployed by cloudflare pages from `main` whenever `public/` or `design/` changes. every page and link works without javascript; one small inline script only warms the next page's html.
 
-`/txt` serves `txt.html`, titled "things i've written", for essays and notes. `/src` serves `src.html`, titled "things i've built" in the navigation and on the page. projects are grouped under a white pill per `category` (in `content/projects.json`); groups and the projects in them follow that file's order. its navigation puts "home" at left and "more stuff" at right, which opens the public github repositories in a new tab. the homepage links read "things i've built", "things i've written", "contact@adhikrish.cloud", "linkedin", and "github". cloudflare pages serves the generated html at extensionless paths. legacy `/etc`, `/essays` and `/projects` paths redirect permanently to the canonical paths. `404.html` makes missing pages return a real 404 instead of the homepage.
+## pages
 
-to publish an essay, copy `templates/essay.html.tmpl` to `txt/essay-title.html`. replace its tokens with the title, description, url slug, publication date, last edited date, and body html. use the latest commit affecting the essay for its last edited date. the template shows the date alone, followed by a smaller last edited line. link the essay from `txt.html`, newest publication date first. use ISO dates in `time datetime` and readable dates in the visible text. edits do not change an essay's place in the publication list. keep font and image urls absolute so nested pages load them correctly. 
+- `/` (`templates/index.html`): the home page. its links: things i've built, things i've written, the email address, linkedin, github.
+- `/src` (`templates/src.html`): "things i've built". projects sit under a white pill per `category`; groups and the projects in them follow the order of `content/projects.json`.
+- `/src/<slug>`: one write-up per project, from `content/projects/<slug>.md`.
+- `/txt` (`templates/txt.html`): "things i've written".
+- `404.html` (`templates/404.html`): makes a missing page a real 404.
+- `nsnip.html`: hand-written, separate from the rest.
 
-repository-backed entries use first commit dates in UTC, not github repository creation dates. each title opens a local reading page with the date alone, linked to the first commit, and a smaller code updated line from the reviewed source commit. an entry without dates can set `status` (shipy shows "revenue generating"), shown where the date would be. its github link opens the repository in a new tab. standalone write-ups can have a `title` and `website` instead of repository metadata. they omit commit dates and link to the product website.
+every page below home starts with a `←` back to its parent. legacy `/etc`, `/essays`, `/projects` and `/projects/<slug>` paths redirect permanently (`site/_redirects`).
 
-every write-up lives in `content/projects/<slug>.md` and is authored here, checked against the code at the entry's `source_commit`. each one opens with a single paragraph that says why the project exists, the problem it solves and its impact, in plain words. then short sections (how it works, how i tested it, limits) with the real engineering detail. claim only results the code or tests back up. keep chronology separate from write-up edits. update `edited_date` from the latest github commit date and `source_commit` to that commit's id. `source_commit` also pins relative documentation and code links to the version reviewed for that page. images use local files with a content hash in their names. `webp_images` maps each PNG fallback to a pixel-identical lossless WebP. generated picture elements let the browser choose one format. keep both image files and update both mappings when a plot changes.
+## building
 
-`content/projects/tryshipy.md` is a deliberately authored public system-design overview. it describes component roles and information flow with ASCII diagrams. it names the actual providers and components, including cloudflare workers, hyperdrive, the private database tunnel, rds, s3, sqs, lambda, clef, fireworks, and dynamodb. it explains their boundaries, durability, scaling, and recovery without copying the private README or exposing credentials, infrastructure identifiers, customer data, prompts, matching rules, or operating thresholds. its public product name is shipy, linked to https://tryshipy.com; the existing /src/tryshipy route remains stable. review the deployed configuration and current code before updating or publishing it.
+`bun public/scripts/render-projects.ts` (bun, and pandoc 3.8 or newer) writes everything generated: `site/index.html`, `site/txt.html`, `site/404.html` and `site/src.html` from the templates, and `site/src/<slug>.html` plus a legacy copy in `site/projects/` from the markdown. the templates pull `design/base.css` and `design/list.css` in through `/* @design <file> */` lines, so a design change reaches every page on the next render. edit the templates, never their copies in `site/`, and commit the generated html with its source.
 
-run `bun public/scripts/render-projects.ts` after changing content. it requires bun and pandoc 3.8 or newer, reads the index template `templates/src.html`, writes the served index to `site/src.html`, and writes static reading pages to `src/`. it also mirrors the generated pages to the legacy `projects/` directory; legacy URLs redirect to `/src`. commit the generated html with the source markdown. visitors receive plain html, css, and images; no markdown renderer or github request runs in their browser.
+run it locally with `npx serve public/site`. that server has no extensionless routes or cache headers, so visit `/txt.html` there.
 
-the page preloads a local copy of the exact inter v20 latin font previously served by google fonts. keeping that file unchanged preserves its rendering. the font license is in `font-licenses/inter-OFL.txt`.
+## projects.json
 
-`_headers` sets caching for cloudflare pages. it also supplies the font preload header for pages' early hints, which can start the font request before the html arrives. the cache policy:
+each entry has a `slug`, `description` and `category`, and either a repository's first-commit `date` (utc) with `edited_date` and `source_commit`, or a `status` shown where the date would be (shipy: "revenue generating"). a write-up page shows the date or status as a pill, then "code updated <edited_date>". `source_commit` pins the github link and any relative links to the code that was reviewed. a standalone write-up can set `title`, `website` and `website_label` instead. `images` maps a markdown image to a local file with a content hash in its name, and `webp_images` maps each png to a pixel-identical lossless webp.
 
-- html: five minutes, then revalidate. a deployed text change may take five minutes to appear in an existing browser cache.
-- the font: one year, immutable. its filename contains its sha256 prefix. change the filename and every preload and font reference whenever the font changes.
-- hashed project images and the PNG favicon: one year, immutable. the legacy favicon and social preview image: one day, then revalidate. change the url when an image needs an immediate cache refresh.
+how to write one is in `AGENTS.md` (this folder).
 
-run locally with `npx serve public/site` (or any static server). this server does not apply the production cache headers or extensionless routes; visit `/txt.html` there.
+## caching (`site/_headers`)
 
-project plots use lossless WebP where supported, with the original PNGs as fallbacks. the opening plot loads eagerly with high fetch priority because it appears in the initial reading viewport; later images remain lazy. image dimensions reserve their layout space.
+- html: five minutes, then revalidate, so a deploy can take five minutes to show in a browser that already has the page.
+- the inter font, hashed project images and the hashed favicon: one year, immutable. their filenames carry a hash; change the name when the file changes.
+- `og.png`, the social preview: one day.
 
-the favicon uses one opaque 48px square PNG, cropped from the supplied sunset photograph, to avoid downloading multiple icon formats. its hashed asset is 3,541 bytes. the root `favicon.png` provides the same image at the legacy URL. retain older hashed assets so cached HTML can still request them. the exact Inter font remains unchanged. cloudflare analytics and browser bot checks remain enabled. these injected scripts add requests and browser work.
+the font is a local copy of inter v20 latin, preloaded by every page (and sent early as a `link` header); its licence is `site/font-licenses/inter-OFL.txt`.
 
-`scripts/navigation-preload.js` fetches linked `/src` html at low priority using the normal browser cache. the homepage warms the index; the index warms its five write-ups. hovering, focusing, or touching a local navigation link also starts its fetch. automatic warming is skipped when the browser reports data-saving mode or a 2g connection. the script consumes html without rendering the destination or running its analytics and bot checks. it does not prefetch images, change links, or override the five-minute cache policy. an immediate click may still arrive before the fetch finishes. the renderer embeds the same script in the homepage, index, and generated reading pages; rerun it after changing the script.
+## navigation-preload.js
+
+`scripts/navigation-preload.js` fetches linked `/src` pages at low priority into the normal browser cache, so a click lands on a warm page: home warms the index, the index warms its write-ups, and hovering or touching a local link starts its fetch. it skips automatic warming on data-saving or 2g connections and renders nothing. the renderer embeds it in home, the index and every write-up; rerun it after changing the script.

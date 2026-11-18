@@ -11,7 +11,6 @@ type Project = {
   description: string;
   date?: string;
   edited_date?: string;
-  first_commit?: string;
   category: string; // the pill it sits under on /src; groups appear in the order their first project does
   source_commit?: string;
   status?: string;
