@@ -232,7 +232,7 @@ test("home is just the visible tabs, no numbers", async () => {
   expect(page).not.toContain('href="/body"'); // hidden
   expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
-  expect(page).not.toContain("<nav"); // no links at the top of home
+  expect(page).toContain('<nav aria-label="site"><a class="external" href="https://admin.adhikrish.cloud/">admin</a></nav>'); // only admin, top right
   writeFileSync(join(artifacts, "page-home.html"), page);
 });
 

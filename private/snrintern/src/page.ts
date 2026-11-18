@@ -123,7 +123,7 @@ function show(f: Field, value: Value, where: "aside" | "line" | "detail"): strin
       const tone = f.colors?.[String(value)];
       return tone ? `<span class="${tone}">${escape(value)}</span>` : `<span class="pill">${escape(value)}</span>`;
     }
-    case "url": return `<a href="${escape(value)}" target="_blank" rel="noopener noreferrer">${escape(site(String(value)))} ↗</a>`;
+    case "url": return `<a href="${escape(value)}" target="_blank" rel="noopener noreferrer">${escape(site(String(value)))}</a>`;
     case "lifts": {
       const lifts = parseLifts(String(value));
       return escape(typeof lifts === "string" ? value : lifts.map((l) => l.exercise).join(", "));
@@ -147,9 +147,9 @@ const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
   return p ? escape(day(p, where === "detail" ? "long" : "short")) : escape(v);
 };
 
-/** No nav on home. Elsewhere: snr intern home and the visible tabs on the left (not the page you're on), admin on the right. */
+/** Home: only admin, top right. Elsewhere: snr intern home and the visible tabs on the left (not the page you're on), admin on the right. */
 function nav(tabs: Tab[], current?: Tab, onRow = false): string {
-  if (!current) return "";
+  if (!current) return `<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
   const others = tabs.filter((t) => !t.hidden && (onRow || t.slug !== current.slug)).map((t) => `<a href="/${t.slug}">${escape(t.label)}</a>`).join("");
   return `<a href="/">snr intern</a>${others}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
 }
