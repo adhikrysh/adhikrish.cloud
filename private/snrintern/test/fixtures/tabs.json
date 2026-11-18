@@ -61,14 +61,7 @@
    },
    {
     "name": "group",
-    "type": "enum",
-    "options": [
-     "space & deep tech",
-     "investors & mentors",
-     "founder peers",
-     "hiring",
-     "other"
-    ]
+    "type": "text"
    },
    {
     "name": "last_contact",
@@ -161,13 +154,7 @@
     "where": {
      "status": "open"
     },
-    "within_days": 30,
-    "score": {
-     "field": "verdict",
-     "set": {
-      "status": "closed"
-     }
-    }
+    "within_days": 30
    },
    {
     "kind": "calibration",

@@ -3,7 +3,7 @@
 import { escape, page, type Design } from "../../../design/html.ts";
 import * as db from "./db.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
-import { renderViews, todayParts, VIEW_CSS } from "./views.ts";
+import { renderViews, VIEW_CSS } from "./views.ts";
 
 const CSS = `
   nav { flex-wrap: wrap; row-gap: 6px; }
@@ -12,14 +12,13 @@ const CSS = `
   h1 small { color: #8a8a8a; font-size: 14px; font-weight: 380; margin-left: 10px; letter-spacing: 0; }
   .tally { color: #8a8a8a; font-size: 14px; margin-top: 6px; }
   .search { position: relative; margin-top: 24px; }
-  .search svg { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: #6a6a66; fill: none; stroke-width: 1.6; pointer-events: none; }
-  .search input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid #252522; border-radius: 0; color: #d8d4c8;
-                  font: inherit; font-size: 16px; padding: 10px 0 10px 26px; outline: none; transition: border-color 220ms ease; -webkit-appearance: none; }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: #6a6a66; fill: none; stroke-width: 1.6; pointer-events: none; }
+  .search input { width: 100%; background: #121210; border: 0; border-radius: 8px; color: #d8d4c8;
+                  font: inherit; font-size: 16px; padding: 10px 40px 10px 36px; outline: none; transition: background 220ms ease; -webkit-appearance: none; }
   .search input::placeholder { color: #5a5a56; }
-  .search input:hover { border-bottom-color: #3a3a35; }
-  .search input:focus { border-bottom-color: #8a8a8a; }
+  .search input:hover, .search input:focus { background: #181816; }
   .search input::-webkit-search-cancel-button { -webkit-appearance: none; }
-  .search kbd { position: absolute; right: 0; top: 50%; transform: translateY(-50%); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  .search kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
                 color: #5a5a56; border: 1px solid #252522; border-radius: 3px; padding: 1px 6px; }
   .search input:focus + kbd { display: none; }
   .project-list { margin-top: 28px; }
@@ -45,27 +44,34 @@ const CSS = `
   dt { color: #8a8a8a; }
   dd { overflow-wrap: anywhere; }
   .updated { color: #6a6a66; font-size: 13px; margin-top: 40px; }
-  h2.tabs-heading { font-size: 13px; font-weight: 450; color: #8a8a8a; margin-top: 44px; padding-top: 18px; border-top: 1px solid #1f1f1c; }
-  h2.tabs-heading + .search { margin-top: 8px; }
-  .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-  .actions-line { display: flex; gap: 14px; font-size: 14px; margin-top: 0; flex: none; }
-  .actions-line form { display: inline; }
-  .actions-line a, button.link { color: #8a8a8a; }
-  button.link { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; cursor: pointer; }
-  button.link:hover, .actions-line a:hover { color: #c4553f; }
-  .actions-line a:hover { color: #d8d4c8; }
-  ul + .actions-line { margin-top: 28px; }
+  .views + .search { margin-top: 44px; }
+  .searching .views, .searching .tally { display: none; }
   .empty { color: #8a8a8a; margin-top: 32px; }
   .day { margin-top: 36px; }
-  .day h2 { font-size: 15px; font-weight: 450; color: #d8d4c8; padding-bottom: 8px; border-bottom: 1px solid #1f1f1c; }
+  .day h2 { font-size: 15px; font-weight: 450; color: #d8d4c8; }
   .day h2 small { color: #6a6a66; font-weight: 380; margin-left: 8px; }
   .day .project-list { margin-top: 14px; }
   .day .project-list li + li { margin-top: 18px; }
+  details.group { margin-top: 6px; }
+  details.group summary { list-style: none; cursor: pointer; font-size: 17px; padding: 10px 0; display: flex; align-items: baseline; gap: 10px; }
+  details.group summary::-webkit-details-marker { display: none; }
+  details.group summary::before { content: "›"; color: #6a6a66; display: inline-block; width: 10px; transition: transform 220ms ease; }
+  details.group[open] summary::before { transform: rotate(90deg); }
+  details.group summary small { color: #6a6a66; font-size: 13px; }
+  details.group .project-list { margin: 6px 0 18px 20px; }
   @media (prefers-reduced-motion: reduce) { .search input { transition: none; } }
 `;
 
 // "/" focuses search from anywhere on a tab page, the way most search boxes on the web do.
-const SLASH_TO_SEARCH = `<script>addEventListener("keydown",e=>{const i=document.querySelector(".search input");if(i&&e.key==="/"&&document.activeElement!==i){e.preventDefault();i.focus();i.select()}})</script>`;
+// Live search: rows are already on the page, so typing just hides the ones that don't match.
+// "/" focuses the box. Pressing enter still runs the same search on the server.
+const LIVE_SEARCH = `<script>(()=>{const i=document.querySelector(".search input"),n=document.querySelector("h1 small");if(!i)return;
+const rows=[...document.querySelectorAll(".rows li")],total=rows.length,text=rows.map(r=>r.dataset.search),none=document.querySelector(".none");
+const run=()=>{const q=i.value.trim().toLowerCase();let shown=0;rows.forEach((r,k)=>{const ok=!q||text[k].includes(q);r.hidden=!ok;if(ok)shown++});
+document.querySelectorAll(".rows section,.rows details").forEach(s=>{const any=[...s.querySelectorAll("li")].some(r=>!r.hidden);s.hidden=!any;if(s.tagName==="DETAILS")s.open=!!q&&any});
+document.body.classList.toggle("searching",!!q);if(n)n.textContent=q?shown+" of "+total:total;if(none)none.hidden=!q||shown>0};
+i.addEventListener("input",run);run();
+addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement!==i){e.preventDefault();i.focus();i.select()}})})()</script>`;
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const label = (name: string) => name.replaceAll("_", " ");
@@ -161,14 +167,12 @@ export async function homePage(design: Design, database: D1Database): Promise<st
             <p>${escape(tab.about)}</p>
           </li>`;
   });
-  const today = await todayParts(tabs, database);
   const body = `      <h1>snr intern</h1>
-${today.length ? `      <div class="views">\n${today.join("\n")}\n      </div>\n      <h2 class="tabs-heading">everything</h2>` : ""}
       <ul class="project-list">
 ${items.join("\n")}
       </ul>
-      <div class="actions-line"><a href="/_new">new tab</a></div>`;
-  return page({ design, title: "snr intern", nav: nav(tabs), body, css: CSS + VIEW_CSS });
+`;
+  return page({ design, title: "snr intern", nav: nav(tabs), body, css: CSS });
 }
 
 export async function tabPage(design: Design, database: D1Database, tab: Tab, q: string): Promise<string> {
@@ -180,7 +184,8 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
     q ? Promise.resolve("") : renderViews(tab, database),
   ]);
   const groupBy = tab.group ? field(tab, tab.group) : undefined;
-  const groupField = groupBy && groupBy.type !== "enum" ? groupBy : undefined; // grouped by day
+  const byValue = groupBy && (groupBy.type === "enum" || groupBy.type === "text");
+  const groupField = groupBy && !byValue ? groupBy : undefined; // grouped by day
   const item = (row: db.Row) => {
     // inside a day group the day is in the heading, so a row only shows its time
     const asideNames = groupField ? tab.aside.filter((n) => n !== groupField.name) : tab.aside;
@@ -188,20 +193,23 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
     const aside = [time && escape(time), joined(tab, row, asideNames, "aside")].filter(Boolean).join(" ");
     const line = joined(tab, row, tab.line, "line");
     const snippet = tab.snippet && present(row[tab.snippet]) ? `\n            <p class="snippet">${escape(row[tab.snippet])}</p>` : "";
-    return `          <li>
+    // every value, so live search matches the same things the server search does
+    const searchable = tab.fields.map((f) => row[f.name]).filter(present).join(" ").toLowerCase();
+    return `          <li data-search="${escape(searchable)}">
             <a class="head" href="/${tab.slug}/${row.id}"><span>${titleOf(tab, row)}</span><small class="aside">${aside}</small></a>${line ? `\n            <p class="line">${line}</p>` : ""}${snippet}
             ${links(tab, row)}
           </li>`;
   };
   let list: string;
-  if (groupBy?.type === "enum") {
-    // grouped by value, in the order the options are listed, then rows without one
-    const keys = [...groupBy.options!, ""];
-    list = keys.map((key) => {
-      const inGroup = rows.filter((r) => (r[groupBy.name] ?? "") === key);
-      if (!inGroup.length) return "";
-      return `      <section class="day">\n        <h2>${escape(key || `no ${label(groupBy.name)}`)}<small>${inGroup.length}</small></h2>\n        <ul class="project-list">\n${inGroup.map(item).join("\n")}\n        </ul>\n      </section>`;
-    }).filter(Boolean).join("\n");
+  if (byValue) {
+    // grouped by value, collapsed: enum options in their listed order, free text by size, then rows without one
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(String(r[groupBy.name] ?? ""), (counts.get(String(r[groupBy.name] ?? "")) ?? 0) + 1);
+    const keys = groupBy.type === "enum" ? [...groupBy.options!, ""] : [...counts.keys()].filter(Boolean).sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b)).concat("");
+    list = keys.filter((key) => counts.get(key)).map((key) => {
+      const inGroup = rows.filter((r) => String(r[groupBy.name] ?? "") === key);
+      return `      <details class="group">\n        <summary>${escape(key || `no ${label(groupBy.name)}`)}<small>${inGroup.length}</small></summary>\n        <ul class="project-list">\n${inGroup.map(item).join("\n")}\n        </ul>\n      </details>`;
+    }).join("\n");
   } else if (groupField) {
     const days = new Map<string, db.Row[]>();
     for (const row of rows) {
@@ -216,10 +224,10 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
   } else list = `      <ul class="project-list">\n${rows.map(item).join("\n")}\n      </ul>`;
   const tally = tallies.flat().map(([v, n]) => `${n} ${escape(v)}`).join(" · ");
   const icon = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>`;
-  const body = `      <div class="title-row"><h1>${escape(tab.label)}<small>${q ? `${rows.length} of ${total}` : total}</small></h1><div class="actions-line"><a href="/${tab.slug}/_new">add</a><a href="/${tab.slug}/_schema">schema</a></div></div>
-${tally ? `      <p class="tally">${tally}</p>\n` : ""}${views ? `      ${views}\n      <h2 class="tabs-heading">all ${escape(tab.label)}</h2>\n` : ""}      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search ${escape(tab.label)}" aria-label="search ${escape(tab.label)}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
-${rows.length ? list : `      <p class="empty">nothing${q ? ` matches "${escape(q)}"` : " yet"}.</p>`}
-      ${SLASH_TO_SEARCH}`;
+  const body = `      <h1>${escape(tab.label)}<small>${q ? `${rows.length} of ${total}` : total}</small></h1>
+${tally ? `      <p class="tally">${tally}</p>\n` : ""}${views ? `      ${views}\n` : ""}      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search ${escape(tab.label)}" aria-label="search ${escape(tab.label)}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
+${rows.length ? `      <div class="rows">\n${list}\n      </div>\n      <p class="empty none" hidden>nothing matches.</p>` : `      <p class="empty">nothing${q ? ` matches "${escape(q)}"` : " yet"}.</p>`}
+      ${LIVE_SEARCH}`;
   return page({ design, title: `${tab.label} | snr intern`, nav: nav(tabs, tab), body, css: CSS + VIEW_CSS });
 }
 
@@ -246,7 +254,7 @@ export async function rowPage(design: Design, database: D1Database, tab: Tab, ro
   const line = joined(tab, row, tab.line, "line");
   const aside = tab.aside.filter((n) => present(row[n])).map((n) => show(field(tab, n), row[n] as Value, "detail")).join(" · ");
   const body = `      <article class="detail">
-      <div class="title-row"><h1>${titleOf(tab, row, "detail").split(" · ")[0]}</h1><div class="actions-line"><a href="/${tab.slug}/${row.id}/_edit">edit</a><form method="post" action="/${tab.slug}/${row.id}/_delete" onsubmit="return confirm('delete this row?')"><button class="link" type="submit">delete</button></form></div></div>
+      <h1>${titleOf(tab, row, "detail").split(" · ")[0]}</h1>
 ${[line, aside].filter(Boolean).map((m) => `      <p class="meta">${m}</p>`).join("\n")}
       ${links(tab, row)}
 ${[...liftSections, ...sections].join("\n")}

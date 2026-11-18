@@ -28,11 +28,8 @@ export const VIEW_CSS = `
   svg.line polyline { fill: none; stroke: #a9a59a; stroke-width: 1.5; } svg.line line { stroke: #6a6a66; stroke-dasharray: 3 3; } svg.line text { fill: #6a6a66; font-size: 10px; }
   .since { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
   .since span small { color: #8a8a8a; margin-left: 4px; }
-  .due li, .stale li { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid #1a1a18; font-size: 15px; }
+  .due li, .stale li { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 6px 0; font-size: 15px; }
   .due li small, .stale li small { color: #8a8a8a; font-size: 13px; white-space: nowrap; }
-  .due form { display: inline-flex; gap: 6px; margin-left: 10px; }
-  .due button { background: transparent; border: 1px solid #2e2e2a; color: #a9a59a; border-radius: 10px; font: inherit; font-size: 12px; padding: 1px 9px; cursor: pointer; }
-  .due button:hover { border-color: #8a8a8a; color: #efebe0; }
   .calib { display: grid; gap: 6px; font-size: 14px; }
 `;
 
@@ -163,17 +160,15 @@ async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }:
   return `<section class="view"><h2>${escape(name)}</h2>${head}<svg class="line" viewBox="0 0 100 90" preserveAspectRatio="none" aria-hidden="true">${goalLine}<polyline points="${poly}" vector-effect="non-scaling-stroke"/></svg></section>`;
 }
 
-/** Rows whose date is due (or overdue), soonest first, each with one-click scoring buttons. */
+/** Rows whose date is due (or overdue), soonest first. */
 function due(v: Extract<View, { kind: "due" }>, { tab, rows }: Ctx): string {
   const now = today(), within = (v.within_days ?? 30) * DAY;
   const open = rows.filter((r) => Object.entries(v.where ?? {}).every(([k, val]) => r[k] === val) && dayOf(r[v.field]) !== null);
   const soon = open.filter((r) => dayOf(r[v.field])! <= now + within).sort((a, b) => dayOf(a[v.field])! - dayOf(b[v.field])!);
-  const scoreField = v.score ? tab.fields.find((f) => f.name === v.score!.field) : undefined;
   const item = (r: db.Row) => {
     const d = Math.round((dayOf(r[v.field])! - now) / DAY);
     const when = d < 0 ? `<span class="bad">overdue ${span(d)}</span>` : d === 0 ? "due today" : `due in ${span(d)}`;
-    const buttons = scoreField ? `<form method="post" action="/${tab.slug}/${r.id}/_set">${Object.entries(v.score!.set ?? {}).map(([k, val]) => `<input type="hidden" name="${escape(k)}" value="${escape(val)}">`).join("")}${scoreField.options!.map((o) => `<button name="${escape(scoreField.name)}" value="${escape(o)}">${escape(o)}</button>`).join("")}</form>` : "";
-    return `<li><a href="/${tab.slug}/${r.id}">${title(tab, r)}</a><small>${when}${buttons}</small></li>`;
+    return `<li><a href="/${tab.slug}/${r.id}">${title(tab, r)}</a><small>${when}</small></li>`;
   };
   if (soon.length) return `<section class="view due"><h2>due for review</h2><ul>${soon.map(item).join("")}</ul></section>`;
   const next = open.sort((a, b) => dayOf(a[v.field])! - dayOf(b[v.field])!)[0];
@@ -228,19 +223,3 @@ export async function renderViews(tab: Tab, database: D1Database): Promise<strin
   const html = parts.filter(Boolean).join("\n");
   return html ? `<div class="views">\n${html}\n</div>` : "";
 }
-
-/** The "needs you" parts of every tab for the home page: due items, people to keep warm, this week's training. */
-export async function todayParts(tabs: Tab[], database: D1Database): Promise<string[]> {
-  const out: string[] = [];
-  for (const tab of tabs) {
-    for (const v of tab.views ?? []) {
-      if (v.kind !== "due" && v.kind !== "stale" && v.kind !== "weekly") continue;
-      const rows = await db.list(database, tab, { limit: 1000 });
-      const ctx = { tab, rows, database };
-      const html = v.kind === "due" ? due(v, ctx) : v.kind === "stale" ? stale(v, ctx) : weekly(v, ctx);
-      if (html) out.push(html.replace(/<h2>([^<]*)<\/h2>/, `<h2><a href="/${tab.slug}">${escape(tab.label)}</a> · $1</h2>`));
-    }
-  }
-  return out;
-}
-

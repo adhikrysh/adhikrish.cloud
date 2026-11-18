@@ -1,6 +1,6 @@
 # snr intern api
 
-base url: `https://snrintern.adhikrish.cloud`. the agent writes; the pages read the same data. everything a page shows comes from rows and tab definitions, so new tabs, columns, exercises and charts need no code change.
+base url: `https://snrintern.adhikrish.cloud`. the agent writes through this api; the pages are read-only. everything a page shows comes from rows and tab definitions, so new tabs, columns, exercises and charts need no code change.
 
 ## auth
 
@@ -53,7 +53,7 @@ every row also has `id`, `created_at`, `updated_at` and `updated_by` (an email, 
 
 - **training**: one row per session. `at`, `type` (strength, run, hike, climb, other), `title`, `focus` (muscle groups, comma-separated: legs, chest, back, shoulders, arms), `lifts`, `distance_km`, `duration_min`, `rpe`, `notes`. a new exercise needs nothing special: write it in `lifts`, and it appears in progress once it has two sessions. reuse an exercise's existing name (look at recent rows) so its history stays in one line.
 - **body**: one row per weigh-in. `at`, `bodyweight_kg`, `bodyfat_percentage`, `notes`. a weigh-in is its own row, never part of a training row.
-- **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (space & deep tech, investors & mentors, founder peers, hiring, other), `last_contact`. set `group` when adding someone; set `last_contact` to today whenever they're mentioned as talked to.
+- **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing an existing topic when one fits (space & deep tech, investors & mentors, founder peers, hiring, other); a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
 - **forecasts**: `date`, `decision`, `rationale`, `confidence` (0-100), `expected`, `review_date`, `outcome`, `verdict` (right, wrong), `status` (open, closed). scoring one = PATCH `verdict` and `status: closed`.
 
 ## changing the schema
@@ -80,7 +80,7 @@ a definition, with every key:
 ```
 
 - `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. `summary`: enum fields counted under the heading.
-- `sort`: `"id"` (newest first) or a field (largest first). `group`: a date field groups the list by day; an enum field groups it by value.
+- `sort`: `"id"` (newest first) or a field (largest first). `group`: a date field groups the list by day; a text or enum field groups it by value, collapsed.
 - `goals`: named numbers the views compare against.
 - slugs are lowercase letters, digits and hyphens. field names are snake_case. `id`, `created_at`, `updated_at` and `updated_by` are reserved.
 
@@ -94,11 +94,9 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 | `weekly` | sessions per week since the first row, against a goal; `mark` highlights rows containing a value (leg days) | `goal`, `mark: { field, contains, goal }` |
 | `since` | how long since each value last appeared, red after two weeks | `field`, `values` |
 | `line` | a number over time, green when moving toward the goal; `tab` reads another tab | `field`, `tab`, `goal` |
-| `due` | rows whose date is within `within_days` (default 30) or overdue, with one-click buttons that set `score.field` plus `score.set` | `field`, `where`, `within_days`, `score: { field, set }` |
+| `due` | rows whose date is within `within_days` (default 30) or overdue, soonest first | `field`, `where`, `within_days` |
 | `calibration` | how often each confidence level came true, once `min` (default 10) rows are scored | `confidence`, `verdict`, `right`, `min` |
 | `stale` | rows whose date is older than `days`, oldest first | `field`, `days`, `label` |
-
-the home page collects every tab's `due`, `stale` and `weekly` views.
 
 ## errors
 
@@ -126,7 +124,7 @@ paste this into the dot's instructions, with the two values from 1password:
 > 1. start with GET /api. it lists the tabs, their fields and the formats. read it first; tabs change.
 > 2. one thing that happened = one row in the tab it belongs to. a session goes in training, a weigh-in in body, a new person in people, a prediction in forecasts.
 > 3. training: write lifts as "exercise: 45x10, 50x8; pull up: bwx10, +25x6" (weights in lb, bw = bodyweight, +25 = added). reuse the exercise names already in recent training rows. set focus to the muscle groups worked.
-> 4. people: search first (GET /api/people?q=<name>) and update instead of duplicating. set group when adding; set last_contact to today when i say i talked to someone.
+> 4. people: search first (GET /api/people?q=<name>) and update instead of duplicating. set group to a topic, reusing an existing one when it fits; set last_contact to today when i say i talked to someone.
 > 5. forecasts: always set confidence (0-100) and review_date. when i say how one turned out, set verdict and status closed.
 > 6. if i ask you to track something new, add a tab or a column: GET /api/_tabs/<slug>, change it, PUT it back. never delete a tab, field or row unless i ask.
 > 7. if you get a 400, the error says what to fix; fix it and retry once.

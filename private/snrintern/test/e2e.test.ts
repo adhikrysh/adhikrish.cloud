@@ -182,23 +182,21 @@ test("the training page is built from the data: progress, weekly, last trained, 
   writeFileSync(join(artifacts, "page-training.html"), after);
 });
 
-test("forecasts open on what is due, and one click scores and closes a forecast", async () => {
+test("forecasts open on what is due; scoring one (by the agent) takes it off the list", async () => {
   const token = await me();
   const page = (await call("forecasts page", "/forecasts", { token })).body as string;
-  expect(page.indexOf("Overdue bet")).toBeLessThan(page.indexOf("Due soon bet"));
-  expect(page).toContain("overdue 10 days");
-  expect(page).toContain("due in 5 days");
-  expect(page.split("due for review")[1].split("</section>")[0]).not.toContain("Far away bet");
+  const dueList = page.split("due for review")[1].split("</section>")[0];
+  expect(dueList.indexOf("Overdue bet")).toBeLessThan(dueList.indexOf("Due soon bet"));
+  expect(dueList).toContain("overdue 10 days");
+  expect(dueList).toContain("due in 5 days");
+  expect(dueList).not.toContain("Far away bet");
   expect(page).toContain("1 of 10 scored before this means anything (so far 1 right)");
-  const rows = (await call("forecast rows", "/api/forecasts?q=Overdue", { token })).body.rows;
-  const scored = await call("score by button", `/forecasts/${rows[0].id}/_set`, {
-    method: "POST", token, headers: { origin: `http://localhost:${port}`, referer: `http://localhost:${port}/forecasts` },
-    body: new URLSearchParams({ status: "closed", verdict: "wrong" }),
-  });
-  expect(scored.status).toBe(303);
-  const after = (await call("scored row", `/api/forecasts/${rows[0].id}`, { token })).body.row;
-  expect(after).toMatchObject({ verdict: "wrong", status: "closed", updated_by: "me@example.com" });
-  writeFileSync(join(artifacts, "page-forecasts.html"), page);
+  const overdue = (await call("forecast rows", "/api/forecasts?q=Overdue", { token })).body.rows[0];
+  await send(await dots(), `/api/forecasts/${overdue.id}`, { verdict: "wrong", status: "closed" }, "PATCH");
+  const after = (await call("forecasts page after scoring", "/forecasts", { token })).body as string;
+  expect(after.split("due for review")[1].split("</section>")[0]).not.toContain("Overdue bet");
+  expect(after).toContain("2 of 10 scored before this means anything (so far 1 right)");
+  writeFileSync(join(artifacts, "page-forecasts.html"), after);
 });
 
 test("people are grouped, and the ones not contacted lately come first", async () => {
@@ -207,18 +205,20 @@ test("people are grouped, and the ones not contacted lately come first", async (
   const keepWarm = page.split("keep warm")[1].split("</section>")[0];
   expect(keepWarm).toContain("Ada Example");
   expect(keepWarm).not.toContain("Ben Sample");
-  const list = page.split("all people")[1];
-  expect(list.indexOf("space &amp; deep tech")).toBeLessThan(list.indexOf("investors &amp; mentors"));
-  expect(list).toContain("no group");
+  const list = page.split('<div class="rows">')[1];
+  expect(list).toContain('<details class="group">');
+  expect(list).toContain("<summary>space &amp; deep tech<small>1</small></summary>");
+  expect(list).toContain("<summary>no group<small>1</small></summary>");
+  // a topic nobody defined anywhere: the agent just writes it, and it becomes a group
+  await send(await dots(), "/api/people", { name: "Eve New", group: "climate" });
+  expect((await call("people page after new topic", "/people", { token })).body).toContain("<summary>climate<small>1</small></summary>");
   writeFileSync(join(artifacts, "page-people.html"), page);
 });
 
-test("home shows what needs attention across tabs", async () => {
+test("home is just the tabs", async () => {
   const page = (await call("home", "/", { token: await me() })).body as string;
-  expect(page).toContain('<a href="/forecasts">forecasts</a> · due for review');
-  expect(page).toContain('<a href="/people">people</a> · keep warm');
-  expect(page).toContain('<a href="/training">training</a> · sessions per week');
   for (const tab of ["people", "forecasts", "training", "body"]) expect(page).toContain(`href="/${tab}"`);
+  expect(page).not.toContain('class="views"');
   expect(page).not.toContain('<a href="/">snr intern</a>'); // no link to the page you're on
   writeFileSync(join(artifacts, "page-home.html"), page);
 });
@@ -246,33 +246,17 @@ test("tabs and columns are added through the api, with no migration, and every c
   ]);
 });
 
-test("everything the agent can do, a person can do from the pages", async () => {
+test("the pages are read-only: no forms, no write routes", async () => {
   const token = await me();
-  const origin = `http://localhost:${port}`;
-  const submit = (path: string, fields: Record<string, string>, from: string | null = origin) => {
-    const headers: Record<string, string> = { "cf-access-jwt-assertion": token };
-    if (from) headers.origin = from;
-    return call(`form ${path}`, path, { method: "POST", headers, body: new URLSearchParams(fields) });
-  };
-  const form = (await call("add form", "/training/_new", { token })).body as string;
-  expect(form).toContain('<textarea id="f-lifts" name="lifts"');
-  expect(form).toContain('<input id="f-distance_km" name="distance_km" type="number" step="any" min="0"');
-  expect((await submit("/training/_new", { at: `${day(0)}T07:00-08:00`, type: "run", title: "tempo", distance_km: "8.4", lifts: "" })).status).toBe(303);
-  const run = (await call("find run", "/api/training?q=tempo", { token })).body.rows[0];
-  expect(run).toMatchObject({ distance_km: 8.4, updated_by: "me@example.com" });
-  expect((await submit("/training/_new", { at: day(0), title: "x" }, "https://evil.example")).status).toBe(403);
-  expect((await submit("/training/_new", { at: day(0), title: "x" }, null)).status).toBe(403);
-  expect((await submit("/training/_new", { at: day(0), lifts: "bench: heavy" })).body).toContain("is not valid");
-  expect((await submit(`/training/${run.id}/_edit`, { at: run.at, type: "run", title: "tempo", distance_km: "", duration_min: "40" })).status).toBe(303);
-  const edited = (await call("edited", `/api/training/${run.id}`, { token })).body.row;
-  expect(edited.duration_min).toBe(40);
-  expect(edited.distance_km).toBeUndefined(); // emptied in the form = cleared
-  expect((await submit(`/training/${run.id}/_delete`, {})).status).toBe(303);
-  expect((await call("deleted", `/api/training/${run.id}`, { token })).status).toBe(404);
-  expect((await call("schema page", "/training/_schema", { token })).body).toContain("&quot;views&quot;");
-  expect((await submit("/training/_schema", { definition: "{not json" })).body).toContain("definition is not valid json");
-  expect((await submit("/_new", { slug: "books", definition: JSON.stringify({ label: "books", about: "", fields: [{ name: "title", type: "text" }] }) })).status).toBe(303);
-  expect((await submit("/books/_schema/delete", {})).status).toBe(303);
+  for (const path of ["/", "/training", "/people", "/forecasts"]) {
+    const page = (await call(`page ${path}`, path, { token })).body as string;
+    expect(page).not.toContain("<form method=\"post\"");
+    expect(page).not.toContain("_edit");
+  }
+  for (const path of ["/training/_new", "/training/1/_edit", "/training/_schema", "/_new"]) {
+    expect((await call(`no form at ${path}`, path, { token })).status).toBe(404);
+    expect((await call(`no post at ${path}`, path, { method: "POST", token, headers: { origin: `http://localhost:${port}` }, body: "x=1" })).status).toBe(405);
+  }
 });
 
 test("every page and a row render; a row shows its lifts per exercise", async () => {

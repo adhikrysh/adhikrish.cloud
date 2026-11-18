@@ -12,7 +12,7 @@ export type TabDefinition = {
   sort: string; // "id" (newest first) or a field name (descending)
   snippet?: string; // a text field previewed under each row in the list
   summary?: string[]; // enum fields tallied under the heading ("2 replied · 8 no reply")
-  group?: string; // a date/datetime field groups the list by day ("wed, sep 17"); an enum field groups it by value
+  group?: string; // a date/datetime field groups the list by day ("wed, sep 17"); a text or enum field groups it by value
   goals?: Record<string, number>; // named targets the views compare against, e.g. { "sessions_per_week": 5 }
   views?: View[]; // what the tab opens on, above the list (see View)
   fields: Field[];
@@ -24,7 +24,7 @@ export type View =
   | { kind: "weekly"; goal?: string; mark?: { field: string; contains: string; goal?: string } } // sessions per week vs a goal
   | { kind: "since"; field: string; values: string[] } // days since each value last appeared in a comma-separated field
   | { kind: "line"; field: string; tab?: string; goal?: string } // a number over time, from this tab or another
-  | { kind: "due"; field: string; where?: Record<string, string>; within_days?: number; score?: { field: string; set?: Record<string, string> } } // rows whose date is coming up, with one-click scoring
+  | { kind: "due"; field: string; where?: Record<string, string>; within_days?: number } // rows whose date is coming up or past
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
   | { kind: "stale"; field: string; days: number; label?: string }; // rows whose date is older than N days ("keep warm")
 export type Tab = TabDefinition & { slug: string; position: number };
@@ -106,7 +106,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
   if (summary.some((name) => types.get(name) !== "enum")) return `"summary" must list enum fields`;
   let group: string | undefined;
   if (d.group !== undefined) {
-    if (typeof d.group !== "string" || !["date", "datetime", "enum"].includes(types.get(d.group) ?? "")) return `"group" must name a date, datetime or enum field`;
+    if (typeof d.group !== "string" || !["date", "datetime", "enum", "text"].includes(types.get(d.group) ?? "")) return `"group" must name a date, datetime, text or enum field`;
     group = d.group;
   }
   let goals: Record<string, number> | undefined;
@@ -169,7 +169,6 @@ function checkViews(input: unknown, types: Map<string, FieldType>, goals: Record
         break;
       case "due":
         if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
-        if (v.score !== undefined && !isField(v.score.field, ["enum"])) return `${where}: "score.field" must name an enum field`;
         break;
       case "calibration": if (!isField(v.confidence, ["int", "number"]) || !isField(v.verdict, ["enum"]) || typeof v.right !== "string") return `${where}: needs a number "confidence", an enum "verdict" and the "right" value`; break;
       case "stale": if (!isField(v.field, ["date", "datetime"]) || typeof v.days !== "number") return `${where}: needs a date "field" and "days"`; break;
