@@ -198,6 +198,7 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
   const lift = (await call("lift page", "/training/lifts/flat%20db%20press", { token })).body as string;
   expect(lift.match(/<circle /g)).toHaveLength(2);
+  expect(lift.match(/<text [^>]*text-anchor="(start|middle|end)">[a-z]{3} \d+<\/text>/g)).toHaveLength(2); // a date under every session
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
@@ -214,11 +215,11 @@ test("forecasts open on what is upcoming and how calibrated; scoring one (by the
   expect(upcoming.indexOf("Due soon bet")).toBeLessThan(upcoming.indexOf("Far away bet"));
   expect(upcoming).toContain('<small class="bad">overdue 10 days</small>');
   expect(upcoming).not.toContain("Scored bet");
-  // calibration from the first scored one: said 80, 1 of 1 came true (more than 10 points off: red)
-  expect(page).toContain('<li><span>said 80% on average</span><small class="bad">came true 1 of 1</small></li>');
-  // rows: verdict and status as pills, confidence and the review under the title, no description
-  expect(page).toContain('<span class="pill bad">open</span>');
-  expect(page).toContain('<span><span class="pill good">right</span></span><span><span class="pill good">closed</span></span>');
+  // calibration from the first scored one, as plain rows
+  expect(page).toContain('<dl class="facts"><dt>avg confidence</dt><dd>80%</dd><dt>came true</dt><dd>1 of 1</dd></dl>');
+  // rows: open a white pill, closed outlined, right green, wrong red; confidence and the review under the title, no description
+  expect(page).toContain('<span class="pill">open</span>');
+  expect(page).toContain('<span><span class="pill good">right</span></span><span><span class="pill outline">closed</span></span>');
   expect(page).toContain("<span>80%</span><span>review in 5 days</span>");
   expect(page).toContain('<span><span class="bad">review overdue by 10 days</span></span>'); // past and still open
   expect(page).toContain("<span>reviewed 2 months ago</span>"); // past and scored
@@ -228,7 +229,8 @@ test("forecasts open on what is upcoming and how calibrated; scoring one (by the
   const after = (await call("forecasts page after scoring", "/forecasts", { token })).body as string;
   expect(after.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0]).not.toContain("Overdue bet");
   expect(after).toContain("<span>reviewed 10 days ago</span>");
-  expect(after).toContain('<li><span>said 70% on average</span><small class="bad">came true 1 of 2</small></li>');
+  expect(after).toContain("<dt>avg confidence</dt><dd>70%</dd><dt>came true</dt><dd>1 of 2</dd>");
+  expect(after).toContain('<span class="pill bad">wrong</span>');
   writeFileSync(join(artifacts, "page-forecasts.html"), after);
 });
 

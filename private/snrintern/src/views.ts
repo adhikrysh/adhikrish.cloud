@@ -29,6 +29,9 @@ export const VIEW_CSS = `
   svg.line { width: 100%; height: 80px; display: block; margin-top: 14px; overflow: visible; }
   svg.line polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; }
   .rowlist { list-style: none; display: grid; gap: 10px; }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 24px; margin: 0; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; }
   .rowlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; }
   .rowlist small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
   .rowlist small.good { color: var(--good); } .rowlist small.bad { color: var(--bad); }
@@ -160,25 +163,19 @@ function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows }: Ctx): s
   return section("upcoming", `<ul class="rowlist">${html.join("")}</ul>`);
 }
 
-/** What you said on average against how many came true, green when within 10 points; once `min` (default 10) are scored,
- * also each confidence level on its own. Nothing until one is scored. */
+/** Plain rows: your average confidence and how many came true; once `min` (default 10) are scored, the same for each confidence level. Nothing until one is scored. */
 function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): string {
   const scored = rows.filter((row) => row[v.verdict] !== undefined && Number.isFinite(Number(row[v.confidence])));
   if (!scored.length) return "";
-  const said = scored.reduce((sum, row) => sum + Number(row[v.confidence]), 0) / scored.length;
-  const right = scored.filter((row) => row[v.verdict] === v.right).length;
-  const overall = `<li><span>said ${Math.round(said)}% on average</span><small class="${Math.abs((right / scored.length) * 100 - said) <= 10 ? "good" : "bad"}">came true ${right} of ${scored.length}</small></li>`;
-  if (scored.length < (v.min ?? 10)) return section("calibration", `<ul class="rowlist">${overall}</ul>`);
-  const buckets = new Map<number, { n: number; right: number }>();
-  for (const row of scored) {
-    const b = Math.round(Number(row[v.confidence]) / 10) * 10, cur = buckets.get(b) ?? { n: 0, right: 0 };
-    buckets.set(b, { n: cur.n + 1, right: cur.right + (row[v.verdict] === v.right ? 1 : 0) });
+  const right = (rs: db.Row[]) => rs.filter((row) => row[v.verdict] === v.right).length;
+  const said = Math.round(scored.reduce((sum, row) => sum + Number(row[v.confidence]), 0) / scored.length);
+  const items = [["avg confidence", `${said}%`], ["came true", `${right(scored)} of ${scored.length}`]];
+  if (scored.length >= (v.min ?? 10)) {
+    const buckets = new Map<number, db.Row[]>();
+    for (const row of scored) { const b = Math.round(Number(row[v.confidence]) / 10) * 10; buckets.set(b, [...(buckets.get(b) ?? []), row]); }
+    for (const [b, rs] of [...buckets].sort((a, z) => a[0] - z[0])) items.push([`said ${b}%`, `${right(rs)} of ${rs.length} came true`]);
   }
-  const html = [...buckets].sort((a, b) => a[0] - b[0]).map(([b, { n, right }]) => {
-    const actual = Math.round((right / n) * 100);
-    return `<li><span>said ${b}%</span><small class="${Math.abs(actual - b) <= 10 ? "good" : "bad"}">came true ${actual}%</small></li>`;
-  });
-  return section("calibration", `<ul class="rowlist">${overall}${html.join("")}</ul>`);
+  return section("calibration", `<dl class="facts">${items.map(([k, val]) => `<dt>${escape(k)}</dt><dd>${escape(val)}</dd>`).join("")}</dl>`);
 }
 
 /** The `limit` (default 3) rows whose date is oldest, oldest first: who you've gone longest without. No threshold to outgrow. */
@@ -190,6 +187,16 @@ function stale(v: Extract<View, { kind: "stale" }>, { tab, rows }: Ctx): string 
 }
 
 /** One exercise: every session plotted, then every session's sets (the best in green), each linking to its session. */
+/** A date under every point; walking back from the latest, a label that would touch the one after it is left out (the point stays). */
+function dates(ts: number[], X: (t: number) => number, y: number): string {
+  const kept: number[] = [];
+  for (const t of [...ts].reverse()) if (!kept.length || X(kept.at(-1)!) - X(t) >= 48) kept.push(t);
+  return kept.map((t, i) => {
+    const anchor = i === 0 && kept.length > 1 ? "end" : t === ts[0] && ts.length > 1 ? "start" : "middle";
+    return `<text x="${X(t).toFixed(1)}" y="${y}" text-anchor="${anchor}">${short(t)}</text>`;
+  }).join("");
+}
+
 export async function liftPage(tab: Tab, database: D1Database, exercise: string): Promise<string | null> {
   const field = tab.views?.find((v): v is Extract<View, { kind: "progress" }> => v.kind === "progress")?.field;
   if (!field) return null;
@@ -203,7 +210,7 @@ export async function liftPage(tab: Tab, database: D1Database, exercise: string)
   const best = pts.reduce((a, p) => (p.top > a.top || (p.top === a.top && p.reps > a.reps) ? p : a));
   const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(exercise)}: best set per session">
 <text x="${L - 8}" y="${Y(max) + 4}" text-anchor="end">${fmt(max)}</text><text x="${L - 8}" y="${Y(min) + 4}" text-anchor="end">${fmt(min)}</text>
-<text x="${L}" y="${H - 6}">${short(t0)}</text><text x="${W - 8}" y="${H - 6}" text-anchor="end">${short(pts.at(-1)!.t)}</text>
+${dates(pts.map((p) => p.t), X, H - 6)}
 <polyline points="${pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.top).toFixed(1)}`).join(" ")}"/>
 ${pts.map((p) => `<a href="/${tab.slug}/${p.row.id}"><circle class="${p === best ? "best" : ""}" cx="${X(p.t).toFixed(1)}" cy="${Y(p.top).toFixed(1)}" r="4"><title>${short(p.t)}: ${escape(p.label)}</title></circle></a>`).join("")}
 </svg>`;

@@ -141,8 +141,7 @@
      "closed"
     ],
     "colors": {
-     "closed": "good",
-     "open": "bad"
+     "closed": "outline"
     }
    }
   ],

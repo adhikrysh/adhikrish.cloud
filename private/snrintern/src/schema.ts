@@ -2,7 +2,9 @@
 // Definitions live in d1 (`tabs`) and change through PUT /api/_tabs/<slug>; this file only checks them.
 
 type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
-export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, "good" | "bad"> };
+export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, Tone> };
+/** How an enum value's pill looks: white (no tone), "outline" (black with a white border), "good" (green border), "bad" (red border). */
+export type Tone = "outline" | "good" | "bad";
 export type TabDefinition = {
   label: string; // shown on the pages
   about: string; // one line on the home page
@@ -78,9 +80,9 @@ export function checkDefinition(input: unknown): TabDefinition | string {
       field.options = f.options as string[];
       if (f.colors !== undefined) {
         const c = f.colors as Record<string, unknown>;
-        if (typeof c !== "object" || c === null || !Object.entries(c).every(([k, v]) => field.options!.includes(k) && (v === "good" || v === "bad")))
-          return `field "${f.name}": colors maps options to "good" or "bad", e.g. { "closed": "good", "open": "bad" }`;
-        field.colors = c as Record<string, "good" | "bad">;
+        if (typeof c !== "object" || c === null || !Object.entries(c).every(([k, v]) => field.options!.includes(k) && (v === "outline" || v === "good" || v === "bad")))
+          return `field "${f.name}": colors maps options to "outline", "good" or "bad", e.g. { "closed": "outline", "right": "good" }`;
+        field.colors = c as Record<string, Tone>;
       }
     } else if (f.options !== undefined || f.colors !== undefined) return `field "${f.name}": options and colors only apply to enum fields`;
     names.add(field.name);

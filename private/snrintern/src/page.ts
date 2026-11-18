@@ -35,7 +35,7 @@ const CSS = `
   dl { margin-top: 32px; display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; }
   dt { color: var(--muted); }
   dd { overflow-wrap: anywhere; }
-  .views + .search { margin-top: 48px; }
+  .views + .search { margin-top: 40px; }
   .searching .views { display: none; }
   .empty { color: var(--muted); margin-top: 32px; }
   .day { margin-top: 36px; }
