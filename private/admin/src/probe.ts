@@ -6,7 +6,6 @@ export type ProbeResult = { service: string; at: number; up: boolean; status: nu
 
 export const publicSites: Service[] = services.public;
 export const privateSites: Service[] = services.private;
-export const external: Service[] = services.external;
 
 // Short enough that the page never hangs: a slow service shows as down.
 const TIMEOUT_MS = 5_000;

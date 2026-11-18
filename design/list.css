@@ -3,5 +3,6 @@
   .project-list li > a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 24px; color: var(--text); padding-block: 8px; text-decoration: none; }
   .project-list li > a:hover { color: var(--hover); }
   .project-list time, .project-list small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
-  .project-list span { overflow-wrap: anywhere; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  /* only a row's title, its first span, is underlined; times, pills and coloured words beside it are not */
+  .project-list li > a > span:first-child { overflow-wrap: anywhere; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .project-list p { color: var(--muted); font-size: var(--fs-small); line-height: 1.6; }

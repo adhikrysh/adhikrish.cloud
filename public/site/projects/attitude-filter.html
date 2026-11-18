@@ -69,6 +69,10 @@
   a:focus-visible, summary:focus-visible { color: var(--hover); }
   main, article { margin-top: 56px; }
   h1 { font-size: var(--fs-title); font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  /* a white pill for labels and dates; green for good, red for bad. nothing else is coloured. */
+  .pill { display: inline-block; font-size: var(--fs-tiny); line-height: 1.6; padding: 0 9px; border-radius: 10px; background: var(--text); color: var(--bg); white-space: nowrap; letter-spacing: 0; }
+  .good { color: var(--good); }
+  .bad { color: var(--bad); }
   @media (max-width: 720px) {
     body { padding-top: 32px; }
     main, article { margin-top: 48px; }
@@ -77,13 +81,13 @@
     body { padding-inline: 20px; }
   }
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+  /* only a row's title, its first span, is underlined; times, pills and coloured words beside it are not */
   nav { flex-wrap: wrap; }
   nav .external { margin-left: auto; }
 
   .project h1 { overflow-wrap: anywhere; }
-  .project-meta { color: var(--muted); font-size: var(--fs-small); margin-top: 12px; }
-  .project-meta a { color: inherit; }
-  .project-meta .last-edited { display: block; font-size: var(--fs-tiny); margin-top: 4px; }
+  .project-meta { margin-top: 14px; }
+  .project-meta .last-edited { color: var(--muted); font-size: var(--fs-tiny); margin-top: 8px; }
   .readme { margin-top: 44px; line-height: 1.75; }
   .readme p, .readme ul, .readme ol { margin-block: 24px; }
   .readme > :first-child { margin-top: 0; }
@@ -132,10 +136,10 @@
     </nav>
     <main class="project">
       <h1>attitude-filter</h1>
-      <p class="project-meta">
-        <a href="https://github.com/adhikrysh/attitude-filter/commit/a0c5cfd90e96220ef4f196d753bd88e894dd9303" target="_blank" rel="noopener noreferrer"><time datetime="2026-01-04">jan 4, 2026</time></a>
-        <span class="last-edited">code updated <a href="https://github.com/adhikrysh/attitude-filter/commit/a811cc6fa58efe89f2c2d69df350f3a68ddc459e" target="_blank" rel="noopener noreferrer"><time datetime="2026-10-02">oct 2, 2026</time></a></span>
-      </p>
+      <div class="project-meta">
+        <span class="pill"><time datetime="2026-01-04">jan 4, 2026</time></span>
+        <p class="last-edited">code updated <time datetime="2026-10-02">oct 2, 2026</time></p>
+      </div>
       <div class="readme">
 <p>spacecraft figure out where they're pointing with star trackers,
 cameras that match star patterns. those drop out during turns, near the

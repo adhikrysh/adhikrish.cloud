@@ -18,7 +18,6 @@ The full write-up of how it all fits together, including restart handling and fa
 ## Where to add things
 
 - **A self-hosted service:** follow `private/infra/docs/add-a-service.md`. Its last step adds one entry to `services.json` (`name`, `url`, optional `health` url, `about`). Admin picks it up on the next deploy.
-- **An external link on admin:** one entry under `external` in `services.json`.
 - **A snrintern tab or column:** no code and no migration. The schema is data in d1: `PUT /api/_tabs/<slug>` with the definition (see `private/snrintern/API.md`). Rows are json documents checked against it (`private/snrintern/src/schema.ts`), and every change lands in `/api/_log`. What a tab opens on (charts, due lists) is the definition's `views` (`src/views.ts`), so a new tab or exercise needs no code. Migrations are only for the storage itself (`tabs`, `rows`, `schema_log`).
 - **A write-up:** see `public/AGENTS.md`.
 

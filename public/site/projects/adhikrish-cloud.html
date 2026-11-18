@@ -69,6 +69,10 @@
   a:focus-visible, summary:focus-visible { color: var(--hover); }
   main, article { margin-top: 56px; }
   h1 { font-size: var(--fs-title); font-weight: 450; line-height: 1.3; letter-spacing: -0.024em; }
+  /* a white pill for labels and dates; green for good, red for bad. nothing else is coloured. */
+  .pill { display: inline-block; font-size: var(--fs-tiny); line-height: 1.6; padding: 0 9px; border-radius: 10px; background: var(--text); color: var(--bg); white-space: nowrap; letter-spacing: 0; }
+  .good { color: var(--good); }
+  .bad { color: var(--bad); }
   @media (max-width: 720px) {
     body { padding-top: 32px; }
     main, article { margin-top: 48px; }
@@ -77,13 +81,13 @@
     body { padding-inline: 20px; }
   }
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
+  /* only a row's title, its first span, is underlined; times, pills and coloured words beside it are not */
   nav { flex-wrap: wrap; }
   nav .external { margin-left: auto; }
 
   .project h1 { overflow-wrap: anywhere; }
-  .project-meta { color: var(--muted); font-size: var(--fs-small); margin-top: 12px; }
-  .project-meta a { color: inherit; }
-  .project-meta .last-edited { display: block; font-size: var(--fs-tiny); margin-top: 4px; }
+  .project-meta { margin-top: 14px; }
+  .project-meta .last-edited { color: var(--muted); font-size: var(--fs-tiny); margin-top: 8px; }
   .readme { margin-top: 44px; line-height: 1.75; }
   .readme p, .readme ul, .readme ol { margin-block: 24px; }
   .readme > :first-child { margin-top: 0; }
@@ -132,7 +136,7 @@
     </nav>
     <main class="project">
       <h1>*.adhikrish.cloud</h1>
-      <p class="project-meta">since dec 2024</p>
+      <div class="project-meta"><span class="pill">since dec 2024</span></div>
       <div class="readme">
 <p>everything i self-host lives under one domain now: this site, an
 admin dashboard, the api my personal agent writes to, and the photos,

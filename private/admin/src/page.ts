@@ -18,8 +18,6 @@ const CSS = `
   .uptime { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: var(--fs-tiny); color: var(--faint); }
   .ticks { display: flex; gap: 2px; }
   .ticks i { width: 6px; height: 14px; border-radius: 2px; background: var(--line); }
-  .ext { display: inline-block; margin-left: 5px; font-style: normal; color: var(--muted); }
-  .project-list.plain li + li { margin-top: 0; }
   .ticks i.up { background: var(--good); } .ticks i.down { background: var(--bad); }
 `;
 
@@ -43,17 +41,12 @@ function items(services: Service[], results: ProbeResult[], history: Map<string,
   }).join("\n");
 }
 
-export function render(groups: Group[], external: Service[], history: Map<string, Uptime>): string {
+export function render(groups: Group[], history: Map<string, Uptime>): string {
   const sections = groups.map(([title, services, results]) => `      <h2><span class="pill">${escape(title)}</span></h2>
       <ul class="project-list">
 ${items(services, results, history)}
       </ul>`);
-  const links = external.map((s) => `          <li><a href="${escape(s.url)}" target="_blank" rel="noopener noreferrer"><span>${escape(s.name)}<i class="ext">↗</i></span></a></li>`);
   const body = `      <h1>admin</h1>
-${sections.join("\n")}
-      <h2><span class="pill">elsewhere</span></h2>
-      <ul class="project-list plain">
-${links.join("\n")}
-      </ul>`;
+${sections.join("\n")}`;
   return page({ design: { base, list }, title: "admin", nav: "", body, css: CSS });
 }

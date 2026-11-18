@@ -27,9 +27,8 @@ const PROJECTS: Project[] = JSON.parse(readFileSync(join(ROOT, "content/projects
 const INDEX_DESCRIPTION = "things i've built.";
 const READING_CSS = `
   .project h1 { overflow-wrap: anywhere; }
-  .project-meta { color: var(--muted); font-size: var(--fs-small); margin-top: 12px; }
-  .project-meta a { color: inherit; }
-  .project-meta .last-edited { display: block; font-size: var(--fs-tiny); margin-top: 4px; }
+  .project-meta { margin-top: 14px; }
+  .project-meta .last-edited { color: var(--muted); font-size: var(--fs-tiny); margin-top: 8px; }
   .readme { margin-top: 44px; line-height: 1.75; }
   .readme p, .readme ul, .readme ol { margin-block: 24px; }
   .readme > :first-child { margin-top: 0; }
@@ -185,12 +184,15 @@ for (const project of PROJECTS) {
     ? `      <a class="external" href="${escape(externalUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${externalLabel} (opens in a new tab)" title="opens in a new tab">${externalLabel}</a>`
     : "";
   let metadata = "";
-  if (project.status) metadata = `      <p class="project-meta">${escape(project.status)}</p>\n`;
+  // the first-commit date (or the status) as a pill; when the code last changed, plainly, under it
+  if (project.status) metadata = `      <div class="project-meta"><span class="pill">${escape(project.status)}</span></div>\n`;
   if (project.date) {
-    metadata = `      <p class="project-meta">
-        <a href="${repository}/commit/${project.first_commit}" target="_blank" rel="noopener noreferrer"><time datetime="${project.date}">${readableDate(project.date)}</time></a>
-        <span class="last-edited">code updated <a href="${repository}/commit/${project.source_commit}" target="_blank" rel="noopener noreferrer"><time datetime="${project.edited_date}">${readableDate(project.edited_date!)}</time></a></span>
-      </p>
+    const updated = project.edited_date
+      ? `\n        <p class="last-edited">code updated <time datetime="${project.edited_date}">${readableDate(project.edited_date)}</time></p>`
+      : "";
+    metadata = `      <div class="project-meta">
+        <span class="pill"><time datetime="${project.date}">${readableDate(project.date)}</time></span>${updated}
+      </div>
 `;
   }
   const page = preloadNavigation(`${head}</head>

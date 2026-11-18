@@ -1,7 +1,7 @@
 // admin.adhikrish.cloud
 //   scheduled (every 5 minutes): probe every service and store up/down; drop rows older than 30 days once a day.
 //   fetch: probe every service live for the current state, and read the stored history for the uptime strips.
-import { external, privateSites, probe, publicSites, type Service } from "./probe.ts";
+import { privateSites, probe, publicSites, type Service } from "./probe.ts";
 import { render, type Uptime } from "./page.ts";
 
 type Env = { DB: D1Database; ACCESS_CLIENT_ID: string; ACCESS_CLIENT_SECRET: string };
@@ -43,7 +43,7 @@ export default {
     if (new URL(request.url).pathname !== "/") return new Response("not found", { status: 404 });
     const probeAll = (services: Service[]) => Promise.all(services.map((s) => probe(s, token(env))));
     const [pub, priv, history] = await Promise.all([probeAll(publicSites), probeAll(privateSites), uptime(env.DB, Date.now())]);
-    return new Response(render([["public", publicSites, pub], ["private", privateSites, priv]], external, history), {
+    return new Response(render([["public", publicSites, pub], ["private", privateSites, priv]], history), {
       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     });
   },

@@ -50,19 +50,5 @@
       "url": "https://stats.adhikrish.cloud/",
       "about": "beszel: cpu, memory, disk, temperatures"
     }
-  ],
-  "external": [
-    {
-      "name": "cloudflare",
-      "url": "https://dash.cloudflare.com/463c6f3b7afadacdf235877e8e36a028"
-    },
-    {
-      "name": "tailscale admin console",
-      "url": "https://login.tailscale.com/admin/machines"
-    },
-    {
-      "name": "openai api keys",
-      "url": "https://platform.openai.com/settings/organization/api-keys"
-    }
   ]
 }
