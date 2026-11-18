@@ -19,8 +19,9 @@ const CSS = `
   .uptime { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; color: #6a6a66; }
   .ticks { display: flex; gap: 2px; }
   .ticks i { width: 6px; height: 14px; border-radius: 2px; background: #1c1c1a; }
+  .ext { display: inline-block; margin-left: 5px; font-style: normal; color: #8a8a8a; }
+  .project-list.plain li + li { margin-top: 0; }
   .ticks i.up { background: #6f9e6a; } .ticks i.down { background: #c4553f; }
-  .elsewhere { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px 22px; }
 `;
 
 /** 24 hourly ticks (green: every probe up, red: any down, dark: no data yet) and the 30-day uptime. */
@@ -48,10 +49,12 @@ export function render(groups: Group[], external: Service[], history: Map<string
       <ul class="project-list">
 ${items(services, results, history)}
       </ul>`);
-  const links = external.map((s) => `<a href="${escape(s.url)}" target="_blank" rel="noopener noreferrer">${escape(s.name)}</a>`);
+  const links = external.map((s) => `          <li><a href="${escape(s.url)}" target="_blank" rel="noopener noreferrer"><span>${escape(s.name)}<i class="ext">↗</i></span></a></li>`);
   const body = `      <h1>admin</h1>
 ${sections.join("\n")}
       <h2><span class="pill">elsewhere</span></h2>
-      <p class="elsewhere">${links.join("")}</p>`;
+      <ul class="project-list plain">
+${links.join("\n")}
+      </ul>`;
   return page({ design: { base, list }, title: "admin", nav: "", body, css: CSS });
 }

@@ -24,7 +24,7 @@
   .reading { max-width: 640px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
   nav a { color: #8a8a8a; font-size: 15px; }
-  a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
+  a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
   a:hover { color: #787878; }
   a:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
   main, article { margin-top: 56px; }
