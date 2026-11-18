@@ -15,6 +15,7 @@ const DB_ID = "7d86a3be-7d4b-45c6-97b1-d9990ae1d484";
 const TEAM = "adhikrish";
 const AUD = "e58f31f732ff5d00f7561ff36e3a9a23161176cdb806319370d50e6e2c0f387c"; // the real app's tag, as configured
 const report: { scenario: string; status: number; detail?: unknown }[] = [];
+mkdirSync(artifacts, { recursive: true }); // ignored by git, so a fresh checkout does not have it
 
 let jwks: ReturnType<typeof Bun.serve>;
 let worker: ReturnType<typeof Bun.spawn> | undefined;
@@ -105,7 +106,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await stopWorker();
   jwks.stop();
-  mkdirSync(artifacts, { recursive: true });
   writeFileSync(join(artifacts, "e2e-report.json"), JSON.stringify({ ranAt: new Date().toISOString(), calls: report }, null, 2));
   rmSync(state, { recursive: true, force: true });
 });
@@ -277,7 +277,6 @@ test("everything the agent can do, a person can do from the pages", async () => 
 
 test("every page and a row render; a row shows its lifts per exercise", async () => {
   const token = await me();
-  mkdirSync(artifacts, { recursive: true });
   for (const tab of ["people", "forecasts", "training", "body"]) {
     const { status, body } = await call(`page ${tab}`, `/${tab}`, { token });
     expect(status).toBe(200);
