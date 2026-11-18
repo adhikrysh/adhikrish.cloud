@@ -66,14 +66,7 @@
     "type": "date"
    }
   ],
-  "group": "group",
-  "views": [
-   {
-    "kind": "stale",
-    "field": "last_contact",
-    "label": "keep warm"
-   }
-  ]
+  "group": "group"
  },
  "forecasts": {
   "label": "forecasts",

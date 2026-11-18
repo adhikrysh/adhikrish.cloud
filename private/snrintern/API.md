@@ -95,7 +95,6 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 | `line` | a number over time: the latest, the change since the first, a line; `tab` reads another tab | `field`, `tab` |
 | `upcoming` | the next `limit` (default 3) rows matching `where` by a date, soonest first, overdue in red. a past date on a row under it reads "reviewed …" once the row stops matching `where`, "review overdue by …" while it still does | `field`, `where`, `limit` |
 | `calibration` | what you said on average against how many came true, from the first scored row; each confidence level on its own once `min` (default 10) are scored | `confidence`, `verdict`, `right`, `min` |
-| `stale` | the `limit` (default 3) rows whose date is oldest: who you've gone longest without | `field`, `limit`, `label` |
 
 ## errors
 

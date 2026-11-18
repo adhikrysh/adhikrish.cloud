@@ -42,9 +42,11 @@ const CSS = `
   .day h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); }
   .day .project-list { margin-top: 12px; }
   .day .project-list li + li { margin-top: 18px; }
+  .rows > details.group:first-child { margin-top: 24px; } /* the same gap under the search as a flat list gets */
   details.group summary { list-style: none; cursor: pointer; padding: 10px 0; }
   details.group summary::-webkit-details-marker { display: none; }
-  details.group summary::before { content: "›"; color: var(--faint); display: inline-block; width: 18px; transition: transform 220ms ease; }
+  /* the arrow turns about its own centre, so open and closed sit on the same line */
+  details.group summary::before { content: "›"; color: var(--faint); display: inline-block; width: 10px; margin-right: 8px; line-height: 1; text-align: center; transition: transform 220ms ease; }
   details.group[open] summary::before { transform: rotate(90deg); }
   details.group .project-list { margin: 4px 0 18px 18px; }
   a.schema { display: inline-block; margin-top: 64px; color: var(--ghost); font-size: var(--fs-tiny); }

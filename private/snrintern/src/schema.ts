@@ -25,8 +25,7 @@ export type View =
   | { kind: "strip"; field: string; label?: string; days?: number } // a tick per day with a row, from the first (at most `days` back) to today
   | { kind: "line"; field: string; tab?: string } // a number over time, from this tab or another
   | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number } // the next rows by a date, overdue first
-  | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
-  | { kind: "stale"; field: string; limit?: number; label?: string }; // the rows whose date is oldest ("keep warm")
+  | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number }; // how often each confidence level came true
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
 export type Data = Record<string, Value>;
@@ -167,11 +166,7 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
         if (v.limit !== undefined && (!Number.isInteger(v.limit) || v.limit < 1 || v.limit > 20)) return `${where}: "limit" must be a whole number from 1 to 20`;
         break;
       case "calibration": if (!isField(v.confidence, ["int", "number"]) || !isField(v.verdict, ["enum"]) || typeof v.right !== "string") return `${where}: needs a number "confidence", an enum "verdict" and the "right" value`; break;
-      case "stale":
-        if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
-        if (v.limit !== undefined && (!Number.isInteger(v.limit) || v.limit < 1 || v.limit > 20)) return `${where}: "limit" must be a whole number from 1 to 20`;
-        break;
-      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, stale`;
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration`;
     }
     views.push(v as View);
   }

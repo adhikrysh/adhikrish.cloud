@@ -178,13 +178,6 @@ function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): 
   return section("calibration", `<dl class="facts">${items.map(([k, val]) => `<dt>${escape(k)}</dt><dd>${escape(val)}</dd>`).join("")}</dl>`);
 }
 
-/** The `limit` (default 3) rows whose date is oldest, oldest first: who you've gone longest without. No threshold to outgrow. */
-function stale(v: Extract<View, { kind: "stale" }>, { tab, rows }: Ctx): string {
-  const old = rows.map((row) => ({ row, t: dayOf(row[v.field]) })).filter((x): x is { row: db.Row; t: number } => x.t !== null).sort((a, b) => a.t - b.t);
-  if (!old.length) return "";
-  const html = old.slice(0, v.limit ?? 3).map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small>${ago(t)}</small></li>`);
-  return section(v.label ?? "keep warm", `<ul class="rowlist">${html.join("")}</ul>`);
-}
 
 /** One exercise: every session plotted, then every session's sets (the best in green), each linking to its session. */
 /** A date under every point. One that would touch the date before it drops to a second line; only when both lines are taken
@@ -253,7 +246,6 @@ export async function renderViews(tab: Tab, database: D1Database): Promise<strin
       case "line": return line(v, ctx);
       case "upcoming": return upcoming(v, ctx);
       case "calibration": return calibration(v, ctx);
-      case "stale": return stale(v, ctx);
     }
   }));
   const html = parts.filter(Boolean).join("\n");

@@ -252,13 +252,10 @@ test("forecasts open on what is upcoming and how calibrated; scoring one (by the
   writeFileSync(join(artifacts, "page-forecasts.html"), after);
 });
 
-test("people are grouped, and the ones not contacted lately come first", async () => {
+test("people are a search and their groups, nothing above", async () => {
   const token = await me();
   const page = (await call("people page", "/people", { token })).body as string;
-  // keep warm: whoever you've gone longest without, oldest first, no threshold (someone with no date isn't listed)
-  const keepWarm = page.split('<h2><span class="pill">keep warm</span></h2>')[1].split("</section>")[0];
-  expect(keepWarm.indexOf("Ada Example")).toBeLessThan(keepWarm.indexOf("Ben Sample"));
-  expect(keepWarm).not.toContain("Cy Placeholder");
+  expect(page).not.toContain('<div class="views">');
   const list = page.split('<div class="rows">')[1];
   expect(list).toContain('<details class="group">');
   expect(list).toContain("<summary>space &amp; deep tech</summary>");
@@ -294,7 +291,7 @@ test("tabs and columns are added through the api, with no migration, and every c
     [{ ...thoughts, fields: [{ name: "mood", type: "enum" }] }, 'field "mood": enum fields need "options"'],
     [{ ...thoughts, views: [{ kind: "progress", field: "text" }] }, 'views[0] (progress): "field" must name a lifts field'],
     [{ ...thoughts, views: [{ kind: "line", field: "nope" }] }, 'views[0] (line): "field" must name a number field'],
-    [{ ...thoughts, views: [{ kind: "weekly" }] }, "views[0]: kind must be one of progress, strip, line, upcoming, calibration, stale"],
+    [{ ...thoughts, views: [{ kind: "weekly" }] }, "views[0]: kind must be one of progress, strip, line, upcoming, calibration"],
   ];
   for (const [d, message] of bad) expect((await send(token, "/api/_tabs/scratch", d, "PUT")).body.error).toStartWith(message);
   const log = (await call("schema log", "/api/_log", { token })).body.changes;
