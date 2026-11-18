@@ -199,6 +199,14 @@ test("the training page is built from the data: a strip of sessions, progress, b
   const lift = (await call("lift page", "/training/lifts/flat%20db%20press", { token })).body as string;
   expect(lift.match(/<circle /g)).toHaveLength(2);
   expect(lift.match(/<text [^>]*text-anchor="(start|middle|end)">[a-z]{3} \d+<\/text>/g)).toHaveLength(2); // a date under every session
+  // sessions at -60, -20, -16, -13 days: -16 sits too close to -20, so its date drops to a second line; every date still shows
+  for (const [d, sets] of [[-60, "40x10"], [-16, "55x8"]] as const)
+    await send(dotsToken, "/api/training", { at: `${day(d)}T18:00-08:00`, type: "strength", title: "chest", lifts: `flat db press: ${sets}` });
+  const crowded = (await call("lift page with close sessions", "/training/lifts/flat%20db%20press", { token })).body as string;
+  const labels = [...crowded.matchAll(/<text x="[\d.]+" y="(\d+)" text-anchor="(?:start|middle|end)">([a-z]{3} \d+)<\/text>/g)];
+  expect(labels).toHaveLength(4);
+  expect(new Set(labels.map((m) => m[1])).size).toBe(2);
+  writeFileSync(join(artifacts, "page-lift-crowded.html"), crowded);
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);

@@ -187,14 +187,19 @@ function stale(v: Extract<View, { kind: "stale" }>, { tab, rows }: Ctx): string 
 }
 
 /** One exercise: every session plotted, then every session's sets (the best in green), each linking to its session. */
-/** A date under every point; walking back from the latest, a label that would touch the one after it is left out (the point stays). */
-function dates(ts: number[], X: (t: number) => number, y: number): string {
-  const kept: number[] = [];
-  for (const t of [...ts].reverse()) if (!kept.length || X(kept.at(-1)!) - X(t) >= 48) kept.push(t);
-  return kept.map((t, i) => {
-    const anchor = i === 0 && kept.length > 1 ? "end" : t === ts[0] && ts.length > 1 ? "start" : "middle";
-    return `<text x="${X(t).toFixed(1)}" y="${y}" text-anchor="${anchor}">${short(t)}</text>`;
-  }).join("");
+/** A date under every point. One that would touch the date before it drops to a second line; only when both lines are taken
+ * (three or more sessions bunched together) does an in-between date give way. The first and the latest always show. */
+function dates(ts: number[], X: (t: number) => number, y: number): { svg: string; lines: number } {
+  const GAP = 48, rows: { x: number; t: number }[][] = [[], []];
+  const room = (row: { x: number }[], x: number) => !row.length || x - row.at(-1)!.x >= GAP;
+  ts.forEach((t, i) => {
+    const x = X(t), line = room(rows[0], x) ? 0 : room(rows[1], x) ? 1 : -1;
+    if (line >= 0) rows[line].push({ x, t });
+    else if (i === ts.length - 1) { rows[0] = rows[0].filter((p) => x - p.x >= GAP); rows[0].push({ x, t }); }
+  });
+  const anchor = (t: number) => (ts.length > 1 && t === ts[0] ? "start" : ts.length > 1 && t === ts.at(-1) ? "end" : "middle");
+  const svg = rows.flatMap((row, line) => row.map(({ x, t }) => `<text x="${x.toFixed(1)}" y="${y + line * 15}" text-anchor="${anchor(t)}">${short(t)}</text>`)).join("");
+  return { svg, lines: rows[1].length ? 2 : 1 };
 }
 
 export async function liftPage(tab: Tab, database: D1Database, exercise: string): Promise<string | null> {
@@ -202,15 +207,18 @@ export async function liftPage(tab: Tab, database: D1Database, exercise: string)
   if (!field) return null;
   const pts = liftSeries(tab, await db.list(database, tab, { limit: 1000 }), field).get(exercise);
   if (!pts) return null;
-  const W = 600, H = 220, L = 44, B = 26, T = 12;
+  const W = 600, L = 44, T = 12;
   const tops = pts.map((p) => p.top), min = Math.min(...tops), max = Math.max(...tops), range = max - min || 1;
   const t0 = pts[0].t, span = pts.at(-1)!.t - t0 || 1;
   const X = (t: number) => (pts.length === 1 ? (L + W) / 2 : L + ((t - t0) / span) * (W - L - 8));
+  const plot = 182; // the line's own height; dates go under it, on one line or two
+  const labels = dates(pts.map((p) => p.t), X, T + plot + 20);
+  const B = labels.lines === 2 ? 41 : 26, H = T + plot + B;
   const Y = (y: number) => T + (1 - (y - min) / range) * (H - T - B);
   const best = pts.reduce((a, p) => (p.top > a.top || (p.top === a.top && p.reps > a.reps) ? p : a));
   const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(exercise)}: best set per session">
 <text x="${L - 8}" y="${Y(max) + 4}" text-anchor="end">${fmt(max)}</text><text x="${L - 8}" y="${Y(min) + 4}" text-anchor="end">${fmt(min)}</text>
-${dates(pts.map((p) => p.t), X, H - 6)}
+${labels.svg}
 <polyline points="${pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.top).toFixed(1)}`).join(" ")}"/>
 ${pts.map((p) => `<a href="/${tab.slug}/${p.row.id}"><circle class="${p === best ? "best" : ""}" cx="${X(p.t).toFixed(1)}" cy="${Y(p.top).toFixed(1)}" r="4"><title>${short(p.t)}: ${escape(p.label)}</title></circle></a>`).join("")}
 </svg>`;
