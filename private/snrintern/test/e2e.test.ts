@@ -1,4 +1,4 @@
-// End to end: apply the d1 migrations and import the sheet csvs with cf, run the worker in workerd,
+// End to end: apply the d1 migrations with cf, run the worker in workerd, import the sheet exports,
 // call it the way dots and a browser do (with cloudflare-access-style signed jwts), restart it,
 // and check nothing was lost.
 // Writes test/artifacts/e2e-report.json and the rendered pages, so a run can be inspected afterwards.
@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { importCsv } from "../scripts/import.ts";
+import { importRows, sheetToRows } from "../scripts/import.ts";
 
 const root = join(import.meta.dir, "..");
 const artifacts = join(import.meta.dir, "artifacts");
@@ -76,8 +76,9 @@ beforeAll(async () => {
   cf("d1", "migrations", "apply", DB_ID);
   await startWorker();
   const importer = { "cf-access-jwt-assertion": await sign({ email: "importer@example.com" }) };
-  for (const [tab, file] of [["people", "ppl-index"], ["outbound", "cold-outbounds"], ["forecasts", "superforecasting"], ["gym", "gym-sessions"]]) {
-    await importCsv(`http://localhost:${port}`, importer, tab, await Bun.file(join(import.meta.dir, "fixtures", `${file}.csv`)).text());
+  for (const [tab, file] of [["people", "ppl-index.csv"], ["outbound", "cold-outbounds.csv"], ["forecasts", "superforecasting.csv"], ["gym", "gym-sessions.tsv"]]) {
+    const rows = sheetToRows(tab, await Bun.file(join(import.meta.dir, "fixtures", file)).text());
+    await importRows(`http://localhost:${port}`, importer, tab, rows);
   }
 }, 120_000);
 
@@ -89,16 +90,32 @@ afterAll(async () => {
   rmSync(state, { recursive: true, force: true });
 });
 
-test("the csv import kept every row, including multi-line cells", async () => {
-  const me = await sign({ email: "me@example.com" });
-  const { status, body } = await call("list tabs", "/api", { token: me });
-  expect(status).toBe(200);
+const me = () => sign({ email: "me@example.com" });
+const dots = () => sign({ common_name: "dots-client-id" });
+const post = (token: string, path: string, body: unknown, method = "POST") =>
+  call(`${method} ${path}`, path, { method, token, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+test("the import renamed and normalized every sheet column", async () => {
+  const token = await me();
+  const { body } = await call("list tabs", "/api", { token });
   expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, outbound: 2, forecasts: 2, gym: 3 });
-  const outbound = await call("outbound rows", "/api/outbound", { token: me });
-  const first = outbound.body.rows.find((r: any) => r.name === "exampleworkspace.io");
-  expect(first.message).toBe("Hey, I'm building a proof of concept\nand would love 15 minutes.");
-  expect(first.follow_up).toStartWith("#1 -- 25 days --");
-  expect(first.updated_by).toBe("importer@example.com");
+  const people = (await call("people", "/api/people", { token })).body.rows;
+  const ada = people.find((r: any) => r.name === "Ada Example");
+  expect(ada.met_date).toBe("2026-06-25"); // 250626 is day, month, year
+  expect(people.find((r: any) => r.name === "Ben Sample").met_date).toBe("2025-06-19");
+  expect(people.find((r: any) => r.name === "Cy Placeholder").met_date).toBeUndefined(); // "Call / intro" is not a date
+  const outbound = (await call("outbound", "/api/outbound", { token })).body.rows;
+  const first = outbound.find((r: any) => r.name === "exampleworkspace.io");
+  expect(first).toMatchObject({ reply: "no reply", message: "Hey, I'm building a proof of concept\nand would love 15 minutes." });
+  expect(first.follow_ups).toStartWith("#1 -- 25 days --");
+  expect(outbound.find((r: any) => r.name === "Dee Fixture").context).toBe("founder");
+  const forecasts = (await call("forecasts", "/api/forecasts", { token })).body.rows;
+  expect(forecasts.map((r: any) => [r.date, r.confidence, r.verdict ?? null, r.status])).toEqual([
+    ["2026-06-30", 80, "right", "closed"], ["2026-06-26", 80, null, "open"], // sorted by date, newest first
+  ]);
+  const gym = (await call("gym", "/api/gym", { token })).body.rows;
+  expect(gym.map((r: any) => r.at)).toEqual(["2026-08-24", "2026-07-18T01:34-07:00", "2026-07-07T17:25"]);
+  expect(gym[2]).toMatchObject({ notes: "First ever leg day", duration_min: 60, rpe: 8, updated_by: "importer@example.com" });
 });
 
 test("requests that did not come through access are refused", async () => {
@@ -109,70 +126,109 @@ test("requests that did not come through access are refused", async () => {
   expect((await call("a service token that is not the agent (the admin prober)", "/api", { token: await sign({ common_name: "admin-prober-id" }) })).status).toBe(403);
 });
 
-test("dots adds, edits, finds and deletes rows with its service token", async () => {
-  const dots = await sign({ common_name: "dots-client-id" });
-  const added = await call("dots logs a gym session", "/api/gym", {
-    method: "POST", token: dots, body: JSON.stringify({ date: "2026-11-17", type: "strength", title: "Back day", duration_min: "62", rpe: 7 }),
-  });
+test("dots adds, edits, finds and deletes rows", async () => {
+  const token = await dots();
+  const added = await post(token, "/api/gym", { at: "2026-11-17T18:00-08:00", type: "strength", title: "Back day", duration_min: "62", rpe: 7 });
   expect(added.status).toBe(201);
   expect(added.body.row).toMatchObject({ title: "Back day", duration_min: 62, rpe: 7, updated_by: "service:dots-client-id" });
-
-  const reply = await call("dots marks an outbound reply", "/api/outbound/1", { method: "PATCH", token: dots, body: JSON.stringify({ replied: "yes", status: "replied" }) });
-  expect(reply.status).toBe(200);
-  expect(reply.body.row).toMatchObject({ replied: "yes", status: "replied", updated_by: "service:dots-client-id" });
-  expect(reply.body.row.message).toContain("proof of concept"); // untouched fields stay
-
-  const found = await call("dots searches people", "/api/people?q=robots", { token: dots });
-  expect(found.body.rows.map((r: any) => r.name)).toEqual(["Ben Sample"]);
-
-  const gone = await call("dots deletes a row", `/api/gym/${added.body.row.id}`, { method: "DELETE", token: dots });
-  expect(gone.status).toBe(200);
-  expect((await call("deleted row is gone", `/api/gym/${added.body.row.id}`, { token: dots })).status).toBe(404);
+  const id = added.body.row.id;
+  const edited = await post(token, `/api/gym/${id}`, { rpe: 8, notes: "felt strong", summary: null }, "PATCH");
+  expect(edited.body.row).toMatchObject({ rpe: 8, notes: "felt strong", title: "Back day" });
+  expect(edited.body.row.summary).toBeUndefined();
+  expect((await call("dots searches every value", "/api/people?q=robots", { token })).body.rows.map((r: any) => r.name)).toEqual(["Ben Sample"]);
+  expect((await call("search does not match field names", "/api/people?q=met_where", { token })).body.rows).toEqual([]);
+  expect((await call("dots deletes a row", `/api/gym/${id}`, { method: "DELETE", token })).status).toBe(200);
+  expect((await call("deleted row is gone", `/api/gym/${id}`, { token })).status).toBe(404);
 });
 
 test("bad writes get a message that says how to fix them", async () => {
-  const dots = await sign({ common_name: "dots-client-id" });
-  const unknown = await call("unknown field", "/api/gym", { method: "POST", token: dots, body: JSON.stringify({ date: "2026-11-17", weight: 80 }) });
-  expect(unknown.status).toBe(400);
-  expect(unknown.body.error).toContain("fields: date, type, title");
-  const missing = await call("missing required field", "/api/people", { method: "POST", token: dots, body: JSON.stringify({ company: "Nowhere" }) });
-  expect(missing.body.error).toBe('"name" is required');
-  const notNumber = await call("rpe is not a number", "/api/gym", { method: "POST", token: dots, body: JSON.stringify({ date: "2026-11-17", rpe: "hard" }) });
-  expect(notNumber.body.error).toBe('"rpe" must be a whole number');
-  expect((await call("unknown tab", "/api/thoughts", { token: dots })).status).toBe(404);
+  const token = await dots();
+  const cases: [string, unknown, string][] = [
+    ["/api/gym", { at: "2026-11-17", weight: 80 }, 'unknown field "weight". fields: at, type, title'],
+    ["/api/people", { company: "Nowhere" }, '"name" is required'],
+    ["/api/gym", { at: "2026-11-17", rpe: "hard" }, '"rpe" must be a whole number'],
+    ["/api/gym", { at: "2026-11-17", rpe: 11 }, '"rpe" must be at most 10'],
+    ["/api/gym", { at: "yesterday" }, '"at" must be a date or iso date-time'],
+    ["/api/gym", { at: "2026-11-17", type: "yoga" }, '"type" must be one of: strength, cardio, other'],
+    ["/api/people", { name: "X", linkedin: "linkedin.com/in/x" }, '"linkedin" must be a url'],
+    ["/api/forecasts", { decision: "Y", review_date: "2026-13-40" }, '"review_date" must be a date like'],
+  ];
+  for (const [path, body, message] of cases) {
+    const r = await post(token, path, body);
+    expect(r.status).toBe(400);
+    expect(r.body.error).toStartWith(message);
+  }
+  expect((await call("unknown tab", "/api/thoughts", { token })).body.error).toContain("tabs: people, outbound, forecasts, gym");
+});
+
+test("tabs and columns are added through the api, with no migration, and every change is logged", async () => {
+  const token = await dots();
+  const gym = (await call("read gym schema", "/api/_tabs/gym", { token })).body.tab;
+  const { slug: _s, position: _p, ...definition } = gym;
+  const withColumn = { ...definition, fields: [...definition.fields, { name: "place", type: "text" }] };
+  expect((await post(token, "/api/_tabs/gym", withColumn, "PUT")).status).toBe(200);
+  const row = await post(token, "/api/gym", { at: "2026-11-18", title: "Legs", place: "home gym" });
+  expect(row.body.row.place).toBe("home gym");
+  const oldRow = (await call("old rows lack the new column", "/api/gym?q=First%20leg", { token })).body.rows[0];
+  expect(oldRow.place).toBeUndefined();
+
+  const thoughts = { label: "thoughts", about: "things worth remembering", title: "text", sort: "at",
+    fields: [{ name: "text", type: "text", required: true }, { name: "at", type: "datetime" }, { name: "source", type: "url" }] };
+  expect((await post(token, "/api/_tabs/thoughts", thoughts, "PUT")).status).toBe(201);
+  expect((await post(token, "/api/thoughts", { text: "the schema is data now", at: "2026-11-18" })).status).toBe(201);
+  const home = await call("home shows the new tab", "/", { token: await me() });
+  expect(home.body).toContain('href="/thoughts"');
+
+  expect((await post(token, "/api/_tabs/thoughts", {}, "DELETE")).status).toBe(409); // still has a row
+  const bad: [unknown, string][] = [
+    [{ ...thoughts, fields: [{ name: "id", type: "text" }] }, 'field name "id" is reserved'],
+    [{ ...thoughts, fields: [{ name: "mood", type: "enum" }] }, 'field "mood": enum fields need "options"'],
+    [{ ...thoughts, title: "nope" }, '"title" must name one of the fields'],
+    [{ ...thoughts, fields: [{ name: "Bad Name", type: "text" }] }, "fields[0].name must be lowercase snake_case"],
+  ];
+  for (const [definition, message] of bad) expect((await post(token, "/api/_tabs/scratch", definition, "PUT")).body.error).toStartWith(message);
+  expect((await post(token, "/api/_tabs/scratch", { label: "scratch", about: "", fields: [{ name: "x", type: "text" }] }, "PUT")).status).toBe(201);
+  expect((await call("delete an empty tab", "/api/_tabs/scratch", { method: "DELETE", token })).status).toBe(200);
+
+  const log = (await call("schema log", "/api/_log", { token })).body.changes;
+  expect(log.slice(0, 4).map((c: any) => [c.tab, c.before === null ? "created" : c.after === null ? "deleted" : "changed", c.by])).toEqual([
+    ["scratch", "deleted", "service:dots-client-id"], ["scratch", "created", "service:dots-client-id"],
+    ["thoughts", "created", "service:dots-client-id"], ["gym", "changed", "service:dots-client-id"],
+  ]);
+  expect(log[3].after.fields.at(-1)).toEqual({ name: "place", type: "text" });
 });
 
 test("the pages render each tab and a row", async () => {
-  const me = await sign({ email: "me@example.com" });
+  const token = await me();
   mkdirSync(artifacts, { recursive: true });
+  const home = await call("home lists every tab", "/", { token });
+  expect(home.status).toBe(200);
+  for (const tab of ["people", "outbound", "forecasts", "gym"]) expect(home.body).toContain(`href="/${tab}"`);
+  expect(home.body).toContain('href="https://admin.adhikrish.cloud/"');
+  expect(home.body).not.toContain('<a href="/">snrintern</a>'); // no link to the page you're on
+  writeFileSync(join(artifacts, "page-home.html"), home.body);
   for (const tab of ["people", "outbound", "forecasts", "gym"]) {
-    const { status, body } = await call(`page ${tab}`, `/${tab}`, { token: me });
+    const { status, body } = await call(`page ${tab}`, `/${tab}`, { token });
     expect(status).toBe(200);
     expect(body).toContain('<ul class="project-list">');
     writeFileSync(join(artifacts, `page-${tab}.html`), body);
   }
-  const row = await call("row page", "/outbound/1", { token: me });
-  expect(row.body).toContain("<dt>follow up</dt>");
+  expect((await call("search narrows a tab", "/people?q=robots", { token })).body).toContain("1 matching");
+  const people = (await call("people rows", "/api/people", { token })).body.rows;
+  const ada = people.find((r: any) => r.name === "Ada Example");
+  const row = await call("row page", `/people/${ada.id}`, { token });
+  expect(row.body).toContain('<a href="https://www.linkedin.com/in/ada-example/" target="_blank"');
   expect(row.body).not.toContain("<dt>name</dt>"); // the title is not repeated
-  expect(row.body).toContain("by service:dots-client-id");
-  writeFileSync(join(artifacts, "page-outbound-1.html"), row.body);
-  const home = await call("home lists every tab", "/", { token: me });
-  expect(home.status).toBe(200);
-  for (const tab of ["people", "outbound", "forecasts", "gym"]) expect(home.body).toContain(`href="/${tab}"`);
-  expect(home.body).toContain("3 rows");
-  expect(home.body).toContain('href="https://admin.adhikrish.cloud/"');
-  expect(home.body).not.toContain('<a href="/">snrintern</a>'); // no link to the page you're on
-  writeFileSync(join(artifacts, "page-home.html"), home.body);
-  const search = await call("search narrows a tab", "/people?q=robots", { token: me });
-  expect(search.body).toContain("1 matching");
+  writeFileSync(join(artifacts, "page-people-row.html"), row.body);
 });
 
 test("a restart loses nothing", { timeout: 60_000 }, async () => {
-  const me = await sign({ email: "me@example.com" });
-  await call("write before restart", "/api/forecasts", { method: "POST", token: me, body: JSON.stringify({ decision: "Restart keeps data", confidence: "99%" }) });
+  const token = await me();
+  await post(token, "/api/forecasts", { decision: "Restart keeps data", confidence: 99 });
   await stopWorker();
   await startWorker();
-  const after = await call("read after restart", "/api/forecasts?q=Restart", { token: me });
+  const after = await call("read after restart", "/api/forecasts?q=Restart", { token });
   expect(after.body.rows).toHaveLength(1);
   expect(after.body.rows[0].updated_by).toBe("me@example.com");
+  expect((await call("schema survives too", "/api/_tabs/thoughts", { token })).status).toBe(200);
 });

@@ -9,7 +9,6 @@ import { handleApi } from "./api.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
 import { homePage, rowPage, tabPage } from "./page.ts";
-import { tabBySlug } from "./tabs.ts";
 
 type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string };
 
@@ -35,10 +34,10 @@ export default {
 
     const [, slug, id] = url.pathname.split("/");
     if (!slug) return html(await homePage(design, env.DB));
-    const tab = tabBySlug.get(slug);
+    const tab = await db.tab(env.DB, slug);
     if (!tab) return html("not found", 404);
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? ""));
-    const row = await db.get(env.DB, tab, Number(id));
+    const row = await db.get(env.DB, tab.slug, Number(id));
     return row ? html(rowPage(design, tab, row)) : html("not found", 404);
   },
 } satisfies ExportedHandler<Env>;

@@ -1,7 +1,7 @@
 // The human pages: a home list of tabs, one list per tab with search, and a detail view per row.
 import { escape, page, type Design } from "../../../design/html.ts";
 import * as db from "./db.ts";
-import { TABS, type Tab } from "./tabs.ts";
+import type { Tab } from "./schema.ts";
 
 const CSS = `
   nav .external { margin-left: auto; }
@@ -29,20 +29,23 @@ const CSS = `
 const SLASH_TO_SEARCH = `<script>addEventListener("keydown",e=>{const i=document.querySelector(".search input");if(i&&e.key==="/"&&document.activeElement!==i){e.preventDefault();i.focus();i.select()}})</script>`;
 
 const show = (row: db.Row, names: string[]) =>
-  names.map((n) => row[n]).filter((v) => v !== null && v !== "").map((v) => escape(v)).join(" · ");
+  names.map((n) => row[n]).filter((v) => v !== undefined && v !== null && v !== "").map((v) => escape(v)).join(" · ");
 
 /** Links only ever go somewhere else: home shows adhikrish.cloud, tab pages lead back to snrintern home. Admin sits on the right. */
 function nav(current?: Tab): string {
-  const left = current ? `<a href="/">snrintern</a><a href="/${current.slug}" aria-current="page">${current.label}</a>` : `<a href="https://adhikrish.cloud/">adhikrish.cloud</a>`;
+  const left = current ? `<a href="/">snrintern</a><a href="/${current.slug}" aria-current="page">${escape(current.label)}</a>` : `<a href="https://adhikrish.cloud/">adhikrish.cloud</a>`;
   return `${left}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
 }
 
 export async function homePage(design: Design, database: D1Database): Promise<string> {
-  const counts = await db.counts(database, TABS);
-  const items = TABS.map((tab, i) => `          <li>
-            <a href="/${tab.slug}"><span>${tab.label}</span><small>${counts[i]} ${counts[i] === 1 ? "row" : "rows"}</small></a>
+  const [tabs, counts] = await Promise.all([db.tabs(database), db.counts(database)]);
+  const items = tabs.map((tab) => {
+    const n = counts.get(tab.slug) ?? 0;
+    return `          <li>
+            <a href="/${tab.slug}"><span>${escape(tab.label)}</span><small>${n} ${n === 1 ? "row" : "rows"}</small></a>
             <p>${escape(tab.about)}</p>
-          </li>`);
+          </li>`;
+  });
   const body = `      <h1>snrintern</h1>
       <ul class="project-list">
 ${items.join("\n")}
@@ -57,8 +60,8 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
             <p>${show(row, tab.line)}</p>
           </li>`);
   const icon = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>`;
-  const body = `      <h1>${tab.label}<small>${q ? `${rows.length} matching` : `${rows.length} ${rows.length === 1 ? "row" : "rows"}`}</small></h1>
-      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search ${tab.label}" aria-label="search ${tab.label}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
+  const body = `      <h1>${escape(tab.label)}<small>${q ? `${rows.length} matching` : `${rows.length} ${rows.length === 1 ? "row" : "rows"}`}</small></h1>
+      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search ${escape(tab.label)}" aria-label="search ${escape(tab.label)}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
 ${rows.length ? `      <ul class="project-list">\n${items.join("\n")}\n      </ul>` : `      <p class="empty">nothing${q ? ` matches "${escape(q)}"` : " yet"}.</p>`}
       ${SLASH_TO_SEARCH}`;
   return page({ design, title: `${tab.label} | snrintern`, nav: nav(tab), body, css: CSS });
@@ -66,8 +69,12 @@ ${rows.length ? `      <ul class="project-list">\n${items.join("\n")}\n      </u
 
 export function rowPage(design: Design, tab: Tab, row: db.Row): string {
   const fields = tab.fields
-    .filter((f) => f.name !== tab.title && row[f.name] !== null && row[f.name] !== "")
-    .map((f) => `        <dt>${f.name.replaceAll("_", " ")}</dt><dd>${escape(row[f.name])}</dd>`);
+    .filter((f) => f.name !== tab.title && row[f.name] !== undefined && row[f.name] !== "")
+    .map((f) => {
+      const value = escape(row[f.name]);
+      const shown = f.type === "url" ? `<a href="${value}" target="_blank" rel="noopener noreferrer">${value}</a>` : value;
+      return `        <dt>${f.name.replaceAll("_", " ")}</dt><dd>${shown}</dd>`;
+    });
   const body = `      <h1>${escape(row[tab.title] ?? "untitled")}</h1>
       <p class="meta">updated ${escape(String(row.updated_at).slice(0, 10))} by ${escape(row.updated_by)}</p>
       <dl>
