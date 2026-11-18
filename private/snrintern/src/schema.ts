@@ -2,7 +2,7 @@
 // Definitions live in d1 (`tabs`) and change through PUT /api/_tabs/<slug>; this file only checks them.
 
 type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
-export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[] };
+export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, "good" | "bad"> };
 export type TabDefinition = {
   label: string; // shown on the pages
   about: string; // one line on the home page
@@ -11,17 +11,17 @@ export type TabDefinition = {
   line: string[]; // fields shown in the muted line under a row
   sort: string; // "id" (newest first) or a field name (descending)
   snippet?: string; // a text field previewed under each row in the list
-  summary?: string[]; // enum fields tallied under the heading ("2 replied · 8 no reply")
   group?: string; // a date/datetime field groups the list by day ("wed, sep 17"); a text or enum field groups it by value
   goals?: Record<string, number>; // named targets the views compare against, e.g. { "sessions_per_week": 5 }
   views?: View[]; // what the tab opens on, above the list (see View)
+  hidden?: boolean; // left out of the nav and home (its data still feeds other tabs' views)
   fields: Field[];
 };
 
 // A view answers one question at the top of a tab, computed from its rows (or, for "line", another tab's).
 export type View =
   | { kind: "progress"; field: string } // lifts field: each exercise's top set over time
-  | { kind: "weekly"; goal?: string; mark?: { field: string; contains: string; goal?: string } } // sessions per week vs a goal
+  | { kind: "weekly"; goal?: string; mark?: { field: string; contains: string; goal?: string } } // this week's sessions vs a goal, as circles
   | { kind: "since"; field: string; values: string[] } // days since each value last appeared in a comma-separated field
   | { kind: "line"; field: string; tab?: string; goal?: string } // a number over time, from this tab or another
   | { kind: "due"; field: string; where?: Record<string, string>; within_days?: number } // rows whose date is coming up or past
@@ -44,7 +44,7 @@ const validDate = (s: string) => !Number.isNaN(Date.parse(s.slice(0, 10)));
 export function checkDefinition(input: unknown): TabDefinition | string {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return "definition must be a json object";
   const d = input as Record<string, unknown>;
-  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "summary", "group", "goals", "views", "fields"]);
+  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "goals", "views", "hidden", "fields"]);
   for (const key of Object.keys(d)) if (!known.has(key)) return `unknown key "${key}". keys: ${[...known].join(", ")}`;
   if (typeof d.label !== "string" || !d.label.trim()) return '"label" must be a non-empty string';
   if (typeof d.about !== "string") return '"about" must be a string';
@@ -58,7 +58,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (RESERVED.includes(f.name)) return `field name "${f.name}" is reserved (every row already has ${RESERVED.join(", ")})`;
     if (names.has(f.name)) return `field "${f.name}" appears twice`;
     if (!TYPES.includes(f.type as FieldType)) return `field "${f.name}": type must be one of ${TYPES.join(", ")}`;
-    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
+    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
     const field: Field = { name: f.name, type: f.type as FieldType };
     if (f.required !== undefined) {
       if (typeof f.required !== "boolean") return `field "${f.name}": required must be true or false`;
@@ -78,7 +78,13 @@ export function checkDefinition(input: unknown): TabDefinition | string {
       if (!Array.isArray(f.options) || f.options.length === 0 || !f.options.every((o) => typeof o === "string" && o.trim()))
         return `field "${f.name}": enum fields need "options", a list of strings`;
       field.options = f.options as string[];
-    } else if (f.options !== undefined) return `field "${f.name}": options only apply to enum fields`;
+      if (f.colors !== undefined) {
+        const c = f.colors as Record<string, unknown>;
+        if (typeof c !== "object" || c === null || !Object.entries(c).every(([k, v]) => field.options!.includes(k) && (v === "good" || v === "bad")))
+          return `field "${f.name}": colors maps options to "good" or "bad", e.g. { "closed": "good", "open": "bad" }`;
+        field.colors = c as Record<string, "good" | "bad">;
+      }
+    } else if (f.options !== undefined || f.colors !== undefined) return `field "${f.name}": options and colors only apply to enum fields`;
     names.add(field.name);
     fields.push(field);
   }
@@ -101,9 +107,6 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (typeof d.snippet !== "string" || types.get(d.snippet) !== "text") return `"snippet" must name a text field`;
     snippet = d.snippet;
   }
-  const summary = list("summary", d.summary);
-  if (typeof summary === "string") return summary;
-  if (summary.some((name) => types.get(name) !== "enum")) return `"summary" must list enum fields`;
   let group: string | undefined;
   if (d.group !== undefined) {
     if (typeof d.group !== "string" || !["date", "datetime", "enum", "text"].includes(types.get(d.group) ?? "")) return `"group" must name a date, datetime, text or enum field`;
@@ -117,8 +120,9 @@ export function checkDefinition(input: unknown): TabDefinition | string {
   }
   const views = checkViews(d.views, types, goals ?? {});
   if (typeof views === "string") return views;
-  return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}), ...(summary.length ? { summary } : {}),
-    ...(group ? { group } : {}), ...(goals ? { goals } : {}), ...(views.length ? { views } : {}), fields };
+  if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
+  return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}),
+    ...(group ? { group } : {}), ...(goals ? { goals } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), fields };
 }
 
 /** Checks one row body against a tab's fields. `partial` is for PATCH: only the given fields are checked. */

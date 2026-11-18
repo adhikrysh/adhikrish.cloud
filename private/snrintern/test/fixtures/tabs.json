@@ -3,9 +3,7 @@
   "label": "people",
   "about": "people i've met, and where",
   "title": "name",
-  "aside": [
-   "last_contact"
-  ],
+  "aside": [],
   "line": [
    "title",
    "company",
@@ -84,19 +82,14 @@
   "title": "decision",
   "aside": [
    "confidence",
+   "verdict",
    "status"
   ],
   "line": [
-   "date",
-   "review_date",
-   "verdict"
+   "review_date"
   ],
   "sort": "date",
   "snippet": "expected",
-  "summary": [
-   "status",
-   "verdict"
-  ],
   "fields": [
    {
     "name": "date",
@@ -136,7 +129,11 @@
     "options": [
      "right",
      "wrong"
-    ]
+    ],
+    "colors": {
+     "right": "good",
+     "wrong": "bad"
+    }
    },
    {
     "name": "status",
@@ -144,7 +141,11 @@
     "options": [
      "open",
      "closed"
-    ]
+    ],
+    "colors": {
+     "closed": "good",
+     "open": "bad"
+    }
    }
   ],
   "views": [
@@ -170,19 +171,17 @@
   "about": "sessions: lifting, runs, hikes",
   "title": "title",
   "aside": [
-   "at"
+   "at",
+   "type"
   ],
   "line": [
-   "type",
    "focus",
-   "duration_min"
+   "duration_min",
+   "distance_km"
   ],
   "sort": "at",
   "group": "at",
   "snippet": "notes",
-  "summary": [
-   "type"
-  ],
   "goals": {
    "sessions_per_week": 5,
    "leg_days_per_week": 2,
@@ -218,6 +217,11 @@
     "tab": "body",
     "field": "bodyweight_kg",
     "goal": "bodyweight_kg"
+   },
+   {
+    "kind": "line",
+    "tab": "body",
+    "field": "bodyfat_percentage"
    }
   ],
   "fields": [
@@ -322,6 +326,7 @@
     "name": "notes",
     "type": "text"
    }
-  ]
+  ],
+  "hidden": true
  }
 }

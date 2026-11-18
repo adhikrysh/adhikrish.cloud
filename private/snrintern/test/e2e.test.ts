@@ -163,39 +163,42 @@ test("the agent adds, edits, finds and deletes rows", async () => {
 test("the training page is built from the data: progress, weekly, last trained, bodyweight", async () => {
   const token = await me();
   const page = (await call("training page", "/training", { token })).body as string;
-  expect(page).toContain("sessions per week");
-  expect(page).toContain("of 5 this week");
-  expect(page).toContain("last trained");
+  expect(page).toContain("<h2>this week</h2>");
+  expect(page).toContain('<span>sessions</span><span class="dots">');
+  expect(page).toContain("<h2>last trained</h2>");
   // flat db press: 50 -> 60 over two sessions, latest is the best: green
-  expect(page).toMatch(/flat db press<\/span><span class="top">best <span class="good">60 lb × 6<\/span>/);
+  expect(page).toContain('<span class="name">flat db press</span><span class="sub"><span class="good">best 60 lb × 6</span>');
   // pull up tracked by added weight: bw x10 then +25x6
-  expect(page).toMatch(/pull up<\/span><span class="top">best <span class="good">\+25 × 6<\/span>/);
+  expect(page).toContain('<span class="name">pull up</span><span class="sub"><span class="good">best +25 × 6</span>');
   // bodyweight line from the body tab, moving toward the 75 kg goal: green
   expect(page).toContain("69.4 kg");
-  expect(page).toMatch(/<span class="good">\+1\.4 kg<\/span>/);
+  expect(page).toContain('<span class="good">+1.4 kg since');
+  expect(page).toContain("<h2>bodyfat</h2>"); // body is hidden, its trends live on training
   // a brand-new exercise shows up in progress after a second session, with no code change
   const dotsToken = await dots();
   await send(dotsToken, "/api/training", { at: `${day(-9)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 30x10" });
   await send(dotsToken, "/api/training", { at: `${day(-1)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 25x12" });
   const after = (await call("training page after new exercise", "/training", { token })).body as string;
-  expect(after).toMatch(/hammer curl<\/span><span class="top">best <span class="bad">30 lb × 10<\/span> · latest 25 lb × 12/);
+  expect(after).toContain('<span class="name">hammer curl</span><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
   writeFileSync(join(artifacts, "page-training.html"), after);
 });
 
 test("forecasts open on what is due; scoring one (by the agent) takes it off the list", async () => {
   const token = await me();
   const page = (await call("forecasts page", "/forecasts", { token })).body as string;
-  const dueList = page.split("due for review")[1].split("</section>")[0];
+  const dueList = page.split("<h2>due</h2>")[1].split("</section>")[0];
   expect(dueList.indexOf("Overdue bet")).toBeLessThan(dueList.indexOf("Due soon bet"));
   expect(dueList).toContain("overdue 10 days");
-  expect(dueList).toContain("due in 5 days");
+  expect(dueList).toContain("in 5 days");
   expect(dueList).not.toContain("Far away bet");
-  expect(page).toContain("1 of 10 scored before this means anything (so far 1 right)");
+  expect(page).not.toContain("calibration"); // under 10 scored: says nothing
+  expect(page).toContain('<span class="bad">open</span>');
+  expect(page).toContain('<span class="good">closed</span>');
+  expect(page).toContain('<span>review in 5 days</span>');
   const overdue = (await call("forecast rows", "/api/forecasts?q=Overdue", { token })).body.rows[0];
   await send(await dots(), `/api/forecasts/${overdue.id}`, { verdict: "wrong", status: "closed" }, "PATCH");
   const after = (await call("forecasts page after scoring", "/forecasts", { token })).body as string;
-  expect(after.split("due for review")[1].split("</section>")[0]).not.toContain("Overdue bet");
-  expect(after).toContain("2 of 10 scored before this means anything (so far 1 right)");
+  expect(after.split("<h2>due</h2>")[1].split("</section>")[0]).not.toContain("Overdue bet");
   writeFileSync(join(artifacts, "page-forecasts.html"), after);
 });
 
@@ -207,17 +210,19 @@ test("people are grouped, and the ones not contacted lately come first", async (
   expect(keepWarm).not.toContain("Ben Sample");
   const list = page.split('<div class="rows">')[1];
   expect(list).toContain('<details class="group">');
-  expect(list).toContain("<summary>space &amp; deep tech<small>1</small></summary>");
-  expect(list).toContain("<summary>no group<small>1</small></summary>");
+  expect(list).toContain("<summary>space &amp; deep tech</summary>");
+  expect(list).toContain("<summary>no group</summary>");
   // a topic nobody defined anywhere: the agent just writes it, and it becomes a group
   await send(await dots(), "/api/people", { name: "Eve New", group: "climate" });
-  expect((await call("people page after new topic", "/people", { token })).body).toContain("<summary>climate<small>1</small></summary>");
+  expect((await call("people page after new topic", "/people", { token })).body).toContain("<summary>climate</summary>");
   writeFileSync(join(artifacts, "page-people.html"), page);
 });
 
-test("home is just the tabs", async () => {
+test("home is just the visible tabs, no numbers", async () => {
   const page = (await call("home", "/", { token: await me() })).body as string;
-  for (const tab of ["people", "forecasts", "training", "body"]) expect(page).toContain(`href="/${tab}"`);
+  for (const tab of ["people", "forecasts", "training"]) expect(page).toContain(`href="/${tab}"`);
+  expect(page).not.toContain('href="/body"'); // hidden
+  expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
   expect(page).not.toContain('<a href="/">snr intern</a>'); // no link to the page you're on
   writeFileSync(join(artifacts, "page-home.html"), page);
@@ -269,7 +274,8 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
   }
   const chest = (await call("chest", "/api/training?q=tricep", { token })).body.rows[0];
   const row = (await call("row page", `/training/${chest.id}`, { token })).body as string;
-  expect(row).toContain('<span class="ex">tricep pushdown</span> 50×8, 50×8, 50×8');
+  expect(row).toContain('<span class="ex">tricep pushdown</span>50 × 8   50 × 8   50 × 8');
+  expect(row).toContain(`<a class="schema" href="/api/_tabs/training">schema</a>`);
   writeFileSync(join(artifacts, "page-training-row.html"), row);
 });
 
