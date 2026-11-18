@@ -8,6 +8,12 @@
   ],
   "private": [
     {
+      "name": "snr intern",
+      "url": "https://snrintern.adhikrish.cloud/",
+      "health": "https://snrintern.adhikrish.cloud/health",
+      "about": "people, outbound, forecasts, gym"
+    },
+    {
       "name": "npm",
       "url": "https://npm.adhikrish.cloud/",
       "about": "nginx proxy manager: routes each hostname to its container"
@@ -43,12 +49,6 @@
       "name": "system stats",
       "url": "https://stats.adhikrish.cloud/",
       "about": "beszel: cpu, memory, disk, temperatures"
-    },
-    {
-      "name": "snr intern",
-      "url": "https://snrintern.adhikrish.cloud/",
-      "health": "https://snrintern.adhikrish.cloud/health",
-      "about": "people, outbound, forecasts, gym"
     }
   ],
   "external": [

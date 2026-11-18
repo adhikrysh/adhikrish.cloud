@@ -4,12 +4,8 @@
 // and passes them in as `design`.
 export type Design = { base: string; list: string };
 
-// Shared by every private page: links read as text (no underline) and brighten on hover; a white pill for labels;
-// green for good, red for bad. Nothing else is coloured.
+// Shared by every private page: a white pill for labels, green for good, red for bad. Nothing else is coloured.
 const PRIVATE = `
-  a, .project-list span { text-decoration: none; }
-  a:hover, .project-list a:hover { color: #efebe0; }
-  nav a { color: #8a8a8a; }
   .pill { display: inline-block; font-size: 12px; line-height: 1.6; padding: 0 9px; border-radius: 10px; background: #d8d4c8; color: #080807; white-space: nowrap; letter-spacing: 0; }
   .good { color: #6f9e6a; }
   .bad { color: #c4553f; }

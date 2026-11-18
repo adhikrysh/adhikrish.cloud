@@ -1,14 +1,14 @@
 // snrintern.adhikrish.cloud
 //   /health          liveness for the admin dashboard
 //   /api/...         json api (src/api.ts): dots and scripts
-//   /, /<tab>, /<tab>/<id>  read-only pages (src/page.ts): home list of tabs, a tab, a row. all writes go through the api.
+//   /, /<tab>, /<tab>/<id>, /<tab>/lifts/<exercise>  read-only pages (src/page.ts). all writes go through the api.
 // Every request except /health must carry the jwt cloudflare access signs for requests it let in.
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
-import { homePage, rowPage, tabPage } from "./page.ts";
+import { exercisePage, homePage, rowPage, tabPage } from "./page.ts";
 
 type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string };
 
@@ -32,11 +32,15 @@ export default {
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return handleApi(request, env.DB, who.who);
     if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
 
-    const [, slug, id] = url.pathname.split("/");
+    const [, slug, id, name] = url.pathname.split("/");
     if (!slug) return html(await homePage(design, env.DB));
     const tab = await db.tab(env.DB, slug);
     if (!tab) return html("not found", 404);
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? ""));
+    if (id === "lifts" && name) {
+      const lift = await exercisePage(design, env.DB, tab, decodeURIComponent(name));
+      return lift ? html(lift) : html("not found", 404);
+    }
     const row = await db.get(env.DB, tab.slug, Number(id));
     return row ? html(await rowPage(design, env.DB, tab, row)) : html("not found", 404);
   },

@@ -19,6 +19,7 @@ export const VIEW_CSS = `
   .lifts { display: grid; gap: 16px; }
   .lift { display: grid; grid-template-columns: minmax(0, 1fr) 92px; column-gap: 16px; align-items: center; }
   .lift .name { color: #efebe0; font-size: 15px; }
+  .lift a.name:hover { color: #ffffff; }
   .lift .sub { grid-column: 1; margin-top: 2px; }
   .lift svg { grid-row: 1 / span 2; grid-column: 2; }
   svg.spark { width: 92px; height: 26px; overflow: visible; }
@@ -61,23 +62,34 @@ const dateField = (tab: Tab) => (tab.sort !== "id" ? tab.sort : tab.group ?? "cr
 const title = (tab: Tab, row: db.Row) => escape(row[tab.title] ?? "untitled");
 const section = (heading: string, body: string) => `<section class="view"><h2>${escape(heading)}</h2>${body}</section>`;
 
-/** Each exercise done on 2+ days: its best set over time. Bodyweight work (bw, +25) counts added weight, bw = 0. */
-function progress(v: Extract<View, { kind: "progress" }>, { tab, rows }: Ctx): string {
-  const unit = tab.fields.find((f) => f.name === v.field)?.unit ?? "lb";
-  const series = new Map<string, { t: number; top: number; reps: number; label: string }[]>();
+type Point = { t: number; top: number; reps: number; label: string; sets: string[]; row: db.Row };
+const setLabel = (s: { load: number | null; added: boolean; reps: number }, bodyweight: boolean, unit: string) =>
+  s.load === null ? `bw × ${s.reps}` : `${bodyweight ? "+" : ""}${fmt(s.load)}${bodyweight ? "" : ` ${unit}`} × ${s.reps}`;
+
+/** Every exercise's sessions in date order: the best set (bodyweight work counts added weight, bw = 0) and all sets. */
+function liftSeries(tab: Tab, rows: db.Row[], field: string): Map<string, Point[]> {
+  const unit = tab.fields.find((f) => f.name === field)?.unit ?? "lb";
+  const series = new Map<string, Point[]>();
   for (const row of rows) {
     const t = dayOf(row[dateField(tab)]);
-    const lifts = typeof row[v.field] === "string" ? parseLifts(String(row[v.field])) : [];
+    const lifts = typeof row[field] === "string" ? parseLifts(String(row[field])) : [];
     if (t === null || typeof lifts === "string") continue;
     for (const lift of lifts) {
       const bodyweight = lift.sets.some((s) => s.load === null || s.added);
       const load = (s: (typeof lift.sets)[number]) => s.load ?? 0;
       const best = lift.sets.reduce((a, s) => (load(s) > load(a) || (load(s) === load(a) && s.reps > a.reps) ? s : a));
-      const label = best.load === null ? `bw × ${best.reps}` : `${bodyweight ? "+" : ""}${fmt(best.load)}${bodyweight ? "" : ` ${unit}`} × ${best.reps}`;
-      series.set(lift.exercise, [...(series.get(lift.exercise) ?? []), { t, top: load(best), reps: best.reps, label }]);
+      series.set(lift.exercise, [...(series.get(lift.exercise) ?? []),
+        { t, top: load(best), reps: best.reps, label: setLabel(best, bodyweight, unit), sets: lift.sets.map((s) => setLabel(s, bodyweight, unit)), row }]);
     }
   }
-  const items = [...series].map(([name, pts]) => ({ name, pts: pts.sort((a, b) => a.t - b.t) })).filter((s) => s.pts.length >= 2)
+  for (const pts of series.values()) pts.sort((a, b) => a.t - b.t);
+  return series;
+}
+
+/** Each exercise done on 2+ days: its best set over time, linking to its own page. */
+function progress(v: Extract<View, { kind: "progress" }>, { tab, rows }: Ctx): string {
+  const series = liftSeries(tab, rows, v.field);
+  const items = [...series].map(([name, pts]) => ({ name, pts })).filter((s) => s.pts.length >= 2)
     .sort((a, b) => b.pts.at(-1)!.t - a.pts.at(-1)!.t);
   if (!items.length) return "";
   const html = items.map(({ name, pts }) => {
@@ -86,7 +98,7 @@ function progress(v: Extract<View, { kind: "progress" }>, { tab, rows }: Ctx): s
     // green: the latest session is the best and beats the first. red: the latest is below the best.
     const tone = last === best && last.top > first.top ? "good" : last.top < best.top ? "bad" : "";
     const latest = last === best ? "" : `<span>latest ${escape(last.label)}</span>`;
-    return `<div class="lift"><span class="name">${escape(name)}</span><span class="sub"><span class="${tone}">best ${escape(best.label)}</span>${latest}</span>${spark(pts.map((p) => p.top))}</div>`;
+    return `<div class="lift"><a class="name" href="/${tab.slug}/lifts/${encodeURIComponent(name)}">${escape(name)}</a><span class="sub"><span class="${tone}">best ${escape(best.label)}</span>${latest}</span>${spark(pts.map((p) => p.top))}</div>`;
   });
   return section("progress", `<div class="lifts">${html.join("")}</div>`);
 }
@@ -178,6 +190,44 @@ function stale(v: Extract<View, { kind: "stale" }>, { tab, rows }: Ctx): string 
   const html = old.slice(0, 6).map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small>${ago(t)}</small></li>`);
   return section(v.label ?? "keep warm", `<ul class="rowlist">${html.join("")}</ul>`);
 }
+
+/** One exercise: every session plotted, then every session's sets (the best in green), each linking to its session. */
+export async function liftPage(tab: Tab, database: D1Database, exercise: string): Promise<string | null> {
+  const field = tab.views?.find((v): v is Extract<View, { kind: "progress" }> => v.kind === "progress")?.field;
+  if (!field) return null;
+  const pts = liftSeries(tab, await db.list(database, tab, { limit: 1000 }), field).get(exercise);
+  if (!pts) return null;
+  const W = 600, H = 220, L = 44, B = 26, T = 12;
+  const tops = pts.map((p) => p.top), min = Math.min(...tops), max = Math.max(...tops), range = max - min || 1;
+  const t0 = pts[0].t, span = pts.at(-1)!.t - t0 || 1;
+  const X = (t: number) => (pts.length === 1 ? (L + W) / 2 : L + ((t - t0) / span) * (W - L - 8));
+  const Y = (y: number) => T + (1 - (y - min) / range) * (H - T - B);
+  const best = pts.reduce((a, p) => (p.top > a.top || (p.top === a.top && p.reps > a.reps) ? p : a));
+  const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(exercise)}: best set per session">
+<text x="${L - 8}" y="${Y(max) + 4}" text-anchor="end">${fmt(max)}</text><text x="${L - 8}" y="${Y(min) + 4}" text-anchor="end">${fmt(min)}</text>
+<text x="${L}" y="${H - 6}">${short(t0)}</text><text x="${W - 8}" y="${H - 6}" text-anchor="end">${short(pts.at(-1)!.t)}</text>
+<polyline points="${pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.top).toFixed(1)}`).join(" ")}"/>
+${pts.map((p) => `<a href="/${tab.slug}/${p.row.id}"><circle class="${p === best ? "best" : ""}" cx="${X(p.t).toFixed(1)}" cy="${Y(p.top).toFixed(1)}" r="4"><title>${short(p.t)}: ${escape(p.label)}</title></circle></a>`).join("")}
+</svg>`;
+  const sessions = [...pts].reverse().map((p) => `<li><a href="/${tab.slug}/${p.row.id}">${short(p.t)}</a><span class="sets">${p.sets.map((s) => { const cls = s === p.label ? (p === best ? "good" : "top") : ""; return `<span${cls ? ` class="${cls}"` : ""}>${escape(s)}</span>`; }).join("")}</span></li>`);
+  return `<h1>${escape(exercise)}</h1>
+<p class="lift-best">best <span class="good">${escape(best.label)}</span> on ${short(best.t)}</p>
+${chart}
+<ul class="sessions">${sessions.join("")}</ul>`;
+}
+
+export const LIFT_CSS = `
+  .lift-best { color: #8a8a8a; font-size: 14px; margin-top: 8px; }
+  svg.chart { width: 100%; height: auto; display: block; margin-top: 28px; overflow: visible; }
+  svg.chart polyline { fill: none; stroke: #6a6a66; stroke-width: 1.5; }
+  svg.chart circle { fill: #a9a59a; } svg.chart circle.best { fill: #6f9e6a; } svg.chart a:hover circle { fill: #efebe0; }
+  svg.chart text { fill: #6a6a66; font-size: 11px; }
+  .sessions { list-style: none; margin-top: 36px; display: grid; gap: 12px; }
+  .sessions li { display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: baseline; font-size: 15px; }
+  .sessions li > a { color: #8a8a8a; font-size: 14px; }
+  .sets { display: flex; flex-wrap: wrap; gap: 4px 16px; color: #8a8a8a; }
+  .sets .top { color: #efebe0; }
+`;
 
 /** All of a tab's views that have something to say, in order. */
 export async function renderViews(tab: Tab, database: D1Database): Promise<string> {

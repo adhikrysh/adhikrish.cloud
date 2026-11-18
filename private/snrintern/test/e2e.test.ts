@@ -167,9 +167,9 @@ test("the training page is built from the data: progress, weekly, last trained, 
   expect(page).toContain('<span>sessions</span><span class="dots">');
   expect(page).toContain("<h2>last trained</h2>");
   // flat db press: 50 -> 60 over two sessions, latest is the best: green
-  expect(page).toContain('<span class="name">flat db press</span><span class="sub"><span class="good">best 60 lb × 6</span>');
+  expect(page).toContain('flat db press</a><span class="sub"><span class="good">best 60 lb × 6</span>');
   // pull up tracked by added weight: bw x10 then +25x6
-  expect(page).toContain('<span class="name">pull up</span><span class="sub"><span class="good">best +25 × 6</span>');
+  expect(page).toContain('pull up</a><span class="sub"><span class="good">best +25 × 6</span>');
   // bodyweight line from the body tab, moving toward the 75 kg goal: green
   expect(page).toContain("69.4 kg");
   expect(page).toContain('<span class="good">+1.4 kg since');
@@ -179,8 +179,16 @@ test("the training page is built from the data: progress, weekly, last trained, 
   await send(dotsToken, "/api/training", { at: `${day(-9)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 30x10" });
   await send(dotsToken, "/api/training", { at: `${day(-1)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 25x12" });
   const after = (await call("training page after new exercise", "/training", { token })).body as string;
-  expect(after).toContain('<span class="name">hammer curl</span><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
+  expect(after).toContain('hammer curl</a><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
   writeFileSync(join(artifacts, "page-training.html"), after);
+  // every lift opens its own page: each session plotted and listed, the best in green
+  expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
+  const lift = (await call("lift page", "/training/lifts/flat%20db%20press", { token })).body as string;
+  expect(lift.match(/<circle /g)).toHaveLength(2);
+  expect(lift).toContain('best <span class="good">60 lb × 6</span>');
+  expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
+  expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
+  writeFileSync(join(artifacts, "page-lift.html"), lift);
 });
 
 test("forecasts open on what is due; scoring one (by the agent) takes it off the list", async () => {
@@ -224,7 +232,7 @@ test("home is just the visible tabs, no numbers", async () => {
   expect(page).not.toContain('href="/body"'); // hidden
   expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
-  expect(page).not.toContain('<a href="/">snr intern</a>'); // no link to the page you're on
+  expect(page).not.toContain("<nav"); // no links at the top of home
   writeFileSync(join(artifacts, "page-home.html"), page);
 });
 

@@ -3,7 +3,7 @@
 import { escape, page, type Design } from "../../../design/html.ts";
 import * as db from "./db.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
-import { renderViews, VIEW_CSS } from "./views.ts";
+import { LIFT_CSS, liftPage, renderViews, VIEW_CSS } from "./views.ts";
 
 const CSS = `
   nav { flex-wrap: wrap; row-gap: 6px; }
@@ -147,9 +147,9 @@ const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
   return p ? escape(day(p, where === "detail" ? "long" : "short")) : escape(v);
 };
 
-/** snr intern home and the visible tabs on the left (not the page you're on), admin on the right. */
+/** No nav on home. Elsewhere: snr intern home and the visible tabs on the left (not the page you're on), admin on the right. */
 function nav(tabs: Tab[], current?: Tab, onRow = false): string {
-  if (!current) return `<a href="https://adhikrish.cloud/">adhikrish.cloud</a><a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
+  if (!current) return "";
   const others = tabs.filter((t) => !t.hidden && (onRow || t.slug !== current.slug)).map((t) => `<a href="/${t.slug}">${escape(t.label)}</a>`).join("");
   return `<a href="/">snr intern</a>${others}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
 }
@@ -246,4 +246,12 @@ export async function rowPage(design: Design, database: D1Database, tab: Tab, ro
       </article>
       ${schemaLink(tab)}`;
   return page({ design, title: `${row[tab.title] ?? "untitled"} | snr intern`, nav: nav(tabs, tab, true), body, css: CSS });
+}
+
+/** One exercise's history (from the tab's progress view): a full chart and every session. */
+export async function exercisePage(design: Design, database: D1Database, tab: Tab, exercise: string): Promise<string | null> {
+  const body = await liftPage(tab, database, exercise);
+  if (!body) return null;
+  const tabs = await db.tabs(database);
+  return page({ design, title: `${exercise} | snr intern`, nav: nav(tabs, tab, true), body, css: CSS + LIFT_CSS });
 }
