@@ -5,14 +5,16 @@
 //   GET    /api/<tab>?q=&limit=            PUT    /api/_tabs/<slug>      create or replace a tab definition
 //   GET    /api/<tab>/<id>                 DELETE /api/_tabs/<slug>      only when the tab has no rows
 //   POST   /api/<tab>                      GET    /api/_log?limit=       recent schema changes
-//   PATCH  /api/<tab>/<id>
+//   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (API.md), as markdown
 //   DELETE /api/<tab>/<id>
+import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
 import * as db from "./db.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 const API = {
+  docs: "GET /api/_docs (the full contract, as markdown; read it before writing)",
   data: ["GET /api", "GET /api/<tab>?q=&limit=", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00)",
@@ -30,6 +32,11 @@ export async function handleApi(request: Request, database: D1Database, who: str
     if (request.method !== "GET") return fail(405, "use GET");
     const [tabs, counts] = await Promise.all([db.tabs(database), db.counts(database)]);
     return json({ tabs: tabs.map((t) => ({ ...t, rows: counts.get(t.slug) ?? 0 })), api: API });
+  }
+
+  if (first === "_docs") {
+    if (request.method !== "GET") return fail(405, "use GET");
+    return new Response(docs, { headers: { "content-type": "text/markdown; charset=utf-8" } });
   }
 
   if (first === "_log") {

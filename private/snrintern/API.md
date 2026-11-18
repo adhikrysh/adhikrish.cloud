@@ -15,7 +15,7 @@ cloudflare access checks them before the request reaches the worker. without the
 
 ## discover first
 
-`GET /api` returns every tab with its definition and row count, plus the field types and view kinds. tabs change, so read it before writing and never hard-code the list.
+`GET /api` returns every tab with its definition and row count, plus the field types and view kinds. tabs change, so read it before writing and never hard-code the list. this document itself is `GET /api/_docs`, served by the same deploy as the code, so it always describes what is running.
 
 ## field types
 
@@ -46,6 +46,7 @@ cloudflare access checks them before the request reaches the worker. without the
 | PUT | `/api/_tabs/<slug>` | a full definition | `201` created or `200` replaced |
 | DELETE | `/api/_tabs/<slug>` | | `{ "deleted": "<slug>" }`; `409` while it has rows |
 | GET | `/api/_log?limit=<n>` | | schema changes: `{ at, by, tab, before, after }`, newest first |
+| GET | `/api/_docs` | | this document, as markdown |
 
 every row also has `id`, `created_at`, `updated_at` and `updated_by` (an email, or `service:<client-id>`). you can't set those.
 
@@ -127,4 +128,4 @@ paste this into the dot's instructions, with the two values from 1password:
 > 6. if i ask you to track something new, add a tab or a column: GET /api/_tabs/<slug>, change it, PUT it back. never delete a tab, field or row unless i ask.
 > 7. if you get a 400, the error says what to fix; fix it and retry once.
 > 8. never put these headers or values in a message, a file or a page.
-> 9. the full contract is https://raw.githubusercontent.com/adhikrysh/adhikrish.cloud/main/private/snrintern/API.md. read it before your first write, and again when an error or a new kind of request leaves you unsure.
+> 9. the full contract is GET /api/_docs (same headers). read it before your first write, and again when an error or a new kind of request leaves you unsure.

@@ -3,7 +3,7 @@
 // the agent writes them, and every page read back. A fake cloudflare access signs the jwts.
 // Writes test/artifacts/e2e-report.json and the rendered pages.
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
@@ -212,6 +212,16 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
   expect(lift).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a lift goes back to its tab
   writeFileSync(join(artifacts, "page-lift.html"), lift);
+});
+
+test("the contract is served by the api itself, as the agent sees it", async () => {
+  const res = await call("docs", "/api/_docs", { token: await dots() });
+  expect(res.status).toBe(200);
+  const doc = res.body as string;
+  expect(doc).toStartWith("# snr intern api");
+  expect(doc).toContain("GET /api/_docs (same headers)");
+  expect(doc).toBe(readFileSync(join(import.meta.dir, "../API.md"), "utf8")); // exactly the file in the repo
+  expect((await call("api index", "/api", { token: await dots() })).body.api.docs).toStartWith("GET /api/_docs");
 });
 
 test("forecasts open on what is upcoming and how calibrated; scoring one (by the agent) moves it", async () => {
