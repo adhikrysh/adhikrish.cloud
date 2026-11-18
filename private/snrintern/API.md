@@ -67,7 +67,6 @@ a definition, with every key:
   "label": "body", "about": "weigh-ins and measurements",
   "title": "at", "aside": ["bodyweight_kg"], "line": [], "sort": "at",
   "snippet": "notes",
-  "summary": ["type"],
   "group": "at",
   "goals": { "bodyweight_kg": 75 },
   "views": [{ "kind": "line", "field": "bodyweight_kg", "goal": "bodyweight_kg" }],
@@ -79,7 +78,8 @@ a definition, with every key:
 }
 ```
 
-- `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. `summary`: enum fields counted under the heading.
+- `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. an enum field's `colors` (`{ "closed": "good", "open": "bad" }`) shows those values as a green or red word; any other value is a white pill.
+- `hidden: true` keeps a tab out of the nav and off home; its rows still feed other tabs' views (body feeds training's lines).
 - `sort`: `"id"` (newest first) or a field (largest first). `group`: a date field groups the list by day; a text or enum field groups it by value, collapsed.
 - `goals`: named numbers the views compare against.
 - slugs are lowercase letters, digits and hyphens. field names are snake_case. `id`, `created_at`, `updated_at` and `updated_by` are reserved.

@@ -5,7 +5,11 @@
 export type Design = { base: string; list: string };
 
 // Shared by every private page: a white pill for labels, green for good, red for bad. Nothing else is coloured.
+// list.css underlines every span in a list row (on the public site that is only the title); here rows also hold
+// times, pills and coloured words, so only a row's title, its first span, stays underlined.
 const PRIVATE = `
+  .project-list span { text-decoration: none; }
+  .project-list a > span:first-child { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .pill { display: inline-block; font-size: 12px; line-height: 1.6; padding: 0 9px; border-radius: 10px; background: #d8d4c8; color: #080807; white-space: nowrap; letter-spacing: 0; }
   .good { color: #6f9e6a; }
   .bad { color: #c4553f; }
