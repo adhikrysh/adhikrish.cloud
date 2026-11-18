@@ -1,7 +1,7 @@
 // Render checked-in write-ups into static html. Requires Bun and Pandoc 3.8 or newer.
 //   bun public/scripts/render-projects.ts
-// Writes public/site/src.html (the index), public/site/src/<slug>.html and the legacy mirror
-// public/site/projects/<slug>.html, and refreshes the navigation preloader in public/site/index.html.
+// Writes public/site/src.html (the index), public/site/src/<slug>.html, the legacy mirror
+// public/site/projects/<slug>.html, and the hand-written pages (index, txt, 404) from public/templates/.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -26,53 +26,47 @@ const DESIGN = join(ROOT, "..", "design"); // styles shared with the private sit
 const PROJECTS: Project[] = JSON.parse(readFileSync(join(ROOT, "content/projects.json"), "utf8"));
 const INDEX_DESCRIPTION = "things i've built.";
 const READING_CSS = `
-  .project h1 { font-size: 30px; overflow-wrap: anywhere; }
-  .project-meta { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
+  .project h1 { overflow-wrap: anywhere; }
+  .project-meta { color: var(--muted); font-size: var(--fs-small); margin-top: 12px; }
   .project-meta a { color: inherit; }
-  .project-meta .last-edited { display: block; font-size: 12px; margin-top: 4px; }
+  .project-meta .last-edited { display: block; font-size: var(--fs-tiny); margin-top: 4px; }
   .readme { margin-top: 44px; line-height: 1.75; }
   .readme p, .readme ul, .readme ol { margin-block: 24px; }
   .readme > :first-child { margin-top: 0; }
-  /* The opening paragraph says why the project exists; it reads as the lede. */
-  .readme > p:first-child { font-size: 19px; line-height: 1.65; color: #efebe0; }
-  .readme h2 { font-size: 20px; font-weight: 550; line-height: 1.4; color: #efebe0; letter-spacing: -0.02em;
+  .readme h2 { font-size: var(--fs-heading); font-weight: 550; line-height: 1.4; color: var(--bright); letter-spacing: -0.02em;
                margin: 56px 0 16px; }
   .readme h2 + p { margin-top: 0; }
-  .readme h3 { font-size: 17px; font-weight: 550; line-height: 1.5; margin: 32px 0 12px; }
+  .readme h3 { font-size: var(--fs-body); font-weight: 550; line-height: 1.5; margin: 32px 0 12px; }
   .readme ul, .readme ol { padding-left: 22px; }
   .readme li + li { margin-top: 10px; }
-  .readme li::marker { color: #6a6a66; }
+  .readme li::marker { color: var(--faint); }
   .readme a { color: inherit; overflow-wrap: anywhere; }
-  .readme a:hover, .project-meta a:hover { color: #787878; }
-  .readme strong { font-weight: 550; color: #efebe0; }
+  .readme strong { font-weight: 550; color: var(--bright); }
   .readme code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
-  .readme :not(pre) > code { overflow-wrap: anywhere; padding: 1px 5px; background: #151513; border-radius: 3px; }
+  .readme :not(pre) > code { overflow-wrap: anywhere; padding: 1px 5px; background: var(--surface); border-radius: 3px; }
   .readme pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px 18px; margin-block: 28px;
-                background: #121210; border: 1px solid #252522; border-radius: 4px; line-height: 1.7; font-size: 13px; }
+                background: var(--surface); border: 1px solid var(--line); border-radius: 4px; line-height: 1.7; font-size: var(--fs-small); }
   .readme pre code { font-size: inherit; }
   .readme .table-scroll { max-width: 100%; overflow-x: auto; margin-block: 28px; }
-  .readme table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid #252522; text-align: left; vertical-align: top; }
+  .readme table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .readme th, .readme td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
   .readme figure { margin-block: 36px; }
   .readme picture { display: block; }
   .readme img { display: block; max-width: 100%; height: auto; border-radius: 4px; }
-  .readme figcaption { color: #8a8a8a; font-size: 13px; margin-top: 12px; }
-  /* Inline svg diagrams: drawn in the page palette, scroll sideways on narrow phones instead of shrinking text. */
+  .readme figcaption { color: var(--muted); font-size: var(--fs-small); margin-top: 12px; }
+  /* Inline svg diagrams: drawn in the page palette, scroll sideways on narrow phones instead of shrinking text.
+     Their text sizes are svg units that each label was measured against its box with, so they stay off the scale. */
   .readme figure.diagram { overflow-x: auto; }
   .readme figure.diagram svg { display: block; width: 100%; min-width: 560px; height: auto; }
-  .readme .d-box { fill: #121210; stroke: #3a3a35; }
-  .readme .d-store { fill: #0d0d0b; stroke: #3a3a35; }
+  .readme .d-box { fill: var(--surface); stroke: var(--ghost); }
+  .readme .d-store { fill: #0d0d0b; stroke: var(--ghost); }
   .readme .d-t { fill: #e6e2d6; font-size: 13px; font-weight: 550; }
-  .readme .d-s { fill: #8a8a8a; font-size: 11px; }
+  .readme .d-s { fill: var(--muted); font-size: 11px; }
   .readme .d-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 400; }
-  .readme .d-line { stroke: #6a6a66; stroke-width: 1.2; fill: none; }
+  .readme .d-line { stroke: var(--faint); stroke-width: 1.2; fill: none; }
   .readme .d-dash { stroke-dasharray: 4 4; }
-  .readme .d-arrow { fill: #6a6a66; }
+  .readme .d-arrow { fill: var(--faint); }
   .readme .d-warn { fill: #d9a441; font-size: 11px; }
-  @media (max-width: 720px) {
-    .project h1 { font-size: 26px; }
-    .readme > p:first-child { font-size: 18px; }
-  }
 `;
 
 const read = (path: string) => readFileSync(path, "utf8");
@@ -159,8 +153,9 @@ if ((index.match(markers) ?? []).length !== 1) throw new Error("project index mu
 index = index.replace(markers, () => `<!-- project-index:start -->\n      <ul class="project-list">\n${items.join("\n")}\n      </ul>\n      <!-- project-index:end -->`);
 index = preloadNavigation(index);
 writeFileSync(join(SITE, "src.html"), index);
-const homePath = join(SITE, "index.html");
-writeFileSync(homePath, preloadNavigation(read(homePath).replaceAll('<link rel="prefetch" href="/src">\n', "")));
+// The hand-written pages: their own markup, the shared design inlined. Only home warms the next page.
+writeFileSync(join(SITE, "index.html"), preloadNavigation(inlineDesign(read(join(ROOT, "templates/index.html")))));
+for (const name of ["txt.html", "404.html"]) writeFileSync(join(SITE, name), inlineDesign(read(join(ROOT, "templates", name))));
 
 for (const project of PROJECTS) {
   const slug = project.slug;

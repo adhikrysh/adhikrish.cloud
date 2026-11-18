@@ -10,9 +10,9 @@ export type Design = { base: string; list: string };
 const PRIVATE = `
   .project-list span { text-decoration: none; }
   .project-list a > span:first-child { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
-  .pill { display: inline-block; font-size: 12px; line-height: 1.6; padding: 0 9px; border-radius: 10px; background: #d8d4c8; color: #080807; white-space: nowrap; letter-spacing: 0; }
-  .good { color: #6f9e6a; }
-  .bad { color: #c4553f; }
+  .pill { display: inline-block; font-size: var(--fs-tiny); line-height: 1.6; padding: 0 9px; border-radius: 10px; background: var(--text); color: var(--bg); white-space: nowrap; letter-spacing: 0; }
+  .good { color: var(--good); }
+  .bad { color: var(--bad); }
 `;
 
 // The font is served once, from the public site, with a CORS header (public/site/_headers).

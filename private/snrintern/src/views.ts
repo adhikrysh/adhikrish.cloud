@@ -7,31 +7,30 @@ import { parseLifts, type Tab, type View } from "./schema.ts";
 
 export const VIEW_CSS = `
   .views { margin-top: 32px; display: grid; gap: 40px; }
-  .view h2 { font-size: 13px; font-weight: 450; color: #6a6a66; margin-bottom: 12px; }
-  .view .big { font-size: 26px; color: #efebe0; letter-spacing: -0.02em; line-height: 1.2; }
-  .view .sub { color: #8a8a8a; font-size: 13px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .view h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); margin-bottom: 12px; }
+  .view .big { font-size: var(--fs-title); color: var(--bright); letter-spacing: -0.02em; line-height: 1.2; }
+  .view .sub { color: var(--muted); font-size: var(--fs-small); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
   .view a { color: inherit; }
-  .week { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; align-items: center; font-size: 14px; color: #8a8a8a; }
+  .week { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; align-items: center; font-size: var(--fs-small); color: var(--muted); }
   .dots { display: flex; gap: 6px; }
-  .dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid #3a3a35; }
-  .dots i.on { background: #efebe0; border-color: #efebe0; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ghost); }
+  .dots i.on { background: var(--bright); border-color: var(--bright); }
   .week + .sub { margin-top: 12px; }
   .lifts { display: grid; gap: 16px; }
   .lift { display: grid; grid-template-columns: minmax(0, 1fr) 92px; column-gap: 16px; align-items: center; }
-  .lift .name { color: #efebe0; font-size: 15px; }
-  .lift a.name:hover { color: #ffffff; }
+  .lift .name { color: var(--bright); }
   .lift .sub { grid-column: 1; margin-top: 2px; }
   .lift svg { grid-row: 1 / span 2; grid-column: 2; }
   svg.spark { width: 92px; height: 26px; overflow: visible; }
-  svg.spark polyline { fill: none; stroke: #a9a59a; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-  svg.spark circle { fill: #efebe0; }
+  svg.spark polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  svg.spark circle { fill: var(--bright); }
   svg.line { width: 100%; height: 80px; display: block; margin-top: 14px; overflow: visible; }
-  svg.line polyline { fill: none; stroke: #a9a59a; stroke-width: 1.5; } svg.line line { stroke: #3a3a35; stroke-dasharray: 3 4; }
-  .since { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 15px; }
-  .since small { color: #6a6a66; margin-left: 6px; font-size: 13px; }
+  svg.line polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; } svg.line line { stroke: var(--ghost); stroke-dasharray: 3 4; }
+  .since { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+  .since small { color: var(--faint); margin-left: 6px; font-size: var(--fs-small); }
   .rowlist { list-style: none; display: grid; gap: 10px; }
-  .rowlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; font-size: 15px; }
-  .rowlist small { color: #8a8a8a; font-size: 13px; white-space: nowrap; }
+  .rowlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; }
+  .rowlist small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
 `;
 
 const DAY = 86_400_000;
@@ -217,16 +216,16 @@ ${chart}
 }
 
 export const LIFT_CSS = `
-  .lift-best { color: #8a8a8a; font-size: 14px; margin-top: 8px; }
+  .lift-best { color: var(--muted); font-size: var(--fs-small); margin-top: 8px; }
   svg.chart { width: 100%; height: auto; display: block; margin-top: 28px; overflow: visible; }
-  svg.chart polyline { fill: none; stroke: #6a6a66; stroke-width: 1.5; }
-  svg.chart circle { fill: #a9a59a; } svg.chart circle.best { fill: #6f9e6a; } svg.chart a:hover circle { fill: #efebe0; }
-  svg.chart text { fill: #6a6a66; font-size: 11px; }
+  svg.chart polyline { fill: none; stroke: var(--faint); stroke-width: 1.5; }
+  svg.chart circle { fill: var(--muted); } svg.chart circle.best { fill: var(--good); } svg.chart a:hover circle { fill: var(--bright); }
+  svg.chart text { fill: var(--faint); font-size: var(--fs-tiny); }
   .sessions { list-style: none; margin-top: 36px; display: grid; gap: 12px; }
-  .sessions li { display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: baseline; font-size: 15px; }
-  .sessions li > a { color: #8a8a8a; font-size: 14px; }
-  .sets { display: flex; flex-wrap: wrap; gap: 4px 16px; color: #8a8a8a; }
-  .sets .top { color: #efebe0; }
+  .sessions li { display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: baseline; }
+  .sessions li > a { color: var(--muted); font-size: var(--fs-small); }
+  .sets { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); }
+  .sets .top { color: var(--bright); }
 `;
 
 /** All of a tab's views that have something to say, in order. */

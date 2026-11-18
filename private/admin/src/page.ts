@@ -9,19 +9,18 @@ export type Group = [title: string, services: Service[], results: ProbeResult[]]
 
 const CSS = `
   .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 10px; vertical-align: 1px; }
-  .dot.up { background: #6f9e6a; }
-  .dot.down { background: #c4553f; }
+  .dot.up { background: var(--good); }
+  .dot.down { background: var(--bad); }
   h2 { margin-top: 48px; line-height: 1; }
   h1 + h2 { margin-top: 36px; }
   .project-list { margin-top: 18px; }
   .project-list li + li { margin-top: 22px; }
-  .project-list p { font-size: 13px; color: #6a6a66; }
-  .uptime { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; color: #6a6a66; }
+  .uptime { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: var(--fs-tiny); color: var(--faint); }
   .ticks { display: flex; gap: 2px; }
-  .ticks i { width: 6px; height: 14px; border-radius: 2px; background: #1c1c1a; }
-  .ext { display: inline-block; margin-left: 5px; font-style: normal; color: #8a8a8a; }
+  .ticks i { width: 6px; height: 14px; border-radius: 2px; background: var(--line); }
+  .ext { display: inline-block; margin-left: 5px; font-style: normal; color: var(--muted); }
   .project-list.plain li + li { margin-top: 0; }
-  .ticks i.up { background: #6f9e6a; } .ticks i.down { background: #c4553f; }
+  .ticks i.up { background: var(--good); } .ticks i.down { background: var(--bad); }
 `;
 
 /** 24 hourly ticks (green: every probe up, red: any down, dark: no data yet) and the 30-day uptime. */
