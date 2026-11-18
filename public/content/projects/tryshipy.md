@@ -27,7 +27,7 @@ ship brokers do most of their deals over email, so the details end up buried in 
 <rect class="d-box" x="10" y="210" width="134" height="50" rx="4"/><text class="d-t" x="77" y="232" text-anchor="middle">scheduled job</text><text class="d-s" x="77" y="249" text-anchor="middle">finds lost wake-ups</text>
 <line class="d-line d-dash" x1="70" y1="210" x2="70" y2="182" marker-end="url(#shipy-a2)"/>
 </svg>
-<figcaption>the four rules, drawn. evidence stays apart from its interpretation, queues carry only ids, postgres holds job state, publishing is guarded, and a scheduled job catches lost wake-ups.</figcaption>
+<figcaption>the four rules. evidence stays apart from its interpretation, queues carry only ids, postgres holds job state, publishing is guarded, and a scheduled job catches lost wake-ups.</figcaption>
 </figure>
 
 ## what happens to an email

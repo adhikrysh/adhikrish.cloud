@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
-    "deploy": "cf deploy"
+    "deploy": "cf d1 migrations apply 4ec47cb9-170e-4c74-a5f0-ddece6429df7 && cf deploy --secrets-file secrets.env"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "2.0.0-rc.1",

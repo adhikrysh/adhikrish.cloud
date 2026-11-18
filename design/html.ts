@@ -42,7 +42,7 @@ ${design.base.replace("url('/assets/inter-latin-c940764593d0.woff2')", `url('${F
 </head>
 <body>
   <div class="reading">
-    <nav aria-label="site">${nav}</nav>
+    ${nav ? `<nav aria-label="site">${nav}</nav>` : ""}
     <main>
 ${body}
     </main>

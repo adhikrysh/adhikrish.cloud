@@ -23,13 +23,13 @@ look at one of those properly and you can't tell what anything is. is a box a ru
 <text class="d-s" x="70" y="108" text-anchor="middle">a feature?</text><text class="d-s" x="228" y="108" text-anchor="middle">a source file?</text><text class="d-s" x="381" y="108" text-anchor="middle">a computer?</text><text class="d-s" x="531" y="108" text-anchor="middle">a team's area?</text>
 <path class="d-line" d="M70,88 L70,150 L531,150 L531,92" marker-end="url(#fp-p1)"/><text class="d-warn" x="300" y="170" text-anchor="middle">depends on? talks to? runs before?</text>
 </svg>
-<figcaption>kruchten's complaint, drawn. every box is a different kind of thing and no arrow says what it means.</figcaption>
+<figcaption>kruchten's complaint. every box is a different kind of thing and no arrow says what it means.</figcaption>
 </figure>
 
 his fix was simple. stop asking one picture to do everything. split it into a few views, each one for a specific person with a specific question, and inside a view a box means exactly one thing.
 
 <figure class="diagram">
-<svg viewBox="0 0 600 300" role="img" aria-label="kruchten's figure 1 redrawn: logical view for end users, development view for programmers, process view for integrators, physical view for system engineers, joined by scenarios">
+<svg viewBox="0 0 600 300" role="img" aria-label="kruchten's figure 1: logical view for end users, development view for programmers, process view for integrators, physical view for system engineers, joined by scenarios">
 <line class="d-line d-dash" x1="300" y1="150" x2="130" y2="60"/><line class="d-line d-dash" x1="300" y1="150" x2="470" y2="60"/><line class="d-line d-dash" x1="300" y1="150" x2="130" y2="240"/><line class="d-line d-dash" x1="300" y1="150" x2="470" y2="240"/>
 <rect class="d-box" x="20" y="20" width="220" height="80" rx="4"/><text class="d-t" x="130" y="50" text-anchor="middle">logical view</text><text class="d-s" x="130" y="70" text-anchor="middle">for end users</text><text class="d-s" x="130" y="87" text-anchor="middle">cares about: functionality</text>
 <rect class="d-box" x="360" y="20" width="220" height="80" rx="4"/><text class="d-t" x="470" y="50" text-anchor="middle">development view</text><text class="d-s" x="470" y="70" text-anchor="middle">for programmers</text><text class="d-s" x="470" y="87" text-anchor="middle">cares about: managing the software</text>
@@ -37,7 +37,7 @@ his fix was simple. stop asking one picture to do everything. split it into a fe
 <rect class="d-box" x="360" y="200" width="220" height="80" rx="4"/><text class="d-t" x="470" y="230" text-anchor="middle">physical view</text><text class="d-s" x="470" y="250" text-anchor="middle">for system engineers</text><text class="d-s" x="470" y="267" text-anchor="middle">cares about: topology, networks</text>
 <rect class="d-box" x="195" y="115" width="210" height="70" rx="4"/><text class="d-t" x="300" y="145" text-anchor="middle">scenarios, the +1</text><text class="d-s" x="300" y="165" text-anchor="middle">tie the four together</text>
 </svg>
-<figcaption>kruchten's figure 1, redrawn. every view says who it's for and what they care about.</figcaption>
+<figcaption>kruchten's figure 1. every view says who it's for and what they care about.</figcaption>
 </figure>
 
 so the five are basically:
