@@ -161,6 +161,7 @@ test("the pages render each tab and a row", async () => {
   for (const tab of ["people", "outbound", "forecasts", "gym"]) expect(home.body).toContain(`href="/${tab}"`);
   expect(home.body).toContain("3 rows");
   expect(home.body).toContain('href="https://admin.adhikrish.cloud/"');
+  expect(home.body).not.toContain('<a href="/">snrintern</a>'); // no link to the page you're on
   writeFileSync(join(artifacts, "page-home.html"), home.body);
   const search = await call("search narrows a tab", "/people?q=robots", { token: me });
   expect(search.body).toContain("1 matching");

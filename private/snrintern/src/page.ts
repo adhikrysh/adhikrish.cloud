@@ -31,10 +31,10 @@ const SLASH_TO_SEARCH = `<script>addEventListener("keydown",e=>{const i=document
 const show = (row: db.Row, names: string[]) =>
   names.map((n) => row[n]).filter((v) => v !== null && v !== "").map((v) => escape(v)).join(" · ");
 
-/** snrintern home on the left, then the current tab, admin on the right. */
+/** Links only ever go somewhere else: home shows adhikrish.cloud, tab pages lead back to snrintern home. Admin sits on the right. */
 function nav(current?: Tab): string {
-  const crumb = current ? `<a href="/${current.slug}" aria-current="page">${current.label}</a>` : "";
-  return `<a href="/">snrintern</a>${crumb}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
+  const left = current ? `<a href="/">snrintern</a><a href="/${current.slug}" aria-current="page">${current.label}</a>` : `<a href="https://adhikrish.cloud/">adhikrish.cloud</a>`;
+  return `${left}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
 }
 
 export async function homePage(design: Design, database: D1Database): Promise<string> {
