@@ -199,8 +199,7 @@ for (const project of PROJECTS) {
 <body>
   <div class="reading">
     <nav aria-label="site">
-      <a href="/">home</a>
-      <a href="/src">things i've built</a>
+      <a class="back" href="/src" aria-label="back to things i've built">←</a>
 ${externalLink}
     </nav>
     <main class="project">

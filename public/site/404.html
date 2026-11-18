@@ -61,6 +61,8 @@
   .reading { max-width: 640px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
   nav a { color: var(--muted); font-size: var(--fs-small); }
+  /* every page below the top starts with an arrow back to its parent, never a link with the parent's name */
+  nav a.back { font-size: var(--fs-body); line-height: 1; text-decoration: none; padding: 4px 16px 4px 0; margin-block: -4px; }
   a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
   a:hover { color: var(--hover); }
   /* no focus box: a focused link or group dims like a hovered one, so the keyboard still shows where it is */
@@ -96,6 +98,6 @@
     <h1>page not found</h1>
     <p>this link doesn't lead anywhere yet.</p>
   </main>
-  <nav class="links" aria-label="site"><a href="/">home</a></nav>
+  <nav class="links" aria-label="site"><a class="back" href="/" aria-label="back to home">←</a></nav>
 </body>
 </html>

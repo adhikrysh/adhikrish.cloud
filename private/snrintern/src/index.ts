@@ -42,6 +42,6 @@ export default {
       return lift ? html(lift) : html("not found", 404);
     }
     const row = await db.get(env.DB, tab.slug, Number(id));
-    return row ? html(await rowPage(design, env.DB, tab, row)) : html("not found", 404);
+    return row ? html(rowPage(design, tab, row)) : html("not found", 404);
   },
 } satisfies ExportedHandler<Env>;

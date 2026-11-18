@@ -62,6 +62,8 @@
   .reading { max-width: 640px; margin-inline: auto; }
   nav { display: flex; gap: 18px; }
   nav a { color: var(--muted); font-size: var(--fs-small); }
+  /* every page below the top starts with an arrow back to its parent, never a link with the parent's name */
+  nav a.back { font-size: var(--fs-body); line-height: 1; text-decoration: none; padding: 4px 16px 4px 0; margin-block: -4px; }
   a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: color 220ms ease; }
   a:hover { color: var(--hover); }
   /* no focus box: a focused link or group dims like a hovered one, so the keyboard still shows where it is */
@@ -130,8 +132,7 @@
 <body>
   <div class="reading">
     <nav aria-label="site">
-      <a href="/">home</a>
-      <a href="/src">things i've built</a>
+      <a class="back" href="/src" aria-label="back to things i've built">←</a>
       <a class="external" href="https://tryshipy.com" target="_blank" rel="noopener noreferrer" aria-label="visit shipy (opens in a new tab)" title="opens in a new tab">visit shipy</a>
     </nav>
     <main class="project">

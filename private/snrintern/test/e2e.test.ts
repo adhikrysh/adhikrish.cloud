@@ -180,6 +180,7 @@ test("the training page is built from the data: progress, weekly, last trained, 
   await send(dotsToken, "/api/training", { at: `${day(-1)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 25x12" });
   const after = (await call("training page after new exercise", "/training", { token })).body as string;
   expect(after).toContain('hammer curl</a><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
+  expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to snr intern">←</a><a class="external"'); // a tab goes back home
   writeFileSync(join(artifacts, "page-training.html"), after);
   // every lift opens its own page: each session plotted and listed, the best in green
   expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
@@ -188,6 +189,7 @@ test("the training page is built from the data: progress, weekly, last trained, 
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
+  expect(lift).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a lift goes back to its tab
   writeFileSync(join(artifacts, "page-lift.html"), lift);
 });
 
@@ -284,6 +286,8 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
   const row = (await call("row page", `/training/${chest.id}`, { token })).body as string;
   expect(row).toContain('<span class="ex">tricep pushdown</span>50 × 8   50 × 8   50 × 8');
   expect(row).toContain(`<a class="schema" href="/api/_tabs/training">schema</a>`);
+  expect(row).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a row goes back to its tab
+  expect(row).not.toContain('<a href="/people">'); // no sibling tabs in the nav
   writeFileSync(join(artifacts, "page-training-row.html"), row);
 });
 

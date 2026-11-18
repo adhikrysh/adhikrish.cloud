@@ -147,11 +147,10 @@ const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
   return p ? escape(day(p, where === "detail" ? "long" : "short")) : escape(v);
 };
 
-/** Home: only admin, top right. Elsewhere: home and the visible tabs on the left (not the page you're on), admin on the right. */
-function nav(tabs: Tab[], current?: Tab, onRow = false): string {
-  if (!current) return `<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
-  const others = tabs.filter((t) => !t.hidden && (onRow || t.slug !== current.slug)).map((t) => `<a href="/${t.slug}">${escape(t.label)}</a>`).join("");
-  return `<a href="/">home</a>${others}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
+/** Admin top right on every page; below home, an arrow back to the parent on the left (a tab goes home, a row or lift goes to its tab). */
+function nav(parent?: { href: string; label: string }): string {
+  const admin = `<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
+  return parent ? `<a class="back" href="${parent.href}" aria-label="back to ${escape(parent.label)}">←</a>${admin}` : admin;
 }
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
@@ -165,12 +164,11 @@ export async function homePage(design: Design, database: D1Database): Promise<st
       <ul class="project-list">
 ${items.join("\n")}
       </ul>`;
-  return page({ design, title: "snr intern", nav: nav(tabs), body, css: CSS });
+  return page({ design, title: "snr intern", nav: nav(), body, css: CSS });
 }
 
 export async function tabPage(design: Design, database: D1Database, tab: Tab, q: string): Promise<string> {
-  const [tabs, rows, views] = await Promise.all([
-    db.tabs(database),
+  const [rows, views] = await Promise.all([
     db.list(database, tab, { q: q || undefined, limit: 1000 }),
     q ? Promise.resolve("") : renderViews(tab, database),
   ]);
@@ -215,11 +213,10 @@ ${views ? `      ${views}\n` : ""}      <form class="search" action="/${tab.slug
 ${rows.length ? `      <div class="rows">\n${list}\n      </div>\n      <p class="empty none" hidden>nothing matches.</p>` : `      <p class="empty">nothing${q ? ` matches "${escape(q)}"` : " yet"}.</p>`}
       ${schemaLink(tab)}
       ${LIVE_SEARCH}`;
-  return page({ design, title: `${tab.label} | snr intern`, nav: nav(tabs, tab), body, css: CSS + VIEW_CSS });
+  return page({ design, title: `${tab.label} | snr intern`, nav: nav({ href: "/", label: "snr intern" }), body, css: CSS + VIEW_CSS });
 }
 
-export async function rowPage(design: Design, database: D1Database, tab: Tab, row: db.Row): Promise<string> {
-  const tabs = await db.tabs(database);
+export function rowPage(design: Design, tab: Tab, row: db.Row): string {
   const shown = new Set([tab.title, ...tab.line, ...tab.aside]);
   const long = (f: Field) => f.type === "text" && present(row[f.name]) && (f.name === tab.snippet || /\n| · /.test(String(row[f.name])) || String(row[f.name]).length > 120);
   const sections = tab.fields.filter((f) => present(row[f.name]) && (f.type === "lifts" || (!shown.has(f.name) && long(f)))).map((f) => {
@@ -245,13 +242,12 @@ export async function rowPage(design: Design, database: D1Database, tab: Tab, ro
       ${rest.length ? `<dl>${rest.join("")}</dl>` : ""}
       </article>
       ${schemaLink(tab)}`;
-  return page({ design, title: `${row[tab.title] ?? "untitled"} | snr intern`, nav: nav(tabs, tab, true), body, css: CSS });
+  return page({ design, title: `${row[tab.title] ?? "untitled"} | snr intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });
 }
 
 /** One exercise's history (from the tab's progress view): a full chart and every session. */
 export async function exercisePage(design: Design, database: D1Database, tab: Tab, exercise: string): Promise<string | null> {
   const body = await liftPage(tab, database, exercise);
   if (!body) return null;
-  const tabs = await db.tabs(database);
-  return page({ design, title: `${exercise} | snr intern`, nav: nav(tabs, tab, true), body, css: CSS + LIFT_CSS });
+  return page({ design, title: `${exercise} | snr intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS + LIFT_CSS });
 }
