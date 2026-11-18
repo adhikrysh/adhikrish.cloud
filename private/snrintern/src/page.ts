@@ -147,11 +147,11 @@ const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
   return p ? escape(day(p, where === "detail" ? "long" : "short")) : escape(v);
 };
 
-/** Home: only admin, top right. Elsewhere: snr intern home and the visible tabs on the left (not the page you're on), admin on the right. */
+/** Home: only admin, top right. Elsewhere: home and the visible tabs on the left (not the page you're on), admin on the right. */
 function nav(tabs: Tab[], current?: Tab, onRow = false): string {
   if (!current) return `<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
   const others = tabs.filter((t) => !t.hidden && (onRow || t.slug !== current.slug)).map((t) => `<a href="/${t.slug}">${escape(t.label)}</a>`).join("");
-  return `<a href="/">snr intern</a>${others}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
+  return `<a href="/">home</a>${others}<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
 }
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
