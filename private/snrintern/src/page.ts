@@ -3,7 +3,7 @@
 import { escape, page, type Design } from "../../../design/html.ts";
 import * as db from "./db.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
-import { LIFT_CSS, liftPage, renderViews, VIEW_CSS } from "./views.ts";
+import { LIFT_CSS, liftPage, matches, renderViews, VIEW_CSS } from "./views.ts";
 
 const CSS = `
   nav { flex-wrap: wrap; row-gap: 6px; }
@@ -40,7 +40,6 @@ const CSS = `
   .empty { color: var(--muted); margin-top: 32px; }
   .day { margin-top: 36px; }
   .day h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); }
-  .day h2 small { font-size: inherit; font-weight: 380; margin-left: 10px; }
   .day .project-list { margin-top: 12px; }
   .day .project-list li + li { margin-top: 18px; }
   details.group summary { list-style: none; cursor: pointer; padding: 10px 0; }
@@ -103,7 +102,7 @@ const field = (tab: Tab, name: string) => tab.fields.find((f) => f.name === name
 
 /**
  * One value, formatted for where it appears.
- * aside (right of a row): short dates, numbers with units, enums as a pill or a green/red word.
+ * aside (right of a row): short dates, numbers with units, enums as a pill (tinted green or red by the field's colors).
  * line (under a row): dates as "review in 3 years" / "met 5 months ago" (the field name minus "date").
  * detail (a row's page): the full date and how long ago.
  */
@@ -121,7 +120,7 @@ function show(f: Field, value: Value, where: "aside" | "line" | "detail"): strin
     case "number": return escape(f.unit ? `${value}${f.unit === "%" ? "" : " "}${f.unit}` : where === "aside" ? String(value) : `${label(f.name)} ${value}`);
     case "enum": {
       const tone = f.colors?.[String(value)];
-      return tone ? `<span class="${tone}">${escape(value)}</span>` : `<span class="pill">${escape(value)}</span>`;
+      return `<span class="pill${tone ? ` ${tone}` : ""}">${escape(value)}</span>`;
     }
     case "url": return `<a href="${escape(value)}" target="_blank" rel="noopener noreferrer">${escape(site(String(value)))}</a>`;
     case "lifts": {
@@ -132,8 +131,20 @@ function show(f: Field, value: Value, where: "aside" | "line" | "detail"): strin
   }
 }
 
+/** Under a row, a past date that an upcoming view watches reads as done ("reviewed 7 weeks ago"), or overdue in red while the row still matches it. */
+function lineDate(tab: Tab, row: db.Row, f: Field): string | null {
+  const view = tab.views?.find((v) => v.kind === "upcoming" && v.field === f.name);
+  const p = parse(String(row[f.name]));
+  if (!view || view.kind !== "upcoming" || !p || !relative(p).endsWith(" ago")) return null;
+  const name = label(f.name).replace(/ ?date$/, "");
+  if (matches(view.where, row)) return `<span class="bad">${escape(`${name} overdue by ${relative(p).replace(" ago", "")}`)}</span>`;
+  return escape(`${name.endsWith("e") ? `${name}d` : `${name}ed`} ${relative(p)}`);
+}
 const bits = (tab: Tab, row: db.Row, names: string[], where: "aside" | "line") =>
-  names.filter((n) => present(row[n])).map((n) => `<span>${show(field(tab, n), row[n] as Value, where)}</span>`).join("");
+  names.filter((n) => present(row[n])).map((n) => {
+    const f = field(tab, n);
+    return `<span>${(where === "line" && (f.type === "date" || f.type === "datetime") && lineDate(tab, row, f)) || show(f, row[n] as Value, where)}</span>`;
+  }).join("");
 const links = (tab: Tab, row: db.Row) => {
   const urls = tab.fields.filter((f) => f.type === "url" && present(row[f.name]) && !tab.aside.includes(f.name) && !tab.line.includes(f.name));
   return urls.length ? `<p class="links">${urls.map((f) => show(f, row[f.name] as Value, "detail")).join("")}</p>` : "";
@@ -175,9 +186,8 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
   const groupBy = tab.group ? field(tab, tab.group) : undefined;
   const byDay = groupBy && (groupBy.type === "date" || groupBy.type === "datetime") ? groupBy : undefined;
   const item = (row: db.Row) => {
-    // inside a day group the day is the heading, so the row shows only its time
-    const time = byDay && present(row[byDay.name]) ? clock(parse(String(row[byDay.name]))!) : "";
-    const aside = [time && `<span>${escape(time)}</span>`, bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside")].join("");
+    // inside a day group the day is the heading, so the row leaves its date (and time) out
+    const aside = bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside");
     const line = bits(tab, row, tab.line, "line");
     const snippet = tab.snippet && present(row[tab.snippet]) ? `\n            <p class="snippet">${escape(row[tab.snippet])}</p>` : "";
     const searchable = tab.fields.map((f) => row[f.name]).filter(present).join(" ").toLowerCase();
@@ -196,7 +206,7 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
     }
     list = [...days].map(([key, dayRows]) => {
       const p = parse(key);
-      const heading = p ? `${day(p, "long").replace(`, ${new Date().getUTCFullYear()}`, "")}<small>${relative(p)}</small>` : "no date";
+      const heading = p ? day(p, "long").replace(`, ${new Date().getUTCFullYear()}`, "") : "no date";
       return `<section class="day"><h2>${heading}</h2>${ul(dayRows)}</section>`;
     }).join("\n");
   } else if (groupBy) {

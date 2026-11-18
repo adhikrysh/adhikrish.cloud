@@ -7,15 +7,17 @@ import { parseLifts, type Tab, type View } from "./schema.ts";
 
 export const VIEW_CSS = `
   .views { margin-top: 32px; display: grid; gap: 40px; }
-  .view h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); margin-bottom: 12px; }
+  .view h2 { line-height: 1; margin-bottom: 14px; }
   .view .big { font-size: var(--fs-title); color: var(--bright); letter-spacing: -0.02em; line-height: 1.2; }
   .view .sub { color: var(--muted); font-size: var(--fs-small); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
   .view a { color: inherit; }
-  .week { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; align-items: center; font-size: var(--fs-small); color: var(--muted); }
-  .dots { display: flex; gap: 6px; }
-  .dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ghost); }
-  .dots i.on { background: var(--bright); border-color: var(--bright); }
-  .week + .sub { margin-top: 12px; }
+  .strip-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .strip-head h2 { margin-bottom: 14px; }
+  .strip-head > span { color: var(--muted); font-size: var(--fs-small); }
+  .strip { display: flex; gap: 1px; }
+  .strip i { flex: 1; height: 22px; border-radius: 1px; background: var(--line); }
+  .strip i.up { background: var(--good); }
+  .strip-ends { display: flex; justify-content: space-between; color: var(--faint); font-size: var(--fs-tiny); margin-top: 6px; }
   .lifts { display: grid; gap: 16px; }
   .lift { display: grid; grid-template-columns: minmax(0, 1fr) 92px; column-gap: 16px; align-items: center; }
   .lift .name { color: var(--bright); }
@@ -25,12 +27,11 @@ export const VIEW_CSS = `
   svg.spark polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
   svg.spark circle { fill: var(--bright); }
   svg.line { width: 100%; height: 80px; display: block; margin-top: 14px; overflow: visible; }
-  svg.line polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; } svg.line line { stroke: var(--ghost); stroke-dasharray: 3 4; }
-  .since { display: flex; flex-wrap: wrap; gap: 10px 22px; }
-  .since small { color: var(--faint); margin-left: 6px; font-size: var(--fs-small); }
+  svg.line polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; }
   .rowlist { list-style: none; display: grid; gap: 10px; }
   .rowlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; }
   .rowlist small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
+  .rowlist small.good { color: var(--good); } .rowlist small.bad { color: var(--bad); }
 `;
 
 const DAY = 86_400_000;
@@ -59,7 +60,9 @@ function spark(values: number[]): string {
 type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database };
 const dateField = (tab: Tab) => (tab.sort !== "id" ? tab.sort : tab.group ?? "created_at");
 const title = (tab: Tab, row: db.Row) => escape(row[tab.title] ?? "untitled");
-const section = (heading: string, body: string) => `<section class="view"><h2>${escape(heading)}</h2>${body}</section>`;
+// every view is headed by a white pill, the way admin labels its sections
+const pill = (heading: string) => `<h2><span class="pill">${escape(heading)}</span></h2>`;
+const section = (heading: string, body: string) => `<section class="view">${pill(heading)}${body}</section>`;
 
 type Point = { t: number; top: number; reps: number; label: string; sets: string[]; row: db.Row };
 const setLabel = (s: { load: number | null; added: boolean; reps: number }, bodyweight: boolean, unit: string) =>
@@ -102,34 +105,26 @@ function progress(v: Extract<View, { kind: "progress" }>, { tab, rows }: Ctx): s
   return section("progress", `<div class="lifts">${html.join("")}</div>`);
 }
 
-/** This week's sessions as circles against the goal, plus marked sessions (leg days). Red when the last session is over a week old. */
-function weekly(v: Extract<View, { kind: "weekly" }>, { tab, rows }: Ctx): string {
-  const now = today(), monday = now - ((new Date(now).getUTCDay() + 6) % 7) * DAY;
-  const count = (filter: (r: db.Row) => boolean) =>
-    new Set(rows.filter(filter).map((r) => dayOf(r[dateField(tab)])).filter((d): d is number => d !== null && d >= monday)).size;
-  const dots = (done: number, goal?: number) => `<span class="dots">${Array.from({ length: Math.max(done, goal ?? done, 1) }, (_, i) => `<i class="${i < done ? "on" : ""}"></i>`).join("")}</span>`;
-  const grid = [`<span>sessions</span>${dots(count(() => true), v.goal ? tab.goals?.[v.goal] : undefined)}`];
-  if (v.mark) {
-    const mark = v.mark;
-    grid.push(`<span>${escape(mark.contains)}</span>${dots(count((r) => String(r[mark.field] ?? "").toLowerCase().includes(mark.contains)), mark.goal ? tab.goals?.[mark.goal] : undefined)}`);
-  }
-  const last = Math.max(0, ...rows.map((r) => dayOf(r[dateField(tab)]) ?? 0));
-  const stale = last && now - last > 7 * DAY ? `<p class="sub"><span class="bad">last session ${ago(last)}</span></p>` : "";
-  return section("this week", `<div class="week">${grid.join("")}</div>${stale}`);
-}
-
-/** How long since each value last appeared; red after two weeks. */
-function since(v: Extract<View, { kind: "since" }>, { tab, rows }: Ctx): string {
+/** One tick per day from the first row (at most `days` back, default 182) to today, green on days that have a row; how many a week,
+ * and how long since the last, red once this gap is longer than any gap between earlier rows (your own history, no fixed number).
+ * `label` is the heading ("sessions"); the last line uses it without the s. */
+function strip(v: Extract<View, { kind: "strip" }>, { rows }: Ctx): string {
   const now = today();
-  const items = v.values.map((value) => ({
-    value,
-    last: Math.max(0, ...rows.filter((r) => String(r[v.field] ?? "").toLowerCase().split(/\s*,\s*/).includes(value)).map((r) => dayOf(r[dateField(tab)]) ?? 0)),
-  })).sort((a, b) => a.last - b.last);
-  const html = items.map(({ value, last }) => `<span class="${!last || now - last > 14 * DAY ? "bad" : ""}">${escape(value)}<small>${last ? ago(last) : "never"}</small></span>`);
-  return section("last trained", `<div class="since">${html.join("")}</div>`);
+  const dated = rows.map((r) => dayOf(r[v.field])).filter((d): d is number => d !== null && d <= now);
+  if (!dated.length) return "";
+  const days = new Set(dated), sorted = [...days].sort((a, b) => a - b), last = sorted.at(-1)!;
+  const longest = sorted.slice(1).reduce((gap, t, i) => Math.max(gap, t - sorted[i]), 0);
+  const start = Math.max(Math.min(...dated), now - ((v.days ?? 182) - 1) * DAY);
+  const ticks: string[] = [];
+  for (let t = start; t <= now; t += DAY) ticks.push(`<i class="${days.has(t) ? "up" : ""}" title="${short(t)}"></i>`);
+  const perWeek = dated.filter((d) => d >= start).length / Math.max(1, (now - start + DAY) / (7 * DAY));
+  const heading = v.label ?? "entries";
+  return `<section class="view"><div class="strip-head">${pill(heading)}<span>${fmt(Math.round(perWeek * 10) / 10)} a week</span></div>
+<div class="strip">${ticks.join("")}</div><div class="strip-ends"><span>${short(start)}</span><span>today</span></div>
+<p class="sub"><span class="${sorted.length > 1 && now - last > longest ? "bad" : ""}">last ${escape(heading.replace(/s$/, ""))} ${ago(last)}</span></p></section>`;
 }
 
-/** A number over time; green when moving toward the goal, red when away. `tab` reads another tab's rows. */
+/** A number over time: the latest, the change since the first, and a line. `tab` reads another tab's rows. No targets: it shows what happened. */
 async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }: Ctx): Promise<string> {
   const source = v.tab ? await db.tab(database, v.tab) : tab;
   if (!source) return "";
@@ -139,36 +134,41 @@ async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }:
   const pts = sourceRows.map((row) => ({ t: dayOf(row[dateField(source)]), y: Number(row[v.field]) }))
     .filter((p): p is { t: number; y: number } => p.t !== null && Number.isFinite(p.y) && p.y !== 0).sort((a, b) => a.t - b.t);
   if (!pts.length) return "";
-  const goal = v.goal ? tab.goals?.[v.goal] ?? source.goals?.[v.goal] : undefined;
   const first = pts[0], last = pts.at(-1)!, change = last.y - first.y;
-  const tone = goal === undefined || change === 0 ? "" : Math.sign(goal - first.y) === Math.sign(change) ? "good" : "bad";
-  const sub = [pts.length > 1 ? `<span class="${tone}">${change >= 0 ? "+" : ""}${fmt(change)}${u} since ${short(first.t)}</span>` : `<span>${short(last.t)}</span>`,
-    goal !== undefined && goal !== last.y ? `<span>${fmt(Math.abs(goal - last.y))}${u} to ${fmt(goal)}${u}</span>` : ""].join("");
+  const sub = pts.length > 1 ? `<span>${change >= 0 ? "+" : ""}${fmt(change)}${u} since ${short(first.t)}</span>` : `<span>${short(last.t)}</span>`;
   let chart = "";
   if (pts.length > 1) {
-    const ys = [...pts.map((p) => p.y), ...(goal !== undefined ? [goal] : [])];
+    const ys = pts.map((p) => p.y);
     const min = Math.min(...ys), range = Math.max(...ys) - min || 1, span = last.t - first.t || 1;
     const X = (t: number) => ((t - first.t) / span) * 100, Y = (y: number) => 74 - ((y - min) / range) * 68;
-    chart = `<svg class="line" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true">${goal !== undefined ? `<line x1="0" x2="100" y1="${Y(goal)}" y2="${Y(goal)}" vector-effect="non-scaling-stroke"/>` : ""}<polyline points="${pts.map((p) => `${X(p.t).toFixed(2)},${Y(p.y).toFixed(1)}`).join(" ")}" vector-effect="non-scaling-stroke"/></svg>`;
+    chart = `<svg class="line" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map((p) => `${X(p.t).toFixed(2)},${Y(p.y).toFixed(1)}`).join(" ")}" vector-effect="non-scaling-stroke"/></svg>`;
   }
   const name = v.field.replaceAll("_", " ").replace(/ (kg|lb|percentage|cm)$/, "");
   return section(name, `<p class="big">${fmt(last.y)}${escape(u)}</p><p class="sub">${sub}</p>${chart}`);
 }
 
-/** Rows whose date is within `within_days` or already past, soonest first. Nothing due, nothing shown. */
-function due(v: Extract<View, { kind: "due" }>, { tab, rows }: Ctx): string {
-  const now = today(), until = now + (v.within_days ?? 30) * DAY;
-  const soon = rows.filter((row) => Object.entries(v.where ?? {}).every(([k, val]) => row[k] === val))
-    .map((row) => ({ row, t: dayOf(row[v.field]) })).filter((x): x is { row: db.Row; t: number } => x.t !== null && x.t <= until).sort((a, b) => a.t - b.t);
-  if (!soon.length) return "";
-  const html = soon.map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${t < now ? "bad" : ""}">${t < now ? `overdue ${ago(t).replace(" ago", "")}` : ago(t)}</small></li>`);
-  return section("due", `<ul class="rowlist">${html.join("")}</ul>`);
+/** Does a row match a view's `where` (every key equal)? */
+export const matches = (where: Record<string, string> | undefined, row: db.Row) => Object.entries(where ?? {}).every(([k, val]) => row[k] === val);
+
+/** The next `limit` (default 3) rows matching `where`, soonest first; a date already past is overdue, in red. */
+function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows }: Ctx): string {
+  const now = today();
+  const next = rows.filter((row) => matches(v.where, row)).map((row) => ({ row, t: dayOf(row[v.field]) }))
+    .filter((x): x is { row: db.Row; t: number } => x.t !== null).sort((a, b) => a.t - b.t).slice(0, v.limit ?? 3);
+  if (!next.length) return "";
+  const html = next.map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${t < now ? "bad" : ""}">${t < now ? `overdue ${ago(t).replace(" ago", "")}` : ago(t)}</small></li>`);
+  return section("upcoming", `<ul class="rowlist">${html.join("")}</ul>`);
 }
 
-/** How often each confidence level came true. Says nothing until `min` (default 10) rows are scored. */
+/** What you said on average against how many came true, green when within 10 points; once `min` (default 10) are scored,
+ * also each confidence level on its own. Nothing until one is scored. */
 function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): string {
   const scored = rows.filter((row) => row[v.verdict] !== undefined && Number.isFinite(Number(row[v.confidence])));
-  if (scored.length < (v.min ?? 10)) return "";
+  if (!scored.length) return "";
+  const said = scored.reduce((sum, row) => sum + Number(row[v.confidence]), 0) / scored.length;
+  const right = scored.filter((row) => row[v.verdict] === v.right).length;
+  const overall = `<li><span>said ${Math.round(said)}% on average</span><small class="${Math.abs((right / scored.length) * 100 - said) <= 10 ? "good" : "bad"}">came true ${right} of ${scored.length}</small></li>`;
+  if (scored.length < (v.min ?? 10)) return section("calibration", `<ul class="rowlist">${overall}</ul>`);
   const buckets = new Map<number, { n: number; right: number }>();
   for (const row of scored) {
     const b = Math.round(Number(row[v.confidence]) / 10) * 10, cur = buckets.get(b) ?? { n: 0, right: 0 };
@@ -178,15 +178,14 @@ function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): 
     const actual = Math.round((right / n) * 100);
     return `<li><span>said ${b}%</span><small class="${Math.abs(actual - b) <= 10 ? "good" : "bad"}">came true ${actual}%</small></li>`;
   });
-  return section("calibration", `<ul class="rowlist">${html.join("")}</ul>`);
+  return section("calibration", `<ul class="rowlist">${overall}${html.join("")}</ul>`);
 }
 
-/** Rows whose date is older than `days`, oldest first. */
+/** The `limit` (default 3) rows whose date is oldest, oldest first: who you've gone longest without. No threshold to outgrow. */
 function stale(v: Extract<View, { kind: "stale" }>, { tab, rows }: Ctx): string {
-  const now = today();
-  const old = rows.map((row) => ({ row, t: dayOf(row[v.field]) })).filter((x): x is { row: db.Row; t: number } => x.t !== null && now - x.t > v.days * DAY).sort((a, b) => a.t - b.t);
+  const old = rows.map((row) => ({ row, t: dayOf(row[v.field]) })).filter((x): x is { row: db.Row; t: number } => x.t !== null).sort((a, b) => a.t - b.t);
   if (!old.length) return "";
-  const html = old.slice(0, 6).map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small>${ago(t)}</small></li>`);
+  const html = old.slice(0, v.limit ?? 3).map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small>${ago(t)}</small></li>`);
   return section(v.label ?? "keep warm", `<ul class="rowlist">${html.join("")}</ul>`);
 }
 
@@ -235,10 +234,9 @@ export async function renderViews(tab: Tab, database: D1Database): Promise<strin
   const parts = await Promise.all(tab.views.map((v) => {
     switch (v.kind) {
       case "progress": return progress(v, ctx);
-      case "weekly": return weekly(v, ctx);
-      case "since": return since(v, ctx);
+      case "strip": return strip(v, ctx);
       case "line": return line(v, ctx);
-      case "due": return due(v, ctx);
+      case "upcoming": return upcoming(v, ctx);
       case "calibration": return calibration(v, ctx);
       case "stale": return stale(v, ctx);
     }

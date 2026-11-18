@@ -17,7 +17,7 @@ const API = {
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00)",
     "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
-  views: ["progress (lifts field)", "weekly (goal, mark)", "since (field, values)", "line (field, tab, goal)", "due (field, where, within_days)", "calibration (confidence, verdict, right, min)", "stale (field, days, label)"],
+  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "stale (date field, limit, label)"],
 };
 
 export async function handleApi(request: Request, database: D1Database, who: string): Promise<Response> {

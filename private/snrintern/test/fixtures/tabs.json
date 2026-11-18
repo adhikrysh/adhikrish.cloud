@@ -71,8 +71,7 @@
    {
     "kind": "stale",
     "field": "last_contact",
-    "days": 60,
-    "label": "keep warm: not in touch for 2+ months"
+    "label": "keep warm"
    }
   ]
  },
@@ -81,15 +80,14 @@
   "about": "predictions to be scored later",
   "title": "decision",
   "aside": [
-   "confidence",
    "verdict",
    "status"
   ],
   "line": [
+   "confidence",
    "review_date"
   ],
   "sort": "date",
-  "snippet": "expected",
   "fields": [
    {
     "name": "date",
@@ -150,12 +148,12 @@
   ],
   "views": [
    {
-    "kind": "due",
+    "kind": "upcoming",
     "field": "review_date",
     "where": {
      "status": "open"
     },
-    "within_days": 30
+    "limit": 3
    },
    {
     "kind": "calibration",
@@ -178,31 +176,11 @@
   "sort": "at",
   "group": "at",
   "snippet": "notes",
-  "goals": {
-   "sessions_per_week": 5,
-   "leg_days_per_week": 2,
-   "bodyweight_kg": 75
-  },
   "views": [
    {
-    "kind": "weekly",
-    "goal": "sessions_per_week",
-    "mark": {
-     "field": "focus",
-     "contains": "legs",
-     "goal": "leg_days_per_week"
-    }
-   },
-   {
-    "kind": "since",
-    "field": "focus",
-    "values": [
-     "legs",
-     "chest",
-     "back",
-     "shoulders",
-     "arms"
-    ]
+    "kind": "strip",
+    "field": "at",
+    "label": "sessions"
    },
    {
     "kind": "progress",
@@ -211,8 +189,7 @@
    {
     "kind": "line",
     "tab": "body",
-    "field": "bodyweight_kg",
-    "goal": "bodyweight_kg"
+    "field": "bodyweight_kg"
    },
    {
     "kind": "line",
@@ -284,14 +261,10 @@
   ],
   "line": [],
   "sort": "at",
-  "goals": {
-   "bodyweight_kg": 75
-  },
   "views": [
    {
     "kind": "line",
-    "field": "bodyweight_kg",
-    "goal": "bodyweight_kg"
+    "field": "bodyweight_kg"
    },
    {
     "kind": "line",

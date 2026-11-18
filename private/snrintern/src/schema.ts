@@ -12,7 +12,6 @@ export type TabDefinition = {
   sort: string; // "id" (newest first) or a field name (descending)
   snippet?: string; // a text field previewed under each row in the list
   group?: string; // a date/datetime field groups the list by day ("wed, sep 17"); a text or enum field groups it by value
-  goals?: Record<string, number>; // named targets the views compare against, e.g. { "sessions_per_week": 5 }
   views?: View[]; // what the tab opens on, above the list (see View)
   hidden?: boolean; // left out of the nav and home (its data still feeds other tabs' views)
   fields: Field[];
@@ -21,12 +20,11 @@ export type TabDefinition = {
 // A view answers one question at the top of a tab, computed from its rows (or, for "line", another tab's).
 export type View =
   | { kind: "progress"; field: string } // lifts field: each exercise's top set over time
-  | { kind: "weekly"; goal?: string; mark?: { field: string; contains: string; goal?: string } } // this week's sessions vs a goal, as circles
-  | { kind: "since"; field: string; values: string[] } // days since each value last appeared in a comma-separated field
-  | { kind: "line"; field: string; tab?: string; goal?: string } // a number over time, from this tab or another
-  | { kind: "due"; field: string; where?: Record<string, string>; within_days?: number } // rows whose date is coming up or past
+  | { kind: "strip"; field: string; label?: string; days?: number } // a tick per day with a row, from the first (at most `days` back) to today
+  | { kind: "line"; field: string; tab?: string } // a number over time, from this tab or another
+  | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number } // the next rows by a date, overdue first
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
-  | { kind: "stale"; field: string; days: number; label?: string }; // rows whose date is older than N days ("keep warm")
+  | { kind: "stale"; field: string; limit?: number; label?: string }; // the rows whose date is oldest ("keep warm")
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
 export type Data = Record<string, Value>;
@@ -44,7 +42,7 @@ const validDate = (s: string) => !Number.isNaN(Date.parse(s.slice(0, 10)));
 export function checkDefinition(input: unknown): TabDefinition | string {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return "definition must be a json object";
   const d = input as Record<string, unknown>;
-  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "goals", "views", "hidden", "fields"]);
+  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "views", "hidden", "fields"]);
   for (const key of Object.keys(d)) if (!known.has(key)) return `unknown key "${key}". keys: ${[...known].join(", ")}`;
   if (typeof d.label !== "string" || !d.label.trim()) return '"label" must be a non-empty string';
   if (typeof d.about !== "string") return '"about" must be a string';
@@ -112,17 +110,11 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (typeof d.group !== "string" || !["date", "datetime", "enum", "text"].includes(types.get(d.group) ?? "")) return `"group" must name a date, datetime, text or enum field`;
     group = d.group;
   }
-  let goals: Record<string, number> | undefined;
-  if (d.goals !== undefined) {
-    if (typeof d.goals !== "object" || d.goals === null || Array.isArray(d.goals) || !Object.values(d.goals).every((v) => typeof v === "number"))
-      return `"goals" must be an object of numbers, like { "sessions_per_week": 5 }`;
-    goals = d.goals as Record<string, number>;
-  }
-  const views = checkViews(d.views, types, goals ?? {});
+  const views = checkViews(d.views, types);
   if (typeof views === "string") return views;
   if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
   return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}),
-    ...(group ? { group } : {}), ...(goals ? { goals } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), fields };
+    ...(group ? { group } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), fields };
 }
 
 /** Checks one row body against a tab's fields. `partial` is for PATCH: only the given fields are checked. */
@@ -148,7 +140,7 @@ export function checkRow(tab: Tab, body: unknown, { partial }: { partial: boolea
   return { set, unset };
 }
 
-function checkViews(input: unknown, types: Map<string, FieldType>, goals: Record<string, number>): View[] | string {
+function checkViews(input: unknown, types: Map<string, FieldType>): View[] | string {
   if (input === undefined) return [];
   if (!Array.isArray(input)) return '"views" must be a list';
   const views: View[] = [];
@@ -157,26 +149,27 @@ function checkViews(input: unknown, types: Map<string, FieldType>, goals: Record
     const v = raw as Record<string, any>;
     const where = `views[${i}] (${v.kind})`;
     const isField = (name: unknown, allowed: FieldType[]) => typeof name === "string" && allowed.includes(types.get(name)!);
-    const isGoal = (name: unknown) => name === undefined || (typeof name === "string" && name in goals);
     switch (v.kind) {
       case "progress": if (!isField(v.field, ["lifts"])) return `${where}: "field" must name a lifts field`; break;
-      case "weekly":
-        if (!isGoal(v.goal)) return `${where}: "goal" must name a key in "goals"`;
-        if (v.mark !== undefined && (!isField(v.mark.field, ["text", "enum"]) || typeof v.mark.contains !== "string" || !isGoal(v.mark.goal)))
-          return `${where}: "mark" needs a text/enum "field", a "contains" string and an optional "goal" key`;
+      case "strip":
+        if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
+        if (v.label !== undefined && (typeof v.label !== "string" || !v.label.trim())) return `${where}: "label" must be a word like "sessions"`;
+        if (v.days !== undefined && (!Number.isInteger(v.days) || v.days < 7 || v.days > 366)) return `${where}: "days" must be a whole number from 7 to 366`;
         break;
-      case "since": if (!isField(v.field, ["text", "enum"]) || !Array.isArray(v.values) || !v.values.every((x: unknown) => typeof x === "string")) return `${where}: needs a text "field" and a list of "values"`; break;
       case "line":
         if (typeof v.field !== "string" || (v.tab === undefined && !isField(v.field, ["number", "int"]))) return `${where}: "field" must name a number field (or set "tab" for another tab's field)`;
         if (v.tab !== undefined && !SLUG.test(v.tab)) return `${where}: "tab" must be a tab slug`;
-        if (!isGoal(v.goal)) return `${where}: "goal" must name a key in "goals"`;
         break;
-      case "due":
+      case "upcoming":
         if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
+        if (v.limit !== undefined && (!Number.isInteger(v.limit) || v.limit < 1 || v.limit > 20)) return `${where}: "limit" must be a whole number from 1 to 20`;
         break;
       case "calibration": if (!isField(v.confidence, ["int", "number"]) || !isField(v.verdict, ["enum"]) || typeof v.right !== "string") return `${where}: needs a number "confidence", an enum "verdict" and the "right" value`; break;
-      case "stale": if (!isField(v.field, ["date", "datetime"]) || typeof v.days !== "number") return `${where}: needs a date "field" and "days"`; break;
-      default: return `views[${i}]: kind must be one of progress, weekly, since, line, due, calibration, stale`;
+      case "stale":
+        if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
+        if (v.limit !== undefined && (!Number.isInteger(v.limit) || v.limit < 1 || v.limit > 20)) return `${where}: "limit" must be a whole number from 1 to 20`;
+        break;
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, stale`;
     }
     views.push(v as View);
   }

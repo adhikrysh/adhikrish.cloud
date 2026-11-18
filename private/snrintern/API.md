@@ -51,9 +51,9 @@ every row also has `id`, `created_at`, `updated_at` and `updated_by` (an email, 
 
 ## the tabs today
 
-- **training**: one row per session. `at`, `type` (strength, run, hike, climb, other), `title`, `focus` (muscle groups, comma-separated: legs, chest, back, shoulders, arms), `lifts`, `distance_km`, `duration_min`, `rpe`, `notes`. a new exercise needs nothing special: write it in `lifts`, and it appears in progress once it has two sessions. reuse an exercise's existing name (look at recent rows) so its history stays in one line.
+- **training**: one row per session. `at`, `type` (strength, run, hike, climb, other), `title`, `lifts`, `distance_km`, `duration_min`, `rpe`, `notes`. a new exercise needs nothing special: write it in `lifts`, and it appears in progress once it has two sessions. reuse an exercise's existing name (look at recent rows) so its history stays in one line.
 - **body**: one row per weigh-in. `at`, `bodyweight_kg`, `bodyfat_percentage`, `notes`. a weigh-in is its own row, never part of a training row.
-- **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing an existing topic when one fits (space & deep tech, investors & mentors, founders, hiring, other); a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
+- **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing a topic that's already in use (look at existing rows) when one fits; a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
 - **forecasts**: `date`, `decision`, `rationale`, `confidence` (0-100), `expected`, `review_date`, `outcome`, `verdict` (right, wrong), `status` (open, closed). scoring one = PATCH `verdict` and `status: closed`.
 
 ## changing the schema
@@ -68,8 +68,7 @@ a definition, with every key:
   "title": "at", "aside": ["bodyweight_kg"], "line": [], "sort": "at",
   "snippet": "notes",
   "group": "at",
-  "goals": { "bodyweight_kg": 75 },
-  "views": [{ "kind": "line", "field": "bodyweight_kg", "goal": "bodyweight_kg" }],
+  "views": [{ "kind": "line", "field": "bodyweight_kg" }],
   "fields": [
     { "name": "at", "type": "datetime", "required": true },
     { "name": "bodyweight_kg", "type": "number", "min": 20, "max": 300, "unit": "kg" },
@@ -78,10 +77,10 @@ a definition, with every key:
 }
 ```
 
-- `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. an enum field's `colors` (`{ "closed": "good", "open": "bad" }`) shows those values as a green or red word; any other value is a white pill.
+- `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. enums show as a pill; an enum field's `colors` (`{ "closed": "good", "open": "bad" }`) tints those values' pills green or red.
 - `hidden: true` keeps a tab out of the nav and off home; its rows still feed other tabs' views (body feeds training's lines).
 - `sort`: `"id"` (newest first) or a field (largest first). `group`: a date field groups the list by day; a text or enum field groups it by value, collapsed.
-- `goals`: named numbers the views compare against.
+- no targets or thresholds go in a definition (no goal weight, no sessions a week, no "after 60 days"): views show what happened and compare it with your own history, so nothing needs updating as plans change.
 - slugs are lowercase letters, digits and hyphens. field names are snake_case. `id`, `created_at`, `updated_at` and `updated_by` are reserved.
 
 ## views
@@ -91,12 +90,11 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 | kind | shows | keys |
 |---|---|---|
 | `progress` | each exercise's best set over time, green if the latest is the best, red if it's below | `field` (a lifts field) |
-| `weekly` | sessions per week since the first row, against a goal; `mark` highlights rows containing a value (leg days) | `goal`, `mark: { field, contains, goal }` |
-| `since` | how long since each value last appeared, red after two weeks | `field`, `values` |
-| `line` | a number over time, green when moving toward the goal; `tab` reads another tab | `field`, `tab`, `goal` |
-| `due` | rows whose date is within `within_days` (default 30) or overdue, soonest first | `field`, `where`, `within_days` |
-| `calibration` | how often each confidence level came true, once `min` (default 10) rows are scored | `confidence`, `verdict`, `right`, `min` |
-| `stale` | rows whose date is older than `days`, oldest first | `field`, `days`, `label` |
+| `strip` | a tick per day that has a row, from the first row (at most `days` back, default 182) to today; how many a week, and how long since the last, red once that gap is longer than any before | `field` (a date field), `label` ("sessions"), `days` |
+| `line` | a number over time: the latest, the change since the first, a line; `tab` reads another tab | `field`, `tab` |
+| `upcoming` | the next `limit` (default 3) rows matching `where` by a date, soonest first, overdue in red. a past date on a row under it reads "reviewed …" once the row stops matching `where`, "review overdue by …" while it still does | `field`, `where`, `limit` |
+| `calibration` | what you said on average against how many came true, from the first scored row; each confidence level on its own once `min` (default 10) are scored | `confidence`, `verdict`, `right`, `min` |
+| `stale` | the `limit` (default 3) rows whose date is oldest: who you've gone longest without | `field`, `limit`, `label` |
 
 ## errors
 
@@ -108,7 +106,7 @@ errors come back as `{ "error": "<what to fix>" }`: `400` names the field and th
 H=(-H "CF-Access-Client-Id: $ID" -H "CF-Access-Client-Secret: $SECRET")
 curl -s "${H[@]}" https://snrintern.adhikrish.cloud/api
 curl -s "${H[@]}" -X POST -H "content-type: application/json" \
-  -d '{"at":"2026-11-18T18:00-08:00","type":"strength","title":"chest","focus":"chest, arms","lifts":"flat db press: 50x8, 55x8, 60x6; tricep pushdown: 50x8x3","duration_min":60}' \
+  -d '{"at":"2026-11-18T18:00-08:00","type":"strength","title":"chest","lifts":"flat db press: 50x8, 55x8, 60x6; tricep pushdown: 50x8x3","duration_min":60}' \
   https://snrintern.adhikrish.cloud/api/training
 curl -s "${H[@]}" -X POST -H "content-type: application/json" -d '{"at":"2026-11-18","bodyweight_kg":69.2}' \
   https://snrintern.adhikrish.cloud/api/body
@@ -123,7 +121,7 @@ paste this into the dot's instructions, with the two values from 1password:
 > you keep my snr intern database at https://snrintern.adhikrish.cloud. send CF-Access-Client-Id: <client-id> and CF-Access-Client-Secret: <client-secret> on every request.
 > 1. start with GET /api. it lists the tabs, their fields and the formats. read it first; tabs change.
 > 2. one thing that happened = one row in the tab it belongs to. a session goes in training, a weigh-in in body, a new person in people, a prediction in forecasts.
-> 3. training: write lifts as "exercise: 45x10, 50x8; pull up: bwx10, +25x6" (weights in lb, bw = bodyweight, +25 = added). reuse the exercise names already in recent training rows. set focus to the muscle groups worked.
+> 3. training: write lifts as "exercise: 45x10, 50x8; pull up: bwx10, +25x6" (weights in lb, bw = bodyweight, +25 = added). reuse the exercise names already in recent training rows.
 > 4. people: search first (GET /api/people?q=<name>) and update instead of duplicating. set group to a topic, reusing an existing one when it fits; set last_contact to today when i say i talked to someone.
 > 5. forecasts: always set confidence (0-100) and review_date. when i say how one turned out, set verdict and status closed.
 > 6. if i ask you to track something new, add a tab or a column: GET /api/_tabs/<slug>, change it, PUT it back. never delete a tab, field or row unless i ask.

@@ -30,16 +30,6 @@
     "category": "ai & infra"
   },
   {
-    "slug": "ci-batch-scheduler",
-    "date": "2026-09-16",
-    "first_commit": "d9ed1cdbe9cc8df23a836d6dba9ab0142175840a",
-    "source_commit": "d9ed1cdbe9cc8df23a836d6dba9ab0142175840a",
-    "edited_date": "2026-09-16",
-    "description": "batch code-checking jobs onto fewer machines while meeting their deadlines.",
-    "images": {},
-    "category": "ai & infra"
-  },
-  {
     "slug": "command-journal",
     "date": "2026-02-02",
     "first_commit": "f93e5b433147978b89375e71301729ad4440f4b6",

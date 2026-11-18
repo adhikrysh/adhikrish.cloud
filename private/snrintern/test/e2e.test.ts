@@ -160,26 +160,38 @@ test("the agent adds, edits, finds and deletes rows", async () => {
   expect((await call("gone", `/api/people/${id}`, { token })).status).toBe(404);
 });
 
-test("the training page is built from the data: progress, weekly, last trained, bodyweight", async () => {
+test("the training page is built from the data: a strip of sessions, progress, bodyweight", async () => {
   const token = await me();
   const page = (await call("training page", "/training", { token })).body as string;
-  expect(page).toContain("<h2>this week</h2>");
-  expect(page).toContain('<span>sessions</span><span class="dots">');
-  expect(page).toContain("<h2>last trained</h2>");
+  // a tick per day from the first session (20 days ago) to today, green on the 4 days trained; no goals anywhere
+  const strip = page.split('<div class="strip">')[1].split("</div>")[0];
+  expect(strip.match(/<i /g)).toHaveLength(21);
+  expect(strip.match(/class="up"/g)).toHaveLength(4);
+  expect(page).toContain('<h2><span class="pill">sessions</span></h2><span>1.3 a week</span>');
+  // the gap since the last session (2 days) is shorter than the longest before it (7): not red
+  expect(page).toContain('<span class="">last session 2 days ago</span>');
+  expect(page).not.toContain("this week");
+  expect(page).not.toContain("last trained");
+  // grouped by day: the heading is the date alone, and rows carry no time
+  expect(page).not.toContain("6:00 pm");
+  expect(page).not.toMatch(/<h2>[^<]*<small>/);
   // flat db press: 50 -> 60 over two sessions, latest is the best: green
   expect(page).toContain('flat db press</a><span class="sub"><span class="good">best 60 lb × 6</span>');
   // pull up tracked by added weight: bw x10 then +25x6
   expect(page).toContain('pull up</a><span class="sub"><span class="good">best +25 × 6</span>');
-  // bodyweight line from the body tab, moving toward the 75 kg goal: green
+  // bodyweight line from the body tab: what happened, no target to compare against
   expect(page).toContain("69.4 kg");
-  expect(page).toContain('<span class="good">+1.4 kg since');
-  expect(page).toContain("<h2>bodyfat</h2>"); // body is hidden, its trends live on training
+  expect(page).toContain("<span>+1.4 kg since");
+  expect(page).not.toContain(" to 75");
+  expect(page).toContain('<h2><span class="pill">bodyfat</span></h2>'); // body is hidden, its trends live on training
   // a brand-new exercise shows up in progress after a second session, with no code change
   const dotsToken = await dots();
   await send(dotsToken, "/api/training", { at: `${day(-9)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 30x10" });
   await send(dotsToken, "/api/training", { at: `${day(-1)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 25x12" });
   const after = (await call("training page after new exercise", "/training", { token })).body as string;
   expect(after).toContain('hammer curl</a><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
+  expect(after.split('<div class="strip">')[1].split("</div>")[0].match(/class="up"/g)).toHaveLength(6);
+  expect(after).toContain("last session yesterday");
   expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to snr intern">←</a><a class="external"'); // a tab goes back home
   writeFileSync(join(artifacts, "page-training.html"), after);
   // every lift opens its own page: each session plotted and listed, the best in green
@@ -193,31 +205,40 @@ test("the training page is built from the data: progress, weekly, last trained, 
   writeFileSync(join(artifacts, "page-lift.html"), lift);
 });
 
-test("forecasts open on what is due; scoring one (by the agent) takes it off the list", async () => {
+test("forecasts open on what is upcoming and how calibrated; scoring one (by the agent) moves it", async () => {
   const token = await me();
   const page = (await call("forecasts page", "/forecasts", { token })).body as string;
-  const dueList = page.split("<h2>due</h2>")[1].split("</section>")[0];
-  expect(dueList.indexOf("Overdue bet")).toBeLessThan(dueList.indexOf("Due soon bet"));
-  expect(dueList).toContain("overdue 10 days");
-  expect(dueList).toContain("in 5 days");
-  expect(dueList).not.toContain("Far away bet");
-  expect(page).not.toContain("calibration"); // under 10 scored: says nothing
-  expect(page).toContain('<span class="bad">open</span>');
-  expect(page).toContain('<span class="good">closed</span>');
-  expect(page).toContain('<span>review in 5 days</span>');
+  // upcoming: the next 3 open ones, overdue first, however far away the rest are
+  const upcoming = page.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0];
+  expect(upcoming.indexOf("Overdue bet")).toBeLessThan(upcoming.indexOf("Due soon bet"));
+  expect(upcoming.indexOf("Due soon bet")).toBeLessThan(upcoming.indexOf("Far away bet"));
+  expect(upcoming).toContain('<small class="bad">overdue 10 days</small>');
+  expect(upcoming).not.toContain("Scored bet");
+  // calibration from the first scored one: said 80, 1 of 1 came true (more than 10 points off: red)
+  expect(page).toContain('<li><span>said 80% on average</span><small class="bad">came true 1 of 1</small></li>');
+  // rows: verdict and status as pills, confidence and the review under the title, no description
+  expect(page).toContain('<span class="pill bad">open</span>');
+  expect(page).toContain('<span><span class="pill good">right</span></span><span><span class="pill good">closed</span></span>');
+  expect(page).toContain("<span>80%</span><span>review in 5 days</span>");
+  expect(page).toContain('<span><span class="bad">review overdue by 10 days</span></span>'); // past and still open
+  expect(page).toContain("<span>reviewed 2 months ago</span>"); // past and scored
+  expect(page).not.toContain('class="snippet"'); // no description under rows; "expected" stays searchable and on the row page
   const overdue = (await call("forecast rows", "/api/forecasts?q=Overdue", { token })).body.rows[0];
   await send(await dots(), `/api/forecasts/${overdue.id}`, { verdict: "wrong", status: "closed" }, "PATCH");
   const after = (await call("forecasts page after scoring", "/forecasts", { token })).body as string;
-  expect(after.split("<h2>due</h2>")[1].split("</section>")[0]).not.toContain("Overdue bet");
+  expect(after.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0]).not.toContain("Overdue bet");
+  expect(after).toContain("<span>reviewed 10 days ago</span>");
+  expect(after).toContain('<li><span>said 70% on average</span><small class="bad">came true 1 of 2</small></li>');
   writeFileSync(join(artifacts, "page-forecasts.html"), after);
 });
 
 test("people are grouped, and the ones not contacted lately come first", async () => {
   const token = await me();
   const page = (await call("people page", "/people", { token })).body as string;
-  const keepWarm = page.split("keep warm")[1].split("</section>")[0];
-  expect(keepWarm).toContain("Ada Example");
-  expect(keepWarm).not.toContain("Ben Sample");
+  // keep warm: whoever you've gone longest without, oldest first, no threshold (someone with no date isn't listed)
+  const keepWarm = page.split('<h2><span class="pill">keep warm</span></h2>')[1].split("</section>")[0];
+  expect(keepWarm.indexOf("Ada Example")).toBeLessThan(keepWarm.indexOf("Ben Sample"));
+  expect(keepWarm).not.toContain("Cy Placeholder");
   const list = page.split('<div class="rows">')[1];
   expect(list).toContain('<details class="group">');
   expect(list).toContain("<summary>space &amp; deep tech</summary>");
@@ -252,7 +273,8 @@ test("tabs and columns are added through the api, with no migration, and every c
     [{ ...thoughts, fields: [{ name: "id", type: "text" }] }, 'field name "id" is reserved'],
     [{ ...thoughts, fields: [{ name: "mood", type: "enum" }] }, 'field "mood": enum fields need "options"'],
     [{ ...thoughts, views: [{ kind: "progress", field: "text" }] }, 'views[0] (progress): "field" must name a lifts field'],
-    [{ ...thoughts, views: [{ kind: "weekly", goal: "nope" }] }, 'views[0] (weekly): "goal" must name a key in "goals"'],
+    [{ ...thoughts, views: [{ kind: "line", field: "nope" }] }, 'views[0] (line): "field" must name a number field'],
+    [{ ...thoughts, views: [{ kind: "weekly" }] }, "views[0]: kind must be one of progress, strip, line, upcoming, calibration, stale"],
   ];
   for (const [d, message] of bad) expect((await send(token, "/api/_tabs/scratch", d, "PUT")).body.error).toStartWith(message);
   const log = (await call("schema log", "/api/_log", { token })).body.changes;
