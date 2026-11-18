@@ -25,6 +25,7 @@ export function page({ design, title, nav, body, css = "" }: { design: Design; t
 <meta name="robots" content="noindex">
 <title>${escape(title)}</title>
 <link rel="preload" href="${FONT}" as="font" type="font/woff2" crossorigin>
+<link rel="icon" type="image/png" sizes="48x48" href="https://adhikrish.cloud/assets/favicon-7330e902055f.png">
 <style>
 ${design.base.replace("url('/assets/inter-latin-c940764593d0.woff2')", `url('${FONT}')`)}${design.list}${css}
 </style>

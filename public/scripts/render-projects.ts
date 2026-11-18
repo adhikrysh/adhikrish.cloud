@@ -12,6 +12,7 @@ type Project = {
   date?: string;
   edited_date?: string;
   first_commit?: string;
+  category: string; // the pill it sits under on /src; groups appear in the order their first project does
   source_commit?: string;
   status?: string;
   website?: string;
@@ -142,14 +143,19 @@ const items = PROJECTS.map((project) => {
   const aside = project.date
     ? `<time datetime="${project.date}">${readableDate(project.date)}</time>`
     : project.status ? `<small>${escape(project.status)}</small>` : "";
-  return `          <li>
+  return { category: project.category, html: `          <li>
             <a href="/src/${project.slug}"><span>${title}</span>${aside}</a>
             <p>${escape(project.description)}</p>
-          </li>`;
+          </li>` };
 });
+for (const project of PROJECTS) if (!project.category) throw new Error(`${project.slug} has no category`);
+const groups = [...new Set(items.map((i) => i.category))].map((category) => `      <h2><span class="pill">${escape(category)}</span></h2>
+      <ul class="project-list">
+${items.filter((i) => i.category === category).map((i) => i.html).join("\n")}
+      </ul>`);
 const markers = /<!-- project-index:start -->[\s\S]*?<!-- project-index:end -->/g;
 if ((index.match(markers) ?? []).length !== 1) throw new Error("project index must have exactly one pair of markers");
-index = index.replace(markers, () => `<!-- project-index:start -->\n      <ul class="project-list">\n${items.join("\n")}\n      </ul>\n      <!-- project-index:end -->`);
+index = index.replace(markers, () => `<!-- project-index:start -->\n${groups.join("\n")}\n      <!-- project-index:end -->`);
 index = preloadNavigation(index);
 writeFileSync(join(SITE, "src.html"), index);
 // The hand-written pages: their own markup, the shared design inlined. Only home warms the next page.

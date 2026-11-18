@@ -85,7 +85,10 @@
   @media (prefers-reduced-motion: reduce) { a { transition: none; } }
   .project-list { list-style: none; margin-top: 32px; }
   .project-list li + li { margin-top: 20px; }
-  .project-list li > a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 24px; color: var(--text); padding-block: 8px; text-decoration: none; }
+  /* two columns: title and everything under it on the left, the date or number on the right, alone */
+  .project-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; }
+  .project-list li > a { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; color: var(--text); padding-block: 8px; text-decoration: none; }
+  .project-list li > :not(a) { grid-column: 1; }
   .project-list li > a:hover { color: var(--hover); }
   .project-list time, .project-list small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
   /* only a row's title, its first span, is underlined; times, pills and coloured words beside it are not */
@@ -93,6 +96,10 @@
   .project-list p { color: var(--muted); font-size: var(--fs-small); line-height: 1.6; }
   nav { flex-wrap: wrap; }
   nav .external { margin-left: auto; }
+  h2 { margin-top: 48px; line-height: 1; }
+  h1 + h2 { margin-top: 36px; }
+  .project-list { margin-top: 18px; }
+  .project-list li + li { margin-top: 22px; }
 </style>
 </head>
 <body>
@@ -104,6 +111,7 @@
     <main>
       <h1>things i've built</h1>
       <!-- project-index:start -->
+      <h2><span class="pill">ai &amp; infra</span></h2>
       <ul class="project-list">
           <li>
             <a href="/src/fourplusone"><span>fourplusone</span><time datetime="2026-11-07">nov 7, 2026</time></a>
@@ -113,6 +121,17 @@
             <a href="/src/tryshipy"><span>shipy</span><small>revenue generating</small></a>
             <p>ai operating system for ship brokers.</p>
           </li>
+          <li>
+            <a href="/src/adhikrish-cloud"><span>*.adhikrish.cloud</span><small>since dec 2024</small></a>
+            <p>an old thinkpad and a cloudflare account: photos, files, backups and my agent&#x27;s data, with no open ports.</p>
+          </li>
+          <li>
+            <a href="/src/ci-batch-scheduler"><span>ci-batch-scheduler</span><time datetime="2026-09-16">sep 16, 2026</time></a>
+            <p>batch code-checking jobs onto fewer machines while meeting their deadlines.</p>
+          </li>
+      </ul>
+      <h2><span class="pill">space</span></h2>
+      <ul class="project-list">
           <li>
             <a href="/src/command-journal"><span>command-journal</span><time datetime="2026-02-02">feb 2, 2026</time></a>
             <p>recover simulated spacecraft payload commands after a crash.</p>
@@ -128,14 +147,6 @@
           <li>
             <a href="/src/orbit-access"><span>orbit-access</span><time datetime="2025-12-13">dec 13, 2025</time></a>
             <p>simulate satellite orbits and find ground-station visibility windows.</p>
-          </li>
-          <li>
-            <a href="/src/adhikrish-cloud"><span>*.adhikrish.cloud</span><small>since dec 2024</small></a>
-            <p>an old thinkpad and a cloudflare account: photos, files, backups and my agent&#x27;s data, with no open ports.</p>
-          </li>
-          <li>
-            <a href="/src/ci-batch-scheduler"><span>ci-batch-scheduler</span><time datetime="2026-09-16">sep 16, 2026</time></a>
-            <p>batch code-checking jobs onto fewer machines while meeting their deadlines.</p>
           </li>
       </ul>
       <!-- project-index:end -->

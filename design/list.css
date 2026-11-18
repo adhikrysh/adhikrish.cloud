@@ -1,6 +1,9 @@
   .project-list { list-style: none; margin-top: 32px; }
   .project-list li + li { margin-top: 20px; }
-  .project-list li > a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 24px; color: var(--text); padding-block: 8px; text-decoration: none; }
+  /* two columns: title and everything under it on the left, the date or number on the right, alone */
+  .project-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; }
+  .project-list li > a { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; color: var(--text); padding-block: 8px; text-decoration: none; }
+  .project-list li > :not(a) { grid-column: 1; }
   .project-list li > a:hover { color: var(--hover); }
   .project-list time, .project-list small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
   /* only a row's title, its first span, is underlined; times, pills and coloured words beside it are not */
