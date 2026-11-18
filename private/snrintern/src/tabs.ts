@@ -7,6 +7,7 @@ export type Field = { name: string; type: FieldType; required?: boolean };
 export type Tab = {
   slug: string; // url segment and table name
   label: string; // shown on the page
+  about: string; // one line on the home page
   sheet: string; // the google sheet tab it was imported from
   fields: Field[];
   // How a row reads in the list: a title, a short right-hand note, and a muted line below.
@@ -22,6 +23,7 @@ export const TABS: Tab[] = [
   {
     slug: "people",
     label: "people",
+    about: "people i've met, and where",
     sheet: "ppl-index",
     fields: [text("name", true), text("email"), text("company"), text("title"), text("met_where"), text("met_date"),
       text("location"), text("linkedin"), text("twitter"), text("referred_by"), text("notes"), text("added_date")],
@@ -32,6 +34,7 @@ export const TABS: Tab[] = [
   {
     slug: "outbound",
     label: "outbound",
+    about: "cold outreach and who replied",
     sheet: "cold-outbounds",
     fields: [text("name", true), text("person_context"), text("platform"), text("reason"), text("message"), text("replied"),
       text("follow_up"), text("remarks"), text("email"), text("sent_date"), text("status"), text("last_comment")],
@@ -42,6 +45,7 @@ export const TABS: Tab[] = [
   {
     slug: "forecasts",
     label: "forecasts",
+    about: "predictions to be scored later",
     sheet: "superforecasting",
     fields: [text("date"), text("decision", true), text("rationale"), text("confidence"), text("expected"),
       text("review_date"), text("outcome"), text("verdict"), text("status")],
@@ -52,6 +56,7 @@ export const TABS: Tab[] = [
   {
     slug: "gym",
     label: "gym",
+    about: "training sessions",
     sheet: "gym-sessions",
     fields: [text("date", true), text("type"), text("title"), text("summary"), int("duration_min"), int("rpe"), text("feel")],
     title: "title",

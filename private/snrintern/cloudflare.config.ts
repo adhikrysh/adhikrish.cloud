@@ -21,8 +21,8 @@ export default defineConfig(({ mode }) => ({
       // The snrintern_app access application's audience tag (not a secret).
       ACCESS_AUD: bindings.text("e58f31f732ff5d00f7561ff36e3a9a23161176cdb806319370d50e6e2c0f387c"),
       // Service tokens allowed past /health, by client id (comma-separated). Access also lets the admin prober in,
-      // but only for /health: it must never read the data. Add dots' token here when it is created.
-      AGENT_CLIENT_IDS: bindings.text(mode === "test" ? "dots-client-id" : ""),
+      // but only for /health: it must never read the data. The production value is dots' client id.
+      AGENT_CLIENT_IDS: bindings.text(mode === "test" ? "dots-client-id" : "2fab0ff8670b9316e75907563e16eb75.access"),
       ACCESS_CERTS_URL: mode === "test" && bindings.text(process.env.ACCESS_CERTS_URL ?? ""),
     },
   },

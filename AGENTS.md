@@ -8,7 +8,7 @@ One repo for everything under `*.adhikrish.cloud`. The global AGENTS.md still ap
 |---|---|---|---|
 | `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare pages | `public/**` or `design/**` changes (pages build watch paths) |
 | `private/admin/` | admin.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
-| `private/snrintern/` | snrintern.adhikrish.cloud: people / outbound / forecasts / gym, json api for the personal agent | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
+| `private/snrintern/` | snrintern.adhikrish.cloud: people / outbound / forecasts / gym, json api for the personal agent (contract: `private/snrintern/API.md`) | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
 | `private/infra/` | the thinkpad's compose files, scripts, configs, runbooks | thinkpad | by hand (see `private/infra/README.md`) |
 | `design/` | shared css (`base.css`, `list.css`) and the html shell for the private sites (`html.ts`) | | triggers every site |
 | `services.json` | the list of services: admin's links and health probes | | triggers admin |
@@ -25,7 +25,11 @@ The full write-up of how it all fits together, including restart handling and fa
 ## Rules
 
 - Public vs private is about access, not hosting. Everything private sits behind cloudflare access; snrintern also verifies the access jwt itself (`private/snrintern/src/auth.ts`).
-- No secrets in git, ever. 1password is the source of truth. CI reads secrets through a 1password service account (`op://adhikrish.cloud-ci/...` references in the workflows). The thinkpad keeps per-app `.env` files that are never committed.
+- No secrets in git, ever. 1password is the source of truth:
+  - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-admin-prober` (the admin prober's access service token).
+  - vault `Personal`: `snrintern dots token` (the agent's access service token; its client id is in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`).
+  - none of these expire. revoke in cloudflare (zero trust > service tokens, or profile > api tokens) if one leaks.
+  - the thinkpad keeps per-app `.env` files that are never committed.
 - Anything that must work while the thinkpad is off runs on cloudflare (pages, the admin and snrintern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).
 - Keep the private sites in the site's design: `design/base.css` + `design/list.css` through `design/html.ts`. Do not fork the css per app; add page-specific rules through the `css` argument.
 - Everything in this repo is typescript. The public renderer is `public/scripts/render-projects.ts` (bun + pandoc).

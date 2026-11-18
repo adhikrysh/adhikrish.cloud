@@ -154,9 +154,16 @@ test("the pages render each tab and a row", async () => {
   const row = await call("row page", "/outbound/1", { token: me });
   expect(row.body).toContain("<dt>follow up</dt>");
   expect(row.body).not.toContain("<dt>name</dt>"); // the title is not repeated
-  expect(row.body).toContain("updated</dt><dd>");
+  expect(row.body).toContain("by service:dots-client-id");
   writeFileSync(join(artifacts, "page-outbound-1.html"), row.body);
-  expect((await call("root redirects to the first tab", "/", { token: me })).status).toBe(302);
+  const home = await call("home lists every tab", "/", { token: me });
+  expect(home.status).toBe(200);
+  for (const tab of ["people", "outbound", "forecasts", "gym"]) expect(home.body).toContain(`href="/${tab}"`);
+  expect(home.body).toContain("3 rows");
+  expect(home.body).toContain('href="https://admin.adhikrish.cloud/"');
+  writeFileSync(join(artifacts, "page-home.html"), home.body);
+  const search = await call("search narrows a tab", "/people?q=robots", { token: me });
+  expect(search.body).toContain("1 matching");
 });
 
 test("a restart loses nothing", { timeout: 60_000 }, async () => {
