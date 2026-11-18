@@ -25,7 +25,7 @@ const CSS = `
   .project-list .snippet { color: #a9a59a; font-size: 14px; line-height: 1.6; margin-top: 6px;
                            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .links { margin-top: 6px; font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
-  .links a, .project-list .links a { display: inline; padding: 0; color: #8a8a8a; }
+  .links a { color: #8a8a8a; }
   .aside { display: inline-flex; gap: 12px; align-items: baseline; font-size: 13px; }
   .meta { color: #8a8a8a; font-size: 14px; margin-top: 10px; }
   .detail h2 { font-size: 13px; font-weight: 450; color: #8a8a8a; margin-top: 32px; }
@@ -45,6 +45,8 @@ const CSS = `
   .day .project-list li + li { margin-top: 18px; }
   details.group summary { list-style: none; cursor: pointer; font-size: 17px; padding: 10px 0; }
   details.group summary::-webkit-details-marker { display: none; }
+  details.group summary:focus { outline: none; }
+  details.group summary:focus-visible { outline: 1px solid #d8d4c8; outline-offset: 5px; }
   details.group summary::before { content: "›"; color: #6a6a66; display: inline-block; width: 18px; transition: transform 220ms ease; }
   details.group[open] summary::before { transform: rotate(90deg); }
   details.group .project-list { margin: 4px 0 18px 18px; }

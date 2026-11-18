@@ -53,7 +53,7 @@ every row also has `id`, `created_at`, `updated_at` and `updated_by` (an email, 
 
 - **training**: one row per session. `at`, `type` (strength, run, hike, climb, other), `title`, `focus` (muscle groups, comma-separated: legs, chest, back, shoulders, arms), `lifts`, `distance_km`, `duration_min`, `rpe`, `notes`. a new exercise needs nothing special: write it in `lifts`, and it appears in progress once it has two sessions. reuse an exercise's existing name (look at recent rows) so its history stays in one line.
 - **body**: one row per weigh-in. `at`, `bodyweight_kg`, `bodyfat_percentage`, `notes`. a weigh-in is its own row, never part of a training row.
-- **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing an existing topic when one fits (space & deep tech, investors & mentors, founder peers, hiring, other); a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
+- **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing an existing topic when one fits (space & deep tech, investors & mentors, founders, hiring, other); a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
 - **forecasts**: `date`, `decision`, `rationale`, `confidence` (0-100), `expected`, `review_date`, `outcome`, `verdict` (right, wrong), `status` (open, closed). scoring one = PATCH `verdict` and `status: closed`.
 
 ## changing the schema
