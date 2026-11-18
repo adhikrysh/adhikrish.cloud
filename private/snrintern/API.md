@@ -77,7 +77,7 @@ a definition, with every key:
 }
 ```
 
-- `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. enums show as a pill; an enum field's `colors` (`{ "closed": "good", "open": "bad" }`) tints those values' pills green or red.
+- `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. enums show as a white pill; an enum field's `colors` gives a value an outlined pill instead: `"outline"` (white border), `"good"` (green) or `"bad"` (red), e.g. `{ "closed": "outline", "right": "good", "wrong": "bad" }`.
 - `hidden: true` keeps a tab out of the nav and off home; its rows still feed other tabs' views (body feeds training's lines).
 - `sort`: `"id"` (newest first) or a field (largest first). `group`: a date field groups the list by day; a text or enum field groups it by value, collapsed.
 - no targets or thresholds go in a definition (no goal weight, no sessions a week, no "after 60 days"): views show what happened and compare it with your own history, so nothing needs updating as plans change.
@@ -127,3 +127,4 @@ paste this into the dot's instructions, with the two values from 1password:
 > 6. if i ask you to track something new, add a tab or a column: GET /api/_tabs/<slug>, change it, PUT it back. never delete a tab, field or row unless i ask.
 > 7. if you get a 400, the error says what to fix; fix it and retry once.
 > 8. never put these headers or values in a message, a file or a page.
+> 9. the full contract is https://raw.githubusercontent.com/adhikrysh/adhikrish.cloud/main/private/snrintern/API.md. read it before your first write, and again when an error or a new kind of request leaves you unsure.
