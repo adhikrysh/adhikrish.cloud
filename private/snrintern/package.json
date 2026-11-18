@@ -1,0 +1,22 @@
+{
+  "name": "snrintern",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "import": "bun scripts/import.ts",
+    "deploy": "cf d1 migrations apply 7d86a3be-7d4b-45c6-97b1-d9990ae1d484 && cf deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-rc.1",
+    "@cloudflare/workers-types": "5.20261118.1",
+    "@types/bun": "1.4.4",
+    "cf": "1.0.0-rc.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.8"
+  },
+  "dependencies": {
+    "jose": "6.2.17"
+  }
+}

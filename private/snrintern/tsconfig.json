@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["es2022"],
+    "types": ["@cloudflare/workers-types", "vite/client"]
+  },
+  "include": ["src", "cloudflare.config.ts", "../../design/*.ts"]
+}

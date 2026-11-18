@@ -1,0 +1,33 @@
+# admin.adhikrish.cloud: deploy the worker when its code, the shared design or the service list changes.
+name: admin
+on:
+  push:
+    branches: [main]
+    paths: [private/admin/**, design/**, services.json, .github/workflows/admin.yml]
+  workflow_dispatch:
+concurrency: admin
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: private/admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run check
+      # 1password is the source of truth for secrets; the service account can only read the ci vault.
+      - uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: op://adhikrish.cloud-ci/cloudflare-deploy/credential
+          ACCESS_CLIENT_ID: op://adhikrish.cloud-ci/access-admin-prober/client-id
+          ACCESS_CLIENT_SECRET: op://adhikrish.cloud-ci/access-admin-prober/client-secret
+      - run: npx cf deploy --secrets-file secrets.env

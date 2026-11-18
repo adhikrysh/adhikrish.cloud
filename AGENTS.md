@@ -1,17 +1,34 @@
 # AGENTS.md (adhikrish.cloud)
 
-Rules for this repo only. The global AGENTS.md still applies.
+One repo for everything under `*.adhikrish.cloud`. The global AGENTS.md still applies. Subfolders add their own rules (`public/AGENTS.md`).
 
-## Write-ups
+## Map
 
-- Write-ups live in `content/projects/<slug>.md`. The order of `content/projects.json` is the order on `/src`. Run `python3 scripts/render-projects.py` after any change and commit the generated html with the source.
-- Write them in Adhi's voice with the `write-like-adhi` skill. Lead with the idea, written to the reader, never centred on him and never lecturing. The reference opener is fourplusone's: "it's easy to lose mental alignment with your codebase when you build with agents..."
-- The first paragraph says why the project exists, the problem it solves and its impact. Then plain sections. Claim only what the code, the tests or Adhi's own words back up.
+| path | what | runs on | deploys when |
+|---|---|---|---|
+| `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare pages | `public/**` or `design/**` changes (pages build watch paths) |
+| `private/admin/` | admin.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
+| `private/snrintern/` | snrintern.adhikrish.cloud: people / outbound / forecasts / gym, json api for the personal agent | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
+| `private/infra/` | the thinkpad's compose files, scripts, configs, runbooks | thinkpad | by hand (see `private/infra/README.md`) |
+| `design/` | shared css (`base.css`, `list.css`) and the html shell for the private sites (`html.ts`) | | triggers every site |
+| `services.json` | the list of services: admin's links and health probes | | triggers admin |
 
-## Diagrams
+The full write-up of how it all fits together, including restart handling and failure modes: `public/content/projects/adhikrish-cloud.md` (served at /src/adhikrish-cloud).
 
-- Use inline SVG diagrams instead of ASCII, as many as genuinely make the mechanism clearer. Adhi likes diagrams.
-- Each one is `<figure class="diagram"><svg viewBox="0 0 600 H" role="img" aria-label="...">...</svg><figcaption>...</figcaption></figure>`, with no blank lines inside the figure.
-- Style only with the `.d-*` classes in `READING_CSS` (`scripts/render-projects.py`). Give every arrow marker id a per-file prefix.
-- Every box and number comes from real facts. Label schematics as schematic in the caption.
-- After rendering, measure every label against its box in the browser (`getBBox`). Estimates from character counts miss.
+## Where to add things
+
+- **A self-hosted service:** follow `private/infra/docs/add-a-service.md`. Its last step adds one entry to `services.json` (`name`, `url`, optional `health` url, `about`). Admin picks it up on the next deploy.
+- **An external link on admin:** one entry under `external` in `services.json`.
+- **A snrintern tab:** one entry in `private/snrintern/src/tabs.ts` plus one migration in `private/snrintern/migrations/` creating its table (next number, never edit an applied one; ci applies it). The api, page and csv import read the registry, and `GET /api` lists it, so the agent learns it without any api change.
+- **A write-up:** see `public/AGENTS.md`.
+
+## Rules
+
+- Public vs private is about access, not hosting. Everything private sits behind cloudflare access; snrintern also verifies the access jwt itself (`private/snrintern/src/auth.ts`).
+- No secrets in git, ever. 1password is the source of truth. CI reads secrets through a 1password service account (`op://adhikrish.cloud-ci/...` references in the workflows). The thinkpad keeps per-app `.env` files that are never committed.
+- Anything that must work while the thinkpad is off runs on cloudflare (pages, the admin and snrintern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).
+- Keep the private sites in the site's design: `design/base.css` + `design/list.css` through `design/html.ts`. Do not fork the css per app; add page-specific rules through the `css` argument.
+- Everything in this repo is typescript. The public renderer is `public/scripts/render-projects.ts` (bun + pandoc).
+- Tests are end-to-end only. `cd private/snrintern && bun test` runs the worker in workerd on local d1 against a fake access key server and writes `test/artifacts/`. Admin: `cd private/admin && npm run check`, then `npx vite dev` to probe the real hostnames locally.
+- Cloudflare is managed with the `cf` cli (profile `adhi` is bound to this folder). Read freely; ask before any change.
+- Leave changes uncommitted for review unless told otherwise.

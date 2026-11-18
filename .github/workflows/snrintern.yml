@@ -1,0 +1,34 @@
+# snrintern.adhikrish.cloud: test, apply d1 migrations, deploy the worker.
+name: snrintern
+on:
+  push:
+    branches: [main]
+    paths: [private/snrintern/**, design/**, .github/workflows/snrintern.yml]
+  workflow_dispatch:
+concurrency: snrintern
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: private/snrintern
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - run: npm ci
+      - run: npm run check
+      - run: bun test
+      - uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: op://adhikrish.cloud-ci/cloudflare-deploy/credential
+      - run: npm run deploy

@@ -2,3 +2,10 @@
 .gstack/
 output/
 .wrangler/
+node_modules/
+.cloudflare/
+*.db
+*.db-wal
+*.db-shm
+**/test/artifacts/
+.dev.vars

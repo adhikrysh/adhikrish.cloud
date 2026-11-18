@@ -1,0 +1,7 @@
+  .project-list { list-style: none; margin-top: 32px; }
+  .project-list li + li { margin-top: 20px; }
+  .project-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 24px; color: #d8d4c8; padding-block: 8px; text-decoration: none; }
+  .project-list a:hover { color: #787878; }
+  .project-list time, .project-list small { color: #8a8a8a; font-size: 12px; white-space: nowrap; }
+  .project-list span { overflow-wrap: anywhere; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  .project-list p { color: #8a8a8a; font-size: 14px; line-height: 1.6; }
