@@ -38,6 +38,8 @@ const CSS = `
   .views + .search { margin-top: 40px; }
   .searching .views { display: none; }
   .empty { color: var(--muted); margin-top: 32px; }
+  .pager { display: flex; justify-content: space-between; margin-top: 40px; font-size: var(--fs-small); }
+  .pager a { color: var(--muted); }
   .day { margin-top: 36px; }
   .day h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); }
   .day .project-list { margin-top: 12px; }
@@ -54,14 +56,13 @@ const CSS = `
   @media (prefers-reduced-motion: reduce) { .search input, details.group summary::before { transition: none; } }
 `;
 
-// Live search: the rows are already on the page, so typing hides the ones that don't match (every field counts).
-// "/" focuses the box; pressing enter runs the same search on the server.
-const LIVE_SEARCH = `<script>(()=>{const i=document.querySelector(".search input");if(!i)return;
-const rows=[...document.querySelectorAll(".rows li")],text=rows.map(r=>r.dataset.search),none=document.querySelector(".none");
-const run=()=>{const q=i.value.trim().toLowerCase();let shown=0;rows.forEach((r,k)=>{const ok=!q||text[k].includes(q);r.hidden=!ok;if(ok)shown++});
-document.querySelectorAll(".rows section,.rows details").forEach(s=>{const any=[...s.querySelectorAll("li")].some(r=>!r.hidden);s.hidden=!any;if(s.tagName==="DETAILS")s.open=!!q&&any});
-document.body.classList.toggle("searching",!!q);if(none)none.hidden=!q||shown>0};
-i.addEventListener("input",run);run();
+// Live search over every row, not just this page: typing asks the server for the matching first page and swaps the results in
+// (views hide while searching). Answers that arrive out of order are dropped; the url follows, so back and reload keep the search.
+const LIVE_SEARCH = `<script>(()=>{const i=document.querySelector(".search input"),box=document.querySelector(".results");if(!i||!box)return;
+let n=0,t;const run=()=>{const q=i.value.trim(),k=++n,u=new URL(location.href);u.search=q?"?q="+encodeURIComponent(q):"";
+document.body.classList.toggle("searching",!!q);
+fetch(u).then(r=>r.text()).then(h=>{if(k!==n)return;const d=new DOMParser().parseFromString(h,"text/html").querySelector(".results");if(d)box.innerHTML=d.innerHTML;history.replaceState(null,"",u)})};
+i.addEventListener("input",()=>{clearTimeout(t);t=setTimeout(run,180)});
 addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement!==i){e.preventDefault();i.focus();i.select()}})})()</script>`;
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -180,20 +181,24 @@ ${items.join("\n")}
   return page({ design, title: "snr intern", nav: nav(), body, css: CSS });
 }
 
-export async function tabPage(design: Design, database: D1Database, tab: Tab, q: string): Promise<string> {
-  const [rows, views] = await Promise.all([
-    db.list(database, tab, { q: q || undefined, limit: 1000 }),
-    q ? Promise.resolve("") : renderViews(tab, database),
-  ]);
+/** Rows a page shows. A tab grouped by a value (people by topic) is one page: its groups are collapsed, and pages would split a topic. */
+export const PAGE = 50;
+
+export async function tabPage(design: Design, database: D1Database, tab: Tab, q: string, at: number): Promise<string> {
   const groupBy = tab.group ? field(tab, tab.group) : undefined;
   const byDay = groupBy && (groupBy.type === "date" || groupBy.type === "datetime") ? groupBy : undefined;
+  const paged = !groupBy || !!byDay;
+  const [fetched, views] = await Promise.all([
+    db.list(database, tab, { q: q || undefined, ...(paged ? { limit: PAGE + 1, offset: (at - 1) * PAGE } : {}) }),
+    q || at > 1 ? Promise.resolve("") : renderViews(tab, database),
+  ]);
+  const rows = paged ? fetched.slice(0, PAGE) : fetched, older = paged && fetched.length > PAGE;
   const item = (row: db.Row) => {
     // inside a day group the day is the heading, so the row leaves its date (and time) out
     const aside = bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside");
     const line = bits(tab, row, tab.line, "line");
     const snippet = tab.snippet && present(row[tab.snippet]) ? `\n            <p class="snippet">${escape(row[tab.snippet])}</p>` : "";
-    const searchable = tab.fields.map((f) => row[f.name]).filter(present).join(" ").toLowerCase();
-    return `          <li data-search="${escape(searchable)}">
+    return `          <li>
             <a class="head" href="/${tab.slug}/${row.id}"><span>${titleOf(tab, row, "aside")}</span><small class="aside">${aside}</small></a>${line ? `\n            <p class="line bits">${line}</p>` : ""}${snippet}
             ${links(tab, row)}
           </li>`;
@@ -217,15 +222,25 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
     for (const r of rows) size.set(String(r[groupBy.name] ?? ""), (size.get(String(r[groupBy.name] ?? "")) ?? 0) + 1);
     const keys = groupBy.type === "enum" ? [...groupBy.options!, ""] : [...size.keys()].filter(Boolean).sort((a, b) => size.get(b)! - size.get(a)! || a.localeCompare(b)).concat("");
     list = keys.filter((key) => size.get(key)).map((key) =>
-      `<details class="group"><summary>${escape(key || `no ${label(groupBy.name)}`)}</summary>${ul(rows.filter((r) => String(r[groupBy.name] ?? "") === key))}</details>`).join("\n");
+      `<details class="group"${q ? " open" : ""}><summary>${escape(key || `no ${label(groupBy.name)}`)}</summary>${ul(rows.filter((r) => String(r[groupBy.name] ?? "") === key))}</details>`).join("\n");
   } else list = ul(rows);
   const icon = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>`;
   const body = `      <h1>${escape(tab.label)}</h1>
 ${views ? `      ${views}\n` : ""}      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search ${escape(tab.label)}" aria-label="search ${escape(tab.label)}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
-${rows.length ? `      <div class="rows">\n${list}\n      </div>\n      <p class="empty none" hidden>nothing matches.</p>` : `      <p class="empty">nothing${q ? ` matches "${escape(q)}"` : " yet"}.</p>`}
+      <div class="results">
+${rows.length ? `      <div class="rows">\n${list}\n      </div>` : `      <p class="empty">${q ? `nothing matches "${escape(q)}"` : at > 1 ? "nothing older" : "nothing yet"}.</p>`}
+${pager(tab, q, at, older)}
+      </div>
       ${schemaLink(tab)}
       ${LIVE_SEARCH}`;
   return page({ design, title: `${tab.label} | snr intern`, nav: nav({ href: "/", label: "snr intern" }), body, css: CSS + VIEW_CSS });
+}
+
+/** "← newer" and "older →" under a paged list; the search, if any, comes along. */
+function pager(tab: Tab, q: string, at: number, older: boolean): string {
+  const href = (p: number) => `/${tab.slug}${p > 1 || q ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { page: String(p) } : {}) })}` : ""}`;
+  const newer = at > 1 ? `<a href="${escape(href(at - 1))}">← newer</a>` : "<span></span>";
+  return at > 1 || older ? `      <nav class="pager" aria-label="pages">${newer}${older ? `<a href="${escape(href(at + 1))}">older →</a>` : ""}</nav>` : "";
 }
 
 export function rowPage(design: Design, tab: Tab, row: db.Row): string {

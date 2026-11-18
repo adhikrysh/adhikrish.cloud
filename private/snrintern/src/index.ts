@@ -36,7 +36,7 @@ export default {
     if (!slug) return html(await homePage(design, env.DB));
     const tab = await db.tab(env.DB, slug);
     if (!tab) return html("not found", 404);
-    if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? ""));
+    if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? "", Math.max(1, Math.floor(Number(url.searchParams.get("page"))) || 1)));
     if (id === "lifts" && name) {
       const lift = await exercisePage(design, env.DB, tab, decodeURIComponent(name));
       return lift ? html(lift) : html("not found", 404);

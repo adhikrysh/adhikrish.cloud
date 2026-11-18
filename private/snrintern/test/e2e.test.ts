@@ -224,6 +224,52 @@ test("the contract is served by the api itself, as the agent sees it", async () 
   expect((await call("api index", "/api", { token: await dots() })).body.api.docs).toStartWith("GET /api/_docs");
 });
 
+test("ten years of rows: pages of 50, search over all of them, the api and the charts see past 1000", async () => {
+  const token = await me(), agent = await dots();
+  const notes = { label: "notes", about: "paging test", title: "text", aside: [], line: [], sort: "at",
+    views: [{ kind: "line", field: "n" }],
+    fields: [{ name: "at", type: "date", required: true }, { name: "n", type: "int" }, { name: "text", type: "text" }] };
+  expect((await send(agent, "/api/_tabs/notes", notes, "PUT")).status).toBe(201);
+  const date = (n: number) => new Date(Date.UTC(2020, 0, 1) + n * 86_400_000).toISOString().slice(0, 10);
+  const ns = Array.from({ length: 1005 }, (_, k) => k + 1);
+  for (let k = 0; k < ns.length; k += 25)
+    await Promise.all(ns.slice(k, k + 25).map((n) => send(agent, "/api/notes", { at: date(n), n, text: `note ${n} ${n % 2 ? "odd" : "even"}` })));
+  const rowsOf = (html: string) => [...html.matchAll(/<span>(note \d+ \w+)<\/span>/g)].map((m) => m[1]);
+  // page 1: the 50 newest, a link to older, none to newer; the chart counts from the very first row, not the 1000th newest
+  const first = (await call("notes page 1", "/notes", { token })).body as string;
+  expect(rowsOf(first)).toHaveLength(50);
+  expect(rowsOf(first)[0]).toBe("note 1005 odd");
+  expect(first).toContain('<a href="/notes?page=2">older →</a>');
+  expect(first).not.toContain("← newer");
+  expect(first).toContain("<span>+1004 since"); // 1005 - 1: every row, no cap
+  // page 21 is past row 1000: the last 5, newer but no older, no views
+  const last = (await call("notes page 21", "/notes?page=21", { token })).body as string;
+  expect(rowsOf(last)).toEqual(["note 5 odd", "note 4 even", "note 3 odd", "note 2 even", "note 1 odd"]);
+  expect(last).toContain('<a href="/notes?page=20">← newer</a>');
+  expect(last).not.toContain("older →");
+  expect(last).not.toContain('class="views"');
+  expect((await call("notes page 22", "/notes?page=22", { token })).body).toContain("nothing older.");
+  // search runs on the server over every row, and pages the same way, keeping the query
+  const even = (await call("search even", "/notes?q=even", { token })).body as string;
+  expect(rowsOf(even)).toHaveLength(50);
+  expect(rowsOf(even).every((r) => r.endsWith("even"))).toBe(true);
+  expect(even).toContain('<a href="/notes?q=even&amp;page=2">older →</a>');
+  expect(rowsOf((await call("search even, page 11", "/notes?q=even&page=11", { token })).body as string)).toHaveLength(2); // 502 even: 10 pages of 50, then 2
+  // the api walks any tab in pages, past 1000
+  const a = (await call("api page 1", "/api/notes?limit=1000", { token: agent })).body;
+  expect(a.rows).toHaveLength(1000);
+  expect(a.next_offset).toBe(1000);
+  const b = (await call("api page 2", "/api/notes?limit=1000&offset=1000", { token: agent })).body;
+  expect(b.rows.map((r: any) => r.n)).toEqual([5, 4, 3, 2, 1]);
+  expect(b.next_offset).toBe(null);
+  writeFileSync(join(artifacts, "page-notes.html"), first);
+  for (let k = 0; k < ns.length; k += 50) {
+    const ids = (await call("notes ids", `/api/notes?limit=50`, { token: agent })).body.rows.map((r: any) => r.id);
+    await Promise.all(ids.map((id: number) => call("delete note", `/api/notes/${id}`, { method: "DELETE", token: agent })));
+  }
+  expect((await call("drop notes", "/api/_tabs/notes", { method: "DELETE", token: agent })).status).toBe(200);
+}, 120_000);
+
 test("forecasts open on what is upcoming and how calibrated; scoring one (by the agent) moves it", async () => {
   const token = await me();
   const page = (await call("forecasts page", "/forecasts", { token })).body as string;

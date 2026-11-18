@@ -131,7 +131,7 @@ function strip(v: Extract<View, { kind: "strip" }>, { rows }: Ctx): string {
 async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }: Ctx): Promise<string> {
   const source = v.tab ? await db.tab(database, v.tab) : tab;
   if (!source) return "";
-  const sourceRows = v.tab ? await db.list(database, source, { limit: 1000 }) : rows;
+  const sourceRows = v.tab ? await db.list(database, source) : rows;
   const unit = source.fields.find((f) => f.name === v.field)?.unit;
   const u = unit ? (unit === "%" ? "%" : ` ${unit}`) : "";
   const pts = sourceRows.map((row) => ({ t: dayOf(row[dateField(source)]), y: Number(row[v.field]) }))
@@ -198,7 +198,7 @@ function dates(ts: number[], X: (t: number) => number, y: number): { svg: string
 export async function liftPage(tab: Tab, database: D1Database, exercise: string): Promise<string | null> {
   const field = tab.views?.find((v): v is Extract<View, { kind: "progress" }> => v.kind === "progress")?.field;
   if (!field) return null;
-  const pts = liftSeries(tab, await db.list(database, tab, { limit: 1000 }), field).get(exercise);
+  const pts = liftSeries(tab, await db.list(database, tab), field).get(exercise);
   if (!pts) return null;
   const W = 600, L = 44, T = 12;
   const tops = pts.map((p) => p.top), min = Math.min(...tops), max = Math.max(...tops), range = max - min || 1;
@@ -238,7 +238,7 @@ export const LIFT_CSS = `
 /** All of a tab's views that have something to say, in order. */
 export async function renderViews(tab: Tab, database: D1Database): Promise<string> {
   if (!tab.views?.length) return "";
-  const ctx = { tab, rows: await db.list(database, tab, { limit: 1000 }), database };
+  const ctx = { tab, rows: await db.list(database, tab), database };
   const parts = await Promise.all(tab.views.map((v) => {
     switch (v.kind) {
       case "progress": return progress(v, ctx);

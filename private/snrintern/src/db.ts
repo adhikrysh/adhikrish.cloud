@@ -60,13 +60,14 @@ export async function counts(db: D1Database): Promise<Map<string, number>> {
   return new Map(r.results.map((x) => [x.tab, x.n]));
 }
 
-/** Rows of a tab, sorted by the tab's sort field (newest or largest first, empty last). q matches any value. */
-export async function list(db: D1Database, t: Tab, { q, limit }: { q?: string; limit: number }): Promise<Row[]> {
+/** Rows of a tab, sorted by the tab's sort field (newest or largest first, empty last). q matches any value.
+ * No limit means every row: views and charts must see all of them, however many years of rows there are. */
+export async function list(db: D1Database, t: Tab, { q, limit, offset = 0 }: { q?: string; limit?: number; offset?: number } = {}): Promise<Row[]> {
   const order = t.sort === "id" ? "id DESC" : "json_extract(data, ?) IS NULL, json_extract(data, ?) DESC, id DESC";
   const sortBinds = t.sort === "id" ? [] : [`$.${t.sort}`, `$.${t.sort}`];
   const where = q ? "AND EXISTS (SELECT 1 FROM json_each(rows.data) WHERE CAST(json_each.value AS TEXT) LIKE ?)" : "";
-  const binds = [t.slug, ...(q ? [`%${q}%`] : []), ...sortBinds, limit];
-  const sql = `SELECT id, data, created_at, updated_at, updated_by FROM rows WHERE tab = ? ${where} ORDER BY ${order} LIMIT ?`;
+  const binds = [t.slug, ...(q ? [`%${q}%`] : []), ...sortBinds, limit ?? -1, offset]; // LIMIT -1: no limit in sqlite
+  const sql = `SELECT id, data, created_at, updated_at, updated_by FROM rows WHERE tab = ? ${where} ORDER BY ${order} LIMIT ? OFFSET ?`;
   return (await db.prepare(sql).bind(...binds).all<RowRecord>()).results.map(toRow);
 }
 

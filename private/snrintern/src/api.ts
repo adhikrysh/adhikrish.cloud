@@ -2,7 +2,7 @@
 //
 //   data                                   schema (tabs and their fields; every change is logged)
 //   GET    /api                            GET    /api/_tabs/<slug>
-//   GET    /api/<tab>?q=&limit=            PUT    /api/_tabs/<slug>      create or replace a tab definition
+//   GET    /api/<tab>?q=&limit=&offset=    PUT    /api/_tabs/<slug>      create or replace a tab definition
 //   GET    /api/<tab>/<id>                 DELETE /api/_tabs/<slug>      only when the tab has no rows
 //   POST   /api/<tab>                      GET    /api/_log?limit=       recent schema changes
 //   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (API.md), as markdown
@@ -15,7 +15,7 @@ const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 const API = {
   docs: "GET /api/_docs (the full contract, as markdown; read it before writing)",
-  data: ["GET /api", "GET /api/<tab>?q=&limit=", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
+  data: ["GET /api", "GET /api/<tab>?q=&limit=&offset= (pages: next_offset is null on the last)", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00)",
     "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
@@ -69,7 +69,12 @@ export async function handleApi(request: Request, database: D1Database, who: str
   }
 
   if (second === undefined || second === "") {
-    if (request.method === "GET") return json({ rows: await db.list(database, tab, { q: url.searchParams.get("q") ?? undefined, limit: limit(100) }) });
+    if (request.method === "GET") {
+      // pages: ask for one more than the limit to know whether there is a next page
+      const n = limit(100), offset = Math.max(0, Math.floor(Number(url.searchParams.get("offset") ?? 0)) || 0);
+      const rows = await db.list(database, tab, { q: url.searchParams.get("q") ?? undefined, limit: n + 1, offset });
+      return json({ rows: rows.slice(0, n), next_offset: rows.length > n ? offset + n : null });
+    }
     if (request.method === "POST") {
       const change = checkRow(tab, await body(), { partial: false });
       if (typeof change === "string") return fail(400, change);

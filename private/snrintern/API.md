@@ -37,7 +37,7 @@ cloudflare access checks them before the request reaches the worker. without the
 | method | path | body | returns |
 |---|---|---|---|
 | GET | `/api` | | tabs, counts, field types, view kinds |
-| GET | `/api/<tab>?q=<text>&limit=<n>` | | `{ "rows": [...] }`, in the tab's sort order. `q` matches any value. `limit` 100 by default, max 1000 |
+| GET | `/api/<tab>?q=<text>&limit=<n>&offset=<n>` | | `{ "rows": [...], "next_offset": <n> or null }`, in the tab's sort order. `q` matches any value. `limit` 100 by default, max 1000. to read everything, repeat with `offset=next_offset` until it is `null` |
 | GET | `/api/<tab>/<id>` | | `{ "row": {...} }` |
 | POST | `/api/<tab>` | `{ "<field>": value, ... }` | `201 { "row": {...} }` |
 | PATCH | `/api/<tab>/<id>` | only the fields to change | `{ "row": {...} }` |
