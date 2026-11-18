@@ -1,0 +1,340 @@
+{
+ "people": {
+  "label": "people",
+  "about": "people i've met, and where",
+  "title": "name",
+  "aside": [
+   "last_contact"
+  ],
+  "line": [
+   "title",
+   "company",
+   "met_where"
+  ],
+  "sort": "id",
+  "snippet": "notes",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "email",
+    "type": "text"
+   },
+   {
+    "name": "company",
+    "type": "text"
+   },
+   {
+    "name": "title",
+    "type": "text"
+   },
+   {
+    "name": "met_where",
+    "type": "text"
+   },
+   {
+    "name": "met_date",
+    "type": "date"
+   },
+   {
+    "name": "location",
+    "type": "text"
+   },
+   {
+    "name": "linkedin",
+    "type": "url"
+   },
+   {
+    "name": "twitter",
+    "type": "url"
+   },
+   {
+    "name": "referred_by",
+    "type": "text"
+   },
+   {
+    "name": "notes",
+    "type": "text"
+   },
+   {
+    "name": "group",
+    "type": "enum",
+    "options": [
+     "space & deep tech",
+     "investors & mentors",
+     "founder peers",
+     "hiring",
+     "other"
+    ]
+   },
+   {
+    "name": "last_contact",
+    "type": "date"
+   }
+  ],
+  "group": "group",
+  "views": [
+   {
+    "kind": "stale",
+    "field": "last_contact",
+    "days": 60,
+    "label": "keep warm: not in touch for 2+ months"
+   }
+  ]
+ },
+ "forecasts": {
+  "label": "forecasts",
+  "about": "predictions to be scored later",
+  "title": "decision",
+  "aside": [
+   "confidence",
+   "status"
+  ],
+  "line": [
+   "date",
+   "review_date",
+   "verdict"
+  ],
+  "sort": "date",
+  "snippet": "expected",
+  "summary": [
+   "status",
+   "verdict"
+  ],
+  "fields": [
+   {
+    "name": "date",
+    "type": "date"
+   },
+   {
+    "name": "decision",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "rationale",
+    "type": "text"
+   },
+   {
+    "name": "confidence",
+    "type": "int",
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   },
+   {
+    "name": "expected",
+    "type": "text"
+   },
+   {
+    "name": "review_date",
+    "type": "date"
+   },
+   {
+    "name": "outcome",
+    "type": "text"
+   },
+   {
+    "name": "verdict",
+    "type": "enum",
+    "options": [
+     "right",
+     "wrong"
+    ]
+   },
+   {
+    "name": "status",
+    "type": "enum",
+    "options": [
+     "open",
+     "closed"
+    ]
+   }
+  ],
+  "views": [
+   {
+    "kind": "due",
+    "field": "review_date",
+    "where": {
+     "status": "open"
+    },
+    "within_days": 30,
+    "score": {
+     "field": "verdict",
+     "set": {
+      "status": "closed"
+     }
+    }
+   },
+   {
+    "kind": "calibration",
+    "confidence": "confidence",
+    "verdict": "verdict",
+    "right": "right",
+    "min": 10
+   }
+  ]
+ },
+ "training": {
+  "label": "training",
+  "about": "sessions: lifting, runs, hikes",
+  "title": "title",
+  "aside": [
+   "at"
+  ],
+  "line": [
+   "type",
+   "focus",
+   "duration_min"
+  ],
+  "sort": "at",
+  "group": "at",
+  "snippet": "notes",
+  "summary": [
+   "type"
+  ],
+  "goals": {
+   "sessions_per_week": 5,
+   "leg_days_per_week": 2,
+   "bodyweight_kg": 75
+  },
+  "views": [
+   {
+    "kind": "weekly",
+    "goal": "sessions_per_week",
+    "mark": {
+     "field": "focus",
+     "contains": "legs",
+     "goal": "leg_days_per_week"
+    }
+   },
+   {
+    "kind": "since",
+    "field": "focus",
+    "values": [
+     "legs",
+     "chest",
+     "back",
+     "shoulders",
+     "arms"
+    ]
+   },
+   {
+    "kind": "progress",
+    "field": "lifts"
+   },
+   {
+    "kind": "line",
+    "tab": "body",
+    "field": "bodyweight_kg",
+    "goal": "bodyweight_kg"
+   }
+  ],
+  "fields": [
+   {
+    "name": "at",
+    "type": "datetime",
+    "required": true
+   },
+   {
+    "name": "type",
+    "type": "enum",
+    "options": [
+     "strength",
+     "run",
+     "hike",
+     "climb",
+     "other"
+    ]
+   },
+   {
+    "name": "title",
+    "type": "text"
+   },
+   {
+    "name": "focus",
+    "type": "text"
+   },
+   {
+    "name": "lifts",
+    "type": "lifts",
+    "unit": "lb"
+   },
+   {
+    "name": "distance_km",
+    "type": "number",
+    "min": 0,
+    "unit": "km"
+   },
+   {
+    "name": "duration_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "rpe",
+    "type": "int",
+    "min": 1,
+    "max": 10
+   },
+   {
+    "name": "notes",
+    "type": "text"
+   }
+  ]
+ },
+ "body": {
+  "label": "body",
+  "about": "weigh-ins and measurements",
+  "title": "at",
+  "aside": [
+   "bodyweight_kg",
+   "bodyfat_percentage"
+  ],
+  "line": [],
+  "sort": "at",
+  "goals": {
+   "bodyweight_kg": 75
+  },
+  "views": [
+   {
+    "kind": "line",
+    "field": "bodyweight_kg",
+    "goal": "bodyweight_kg"
+   },
+   {
+    "kind": "line",
+    "field": "bodyfat_percentage"
+   }
+  ],
+  "fields": [
+   {
+    "name": "at",
+    "type": "datetime",
+    "required": true
+   },
+   {
+    "name": "bodyweight_kg",
+    "type": "number",
+    "min": 20,
+    "max": 300,
+    "unit": "kg"
+   },
+   {
+    "name": "bodyfat_percentage",
+    "type": "number",
+    "min": 1,
+    "max": 70,
+    "unit": "%"
+   },
+   {
+    "name": "notes",
+    "type": "text"
+   }
+  ]
+ }
+}

@@ -5,7 +5,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 export type Auth = { team: string; aud: string; certsUrl?: string };
-export type Caller = { who: string };
+type Caller = { who: string };
 
 export function verifier(auth: Auth) {
   const jwks = createRemoteJWKSet(new URL(auth.certsUrl ?? `https://${auth.team}.cloudflareaccess.com/cdn-cgi/access/certs`));

@@ -4,7 +4,8 @@ import services from "../../../services.json";
 export type Service = { name: string; url: string; health?: string; about?: string };
 export type ProbeResult = { service: string; at: number; up: boolean; status: number | null; ms: number | null; error: string | null };
 
-export const selfHosted: Service[] = services.self_hosted;
+export const publicSites: Service[] = services.public;
+export const privateSites: Service[] = services.private;
 export const external: Service[] = services.external;
 
 // Short enough that the page never hangs: a slow service shows as down.

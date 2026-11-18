@@ -96,3 +96,10 @@ export async function update(db: D1Database, slug: string, id: number, change: {
 export async function remove(db: D1Database, slug: string, id: number): Promise<boolean> {
   return (await db.prepare("DELETE FROM rows WHERE tab = ? AND id = ?").bind(slug, id).run()).meta.changes > 0;
 }
+
+/** How many rows hold each value of an enum field: [["replied", 2], ["no reply", 8]], most common first. */
+export async function tally(db: D1Database, slug: string, field: string): Promise<[string, number][]> {
+  const r = await db.prepare("SELECT json_extract(data, ?) AS v, COUNT(*) AS n FROM rows WHERE tab = ? AND json_extract(data, ?) IS NOT NULL GROUP BY v ORDER BY n DESC, v")
+    .bind(`$.${field}`, slug, `$.${field}`).all<{ v: string; n: number }>();
+  return r.results.map((x) => [x.v, x.n]);
+}

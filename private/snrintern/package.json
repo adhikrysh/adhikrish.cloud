@@ -5,7 +5,6 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "bun test",
-    "import": "bun scripts/import.ts",
     "deploy": "cf d1 migrations apply 7d86a3be-7d4b-45c6-97b1-d9990ae1d484 && cf deploy"
   },
   "devDependencies": {

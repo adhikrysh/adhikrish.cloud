@@ -2,12 +2,14 @@
 //   /health          liveness for the admin dashboard
 //   /api/...         json api (src/api.ts): dots and scripts
 //   /, /<tab>, /<tab>/<id>  the human pages (src/page.ts): home list of tabs, a tab, a row
+//   /.../_new, _edit, _delete, _schema  forms to add, edit and delete rows and tabs (src/forms.ts)
 // Every request except /health must carry the jwt cloudflare access signs for requests it let in.
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
+import { handleForms } from "./forms.ts";
 import { homePage, rowPage, tabPage } from "./page.ts";
 
 type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string };
@@ -30,6 +32,8 @@ export default {
     }
 
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return handleApi(request, env.DB, who.who);
+    const formResponse = await handleForms(request, env.DB, design, who.who);
+    if (formResponse) return formResponse;
     if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
 
     const [, slug, id] = url.pathname.split("/");
@@ -38,6 +42,6 @@ export default {
     if (!tab) return html("not found", 404);
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? ""));
     const row = await db.get(env.DB, tab.slug, Number(id));
-    return row ? html(rowPage(design, tab, row)) : html("not found", 404);
+    return row ? html(await rowPage(design, env.DB, tab, row)) : html("not found", 404);
   },
 } satisfies ExportedHandler<Env>;

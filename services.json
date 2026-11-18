@@ -1,17 +1,68 @@
 {
-  "self_hosted": [
-    { "name": "npm", "url": "https://npm.adhikrish.cloud/", "about": "nginx proxy manager: routes each hostname to its container" },
-    { "name": "adguard", "url": "https://dns.adhikrish.cloud/login.html", "health": "https://dns.adhikrish.cloud/login.html", "about": "dns resolver and ad blocking" },
-    { "name": "immich", "url": "https://immich.adhikrish.cloud/photos", "health": "https://immich.adhikrish.cloud/api/server/ping", "about": "photos" },
-    { "name": "backrest", "url": "https://backrest.adhikrish.cloud/", "about": "restic backups to b2" },
-    { "name": "uptime", "url": "https://uptime.adhikrish.cloud/dashboard", "about": "uptime kuma, retired once admin's prober is trusted" },
-    { "name": "files", "url": "https://files.adhikrish.cloud/files/", "about": "filebrowser over the data share" },
-    { "name": "system stats", "url": "https://stats.adhikrish.cloud/", "about": "beszel: cpu, memory, disk, temperatures" },
-    { "name": "snrintern", "url": "https://snrintern.adhikrish.cloud/", "health": "https://snrintern.adhikrish.cloud/health", "about": "people, outbound, forecasts, gym" }
+  "public": [
+    {
+      "name": "adhikrish.cloud",
+      "url": "https://adhikrish.cloud/",
+      "about": "this site, static on cloudflare pages"
+    }
+  ],
+  "private": [
+    {
+      "name": "npm",
+      "url": "https://npm.adhikrish.cloud/",
+      "about": "nginx proxy manager: routes each hostname to its container"
+    },
+    {
+      "name": "adguard",
+      "url": "https://dns.adhikrish.cloud/login.html",
+      "health": "https://dns.adhikrish.cloud/login.html",
+      "about": "dns resolver and ad blocking"
+    },
+    {
+      "name": "immich",
+      "url": "https://immich.adhikrish.cloud/photos",
+      "health": "https://immich.adhikrish.cloud/api/server/ping",
+      "about": "photos"
+    },
+    {
+      "name": "backrest",
+      "url": "https://backrest.adhikrish.cloud/",
+      "about": "restic backups to b2"
+    },
+    {
+      "name": "uptime",
+      "url": "https://uptime.adhikrish.cloud/dashboard",
+      "about": "uptime kuma, retired once admin's prober is trusted"
+    },
+    {
+      "name": "files",
+      "url": "https://files.adhikrish.cloud/files/",
+      "about": "filebrowser over the data share"
+    },
+    {
+      "name": "system stats",
+      "url": "https://stats.adhikrish.cloud/",
+      "about": "beszel: cpu, memory, disk, temperatures"
+    },
+    {
+      "name": "snr intern",
+      "url": "https://snrintern.adhikrish.cloud/",
+      "health": "https://snrintern.adhikrish.cloud/health",
+      "about": "people, outbound, forecasts, gym"
+    }
   ],
   "external": [
-    { "name": "cloudflare", "url": "https://dash.cloudflare.com/463c6f3b7afadacdf235877e8e36a028" },
-    { "name": "tailscale admin console", "url": "https://login.tailscale.com/admin/machines" },
-    { "name": "openai api keys", "url": "https://platform.openai.com/settings/organization/api-keys" }
+    {
+      "name": "cloudflare",
+      "url": "https://dash.cloudflare.com/463c6f3b7afadacdf235877e8e36a028"
+    },
+    {
+      "name": "tailscale admin console",
+      "url": "https://login.tailscale.com/admin/machines"
+    },
+    {
+      "name": "openai api keys",
+      "url": "https://platform.openai.com/settings/organization/api-keys"
+    }
   ]
 }

@@ -1,8 +1,8 @@
 // The schema is data. A tab definition says what fields a tab's rows may hold and how its list reads.
 // Definitions live in d1 (`tabs`) and change through PUT /api/_tabs/<slug>; this file only checks them.
 
-export type FieldType = "text" | "int" | "date" | "datetime" | "url" | "enum";
-export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; options?: string[] };
+type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
+export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[] };
 export type TabDefinition = {
   label: string; // shown on the pages
   about: string; // one line on the home page
@@ -10,8 +10,23 @@ export type TabDefinition = {
   aside: string[]; // fields shown at the right of a row
   line: string[]; // fields shown in the muted line under a row
   sort: string; // "id" (newest first) or a field name (descending)
+  snippet?: string; // a text field previewed under each row in the list
+  summary?: string[]; // enum fields tallied under the heading ("2 replied · 8 no reply")
+  group?: string; // a date/datetime field groups the list by day ("wed, sep 17"); an enum field groups it by value
+  goals?: Record<string, number>; // named targets the views compare against, e.g. { "sessions_per_week": 5 }
+  views?: View[]; // what the tab opens on, above the list (see View)
   fields: Field[];
 };
+
+// A view answers one question at the top of a tab, computed from its rows (or, for "line", another tab's).
+export type View =
+  | { kind: "progress"; field: string } // lifts field: each exercise's top set over time
+  | { kind: "weekly"; goal?: string; mark?: { field: string; contains: string; goal?: string } } // sessions per week vs a goal
+  | { kind: "since"; field: string; values: string[] } // days since each value last appeared in a comma-separated field
+  | { kind: "line"; field: string; tab?: string; goal?: string } // a number over time, from this tab or another
+  | { kind: "due"; field: string; where?: Record<string, string>; within_days?: number; score?: { field: string; set?: Record<string, string> } } // rows whose date is coming up, with one-click scoring
+  | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
+  | { kind: "stale"; field: string; days: number; label?: string }; // rows whose date is older than N days ("keep warm")
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
 export type Data = Record<string, Value>;
@@ -19,7 +34,7 @@ export type Data = Record<string, Value>;
 export const SLUG = /^[a-z][a-z0-9-]{0,39}$/;
 const FIELD_NAME = /^[a-z][a-z0-9_]{0,39}$/;
 const RESERVED = ["id", "created_at", "updated_at", "updated_by"];
-const TYPES: FieldType[] = ["text", "int", "date", "datetime", "url", "enum"];
+const TYPES: FieldType[] = ["text", "int", "number", "date", "datetime", "url", "enum", "lifts"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // a date, optionally with a time and an offset: 2026-07-18, 2026-07-07T17:25, 2026-07-18T01:34-07:00
 const DATETIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
@@ -29,7 +44,7 @@ const validDate = (s: string) => !Number.isNaN(Date.parse(s.slice(0, 10)));
 export function checkDefinition(input: unknown): TabDefinition | string {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return "definition must be a json object";
   const d = input as Record<string, unknown>;
-  const known = new Set(["label", "about", "title", "aside", "line", "sort", "fields"]);
+  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "summary", "group", "goals", "views", "fields"]);
   for (const key of Object.keys(d)) if (!known.has(key)) return `unknown key "${key}". keys: ${[...known].join(", ")}`;
   if (typeof d.label !== "string" || !d.label.trim()) return '"label" must be a non-empty string';
   if (typeof d.about !== "string") return '"about" must be a string';
@@ -43,16 +58,21 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (RESERVED.includes(f.name)) return `field name "${f.name}" is reserved (every row already has ${RESERVED.join(", ")})`;
     if (names.has(f.name)) return `field "${f.name}" appears twice`;
     if (!TYPES.includes(f.type as FieldType)) return `field "${f.name}": type must be one of ${TYPES.join(", ")}`;
-    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "options"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
+    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
     const field: Field = { name: f.name, type: f.type as FieldType };
     if (f.required !== undefined) {
       if (typeof f.required !== "boolean") return `field "${f.name}": required must be true or false`;
       if (f.required) field.required = true;
     }
     if (f.min !== undefined || f.max !== undefined) {
-      if (field.type !== "int") return `field "${f.name}": min and max only apply to int fields`;
-      if (f.min !== undefined) { if (!Number.isInteger(f.min)) return `field "${f.name}": min must be a whole number`; field.min = f.min as number; }
-      if (f.max !== undefined) { if (!Number.isInteger(f.max)) return `field "${f.name}": max must be a whole number`; field.max = f.max as number; }
+      if (field.type !== "int" && field.type !== "number") return `field "${f.name}": min and max only apply to int and number fields`;
+      if (f.min !== undefined) { if (typeof f.min !== "number") return `field "${f.name}": min must be a number`; field.min = f.min as number; }
+      if (f.max !== undefined) { if (typeof f.max !== "number") return `field "${f.name}": max must be a number`; field.max = f.max as number; }
+    }
+    if (f.unit !== undefined) {
+      if (!["int", "number", "lifts"].includes(field.type)) return `field "${f.name}": unit only applies to int, number and lifts fields`;
+      if (typeof f.unit !== "string" || !f.unit.trim() || f.unit.length > 12) return `field "${f.name}": unit must be a short string like "%" or "min"`;
+      field.unit = f.unit;
     }
     if (field.type === "enum") {
       if (!Array.isArray(f.options) || f.options.length === 0 || !f.options.every((o) => typeof o === "string" && o.trim()))
@@ -75,7 +95,30 @@ export function checkDefinition(input: unknown): TabDefinition | string {
   if (typeof line === "string") return line;
   const sort = d.sort ?? "id";
   if (typeof sort !== "string" || (sort !== "id" && !names.has(sort))) return `"sort" must be "id" or a field name`;
-  return { label: d.label.trim(), about: d.about, title, aside, line, sort, fields };
+  const types = new Map(fields.map((f) => [f.name, f.type]));
+  let snippet: string | undefined;
+  if (d.snippet !== undefined) {
+    if (typeof d.snippet !== "string" || types.get(d.snippet) !== "text") return `"snippet" must name a text field`;
+    snippet = d.snippet;
+  }
+  const summary = list("summary", d.summary);
+  if (typeof summary === "string") return summary;
+  if (summary.some((name) => types.get(name) !== "enum")) return `"summary" must list enum fields`;
+  let group: string | undefined;
+  if (d.group !== undefined) {
+    if (typeof d.group !== "string" || !["date", "datetime", "enum"].includes(types.get(d.group) ?? "")) return `"group" must name a date, datetime or enum field`;
+    group = d.group;
+  }
+  let goals: Record<string, number> | undefined;
+  if (d.goals !== undefined) {
+    if (typeof d.goals !== "object" || d.goals === null || Array.isArray(d.goals) || !Object.values(d.goals).every((v) => typeof v === "number"))
+      return `"goals" must be an object of numbers, like { "sessions_per_week": 5 }`;
+    goals = d.goals as Record<string, number>;
+  }
+  const views = checkViews(d.views, types, goals ?? {});
+  if (typeof views === "string") return views;
+  return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}), ...(summary.length ? { summary } : {}),
+    ...(group ? { group } : {}), ...(goals ? { goals } : {}), ...(views.length ? { views } : {}), fields };
 }
 
 /** Checks one row body against a tab's fields. `partial` is for PATCH: only the given fields are checked. */
@@ -101,11 +144,78 @@ export function checkRow(tab: Tab, body: unknown, { partial }: { partial: boolea
   return { set, unset };
 }
 
+function checkViews(input: unknown, types: Map<string, FieldType>, goals: Record<string, number>): View[] | string {
+  if (input === undefined) return [];
+  if (!Array.isArray(input)) return '"views" must be a list';
+  const views: View[] = [];
+  for (const [i, raw] of input.entries()) {
+    if (typeof raw !== "object" || raw === null) return `views[${i}] must be an object`;
+    const v = raw as Record<string, any>;
+    const where = `views[${i}] (${v.kind})`;
+    const isField = (name: unknown, allowed: FieldType[]) => typeof name === "string" && allowed.includes(types.get(name)!);
+    const isGoal = (name: unknown) => name === undefined || (typeof name === "string" && name in goals);
+    switch (v.kind) {
+      case "progress": if (!isField(v.field, ["lifts"])) return `${where}: "field" must name a lifts field`; break;
+      case "weekly":
+        if (!isGoal(v.goal)) return `${where}: "goal" must name a key in "goals"`;
+        if (v.mark !== undefined && (!isField(v.mark.field, ["text", "enum"]) || typeof v.mark.contains !== "string" || !isGoal(v.mark.goal)))
+          return `${where}: "mark" needs a text/enum "field", a "contains" string and an optional "goal" key`;
+        break;
+      case "since": if (!isField(v.field, ["text", "enum"]) || !Array.isArray(v.values) || !v.values.every((x: unknown) => typeof x === "string")) return `${where}: needs a text "field" and a list of "values"`; break;
+      case "line":
+        if (typeof v.field !== "string" || (v.tab === undefined && !isField(v.field, ["number", "int"]))) return `${where}: "field" must name a number field (or set "tab" for another tab's field)`;
+        if (v.tab !== undefined && !SLUG.test(v.tab)) return `${where}: "tab" must be a tab slug`;
+        if (!isGoal(v.goal)) return `${where}: "goal" must name a key in "goals"`;
+        break;
+      case "due":
+        if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
+        if (v.score !== undefined && !isField(v.score.field, ["enum"])) return `${where}: "score.field" must name an enum field`;
+        break;
+      case "calibration": if (!isField(v.confidence, ["int", "number"]) || !isField(v.verdict, ["enum"]) || typeof v.right !== "string") return `${where}: needs a number "confidence", an enum "verdict" and the "right" value`; break;
+      case "stale": if (!isField(v.field, ["date", "datetime"]) || typeof v.days !== "number") return `${where}: needs a date "field" and "days"`; break;
+      default: return `views[${i}]: kind must be one of progress, weekly, since, line, due, calibration, stale`;
+    }
+    views.push(v as View);
+  }
+  return views;
+}
+
+// lifts: "flat db press: 45x10, 50x8, 60x6; pull up: bwx10, +25x4" (weights in the field's unit, lb unless set).
+// bw = bodyweight, +25 = bodyweight plus 25, 50x8x3 = three sets of 50x8.
+type LiftSet = { load: number | null; added: boolean; reps: number };
+type Lift = { exercise: string; sets: LiftSet[] };
+const SET = /^(bw|\+?\d+(?:\.\d+)?)\s*x\s*(\d+)(?:\s*x\s*(\d+))?$/;
+
+/** Parses and normalizes a lifts value. Returns the lifts, or an error saying what is wrong. */
+export function parseLifts(text: string): Lift[] | string {
+  const lifts: Lift[] = [];
+  for (const part of text.replaceAll("×", "x").split(";").map((p) => p.trim()).filter(Boolean)) {
+    const colon = part.indexOf(":");
+    if (colon < 1) return `"${part.slice(0, 30)}" needs "exercise: sets"`;
+    const exercise = part.slice(0, colon).trim().toLowerCase().replace(/\s+/g, " ");
+    if (!/^[a-z0-9][a-z0-9 ()'\/-]*$/.test(exercise)) return `exercise "${exercise}" may only use letters, digits, spaces and ()'/-`;
+    const sets: LiftSet[] = [];
+    for (const raw of part.slice(colon + 1).split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)) {
+      const m = SET.exec(raw);
+      if (!m) return `"${raw}" in ${exercise} must look like 50x8, bwx10, +25x6 or 50x8x3`;
+      const load = m[1] === "bw" ? null : Number(m[1].replace("+", ""));
+      for (let i = 0; i < Number(m[3] ?? 1); i++) sets.push({ load, added: m[1].startsWith("+"), reps: Number(m[2]) });
+    }
+    if (!sets.length) return `${exercise} has no sets`;
+    lifts.push({ exercise, sets });
+  }
+  return lifts.length ? lifts : "no exercises given";
+}
+
+const formatLifts = (lifts: Lift[]) =>
+  lifts.map((l) => `${l.exercise}: ${l.sets.map((s) => `${s.load === null ? "bw" : (s.added ? "+" : "") + s.load}x${s.reps}`).join(", ")}`).join("; ");
+
 function checkValue(field: Field, value: unknown): Value | { error: string } {
   const fail = (what: string) => ({ error: `"${field.name}" ${what}` });
-  if (field.type === "int") {
+  if (field.type === "int" || field.type === "number") {
     const n = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : NaN;
-    if (!Number.isInteger(n)) return fail("must be a whole number");
+    if (field.type === "int" && !Number.isInteger(n)) return fail("must be a whole number");
+    if (!Number.isFinite(n)) return fail("must be a number");
     if (field.min !== undefined && n < field.min) return fail(`must be at least ${field.min}`);
     if (field.max !== undefined && n > field.max) return fail(`must be at most ${field.max}`);
     return n;
@@ -117,6 +227,7 @@ function checkValue(field: Field, value: unknown): Value | { error: string } {
     case "datetime": return DATETIME.test(s) && validDate(s) ? s : fail("must be a date or iso date-time like 2026-11-18 or 2026-11-18T09:30-08:00");
     case "url": return /^https?:\/\/\S+$/.test(s) ? s : fail("must be a url starting with http:// or https://");
     case "enum": return field.options!.includes(s) ? s : fail(`must be one of: ${field.options!.join(", ")}`);
+    case "lifts": { const lifts = parseLifts(s); return typeof lifts === "string" ? fail(`is not valid: ${lifts}`) : formatLifts(lifts); }
     default: return s;
   }
 }
