@@ -17,5 +17,7 @@ export default defineConfig({
     // Off: one public address only. Turn it on briefly to golden-test a change before it reaches the domain.
     workersDev: false,
     previewUrls: false,
+    // On for uniformity. Requests that match a file are served without running a worker, so today this records nothing.
+    observability: { enabled: true, logs: { enabled: true, invocationLogs: true }, traces: { enabled: true } },
   },
 });

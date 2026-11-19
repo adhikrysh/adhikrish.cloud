@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => ({
     domains: ["seniorintern.adhikrish.cloud"],
     workersDev: false,
     previewUrls: false,
+    // Logs and traces in the dashboard (see private/admin/cloudflare.config.ts). Query strings are redacted:
+    // ?q= carries search terms, which can be people's names.
+    observability: { enabled: true, redactQueryString: true, logs: { enabled: true, invocationLogs: true }, traces: { enabled: true } },
     env: {
       DB: bindings.d1({ name: "snrintern", id: "7d86a3be-7d4b-45c6-97b1-d9990ae1d484" }),
       ACCESS_TEAM: bindings.text("adhikrish"),

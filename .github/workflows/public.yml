@@ -40,4 +40,12 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           CLOUDFLARE_API_TOKEN: op://adhikrish.cloud-ci/cloudflare-deploy/credential
-      - run: npm run deploy
+      # Retry only the deploy: a network blip should not need a human. Checks above are deterministic, so they never retry.
+      # Safe to repeat: the upload is the same files and applied d1 migrations are skipped.
+      - name: deploy (up to 3 tries, 15s then 30s apart)
+        run: |
+          for try in 1 2 3; do
+            npm run deploy && exit 0
+            [ "$try" -lt 3 ] && { echo "deploy failed (try $try), retrying in $((15 * try))s"; sleep $((15 * try)); }
+          done
+          exit 1
