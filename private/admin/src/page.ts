@@ -63,5 +63,5 @@ ${items(services, results, history)}
       </ul>`);
   const body = `      <h1>uptime</h1>
 ${sections.join("\n")}`;
-  return page({ design: { base, list }, title: "uptime", nav: "", body, css: CSS });
+  return page({ design: { base, list }, title: "uptime", nav: `<a class="back" href="https://adhikrish.cloud/" aria-label="back to adhikrish.cloud">←</a>`, body, css: CSS });
 }
