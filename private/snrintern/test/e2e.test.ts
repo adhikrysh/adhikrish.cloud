@@ -220,7 +220,7 @@ test("the contract is served by the api itself, as the agent sees it", async () 
   const doc = res.body as string;
   expect(doc).toStartWith("# senior intern api");
   expect(doc).toContain("GET /api/_docs (same headers)");
-  expect(doc).toBe(readFileSync(join(import.meta.dir, "../API.md"), "utf8")); // exactly the file in the repo
+  expect(doc).toBe(readFileSync(join(import.meta.dir, "../../../docs/seniorintern-api.md"), "utf8")); // exactly the file in the repo
   expect((await call("api index", "/api", { token: await dots() })).body.api.docs).toStartWith("GET /api/_docs");
 });
 

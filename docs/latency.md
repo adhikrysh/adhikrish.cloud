@@ -30,12 +30,12 @@ curl -o /dev/null -s -w \
 
 | change | where | why it helps on a long link |
 |---|---|---|
-| bbr congestion control + `fq` | [`config/sysctl/99-network-latency.conf`](../config/sysctl/99-network-latency.conf) | models bandwidth and rtt directly instead of backing off on every lost packet |
+| bbr congestion control + `fq` | [`config/sysctl/99-network-latency.conf`](../private/infra/config/sysctl/99-network-latency.conf) | models bandwidth and rtt directly instead of backing off on every lost packet |
 | tcp fast open (client and server) | same file | a returning client sends data in its first packet, saving one round trip |
 | no slow start after idle | same file | a pause, like switching tabs, does not reset the connection to a crawl |
 | shorter keepalives | same file | dead connections are noticed in about a minute instead of two hours |
 | http/2 on every proxy host | nginx proxy manager, per host | many requests share one connection instead of queueing |
-| gzip level 5 | [`config/nginx/custom-http.conf`](../config/nginx/custom-http.conf) | smaller responses need fewer round trips to deliver |
+| gzip level 5 | [`config/nginx/custom-http.conf`](../private/infra/config/nginx/custom-http.conf) | smaller responses need fewer round trips to deliver |
 
 ## what was considered and not done
 

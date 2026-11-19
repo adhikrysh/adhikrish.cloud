@@ -1,6 +1,6 @@
 # *.adhikrish.cloud
 
-everything i self-host lives under one domain now: this site, an admin dashboard, the api my personal agent writes to, and the photos, files and backups that run on an old thinkpad t480 in singapore. i work from palo alto, so two constraints drive every decision: nothing on the box is exposed to the internet, and every round trip across the pacific costs about 110 ms. the interesting part isn't the happy path. it's what happens when the power cuts out, the box reboots, or a path in breaks.
+everything i self-host lives under one domain now: this site, an uptime dashboard, the api my personal agent writes to, and the photos, files and backups that run on an old thinkpad t480 in singapore. i work from palo alto, so two constraints drive every decision: nothing on the box is exposed to the internet, and every round trip across the pacific costs about 110 ms. the interesting part isn't the happy path. it's what happens when the power cuts out, the box reboots, or a path in breaks.
 
 ## what runs where
 
@@ -35,7 +35,7 @@ all of it is one repo, [adhikrysh/adhikrish.cloud](https://github.com/adhikrysh/
 
 no port is forwarded on the router and my home ip isn't in dns. `cloudflared` runs as a container on the thinkpad and keeps an outbound tunnel open to cloudflare, and cloudflare pushes requests down it. one wildcard record sends every subdomain to the tunnel, so adding an app is a compose file and a proxy entry, with no dns change.
 
-before a request reaches the tunnel, cloudflare access checks who's asking. people log in with github, google or an emailed code. machines carry a service token: the immich app on my phone has one, and the admin dashboard's prober gets its own. each app gets its own docker network, and only the proxy is attached to all of them, so a compromised app can't talk to its neighbours.
+before a request reaches the tunnel, cloudflare access checks who's asking. people log in with github, google or an emailed code. machines carry a service token: the immich app on my phone has one, and the uptime dashboard's prober gets its own. a wildcard app locks every subdomain by default, and a service gets its own app only when one extra visitor, like that phone, needs into it and nothing else. access never merges apps: the most specific name wins, so each of those apps repeats the full guest list. [`docs/access.md`](https://github.com/adhikrysh/adhikrish.cloud/blob/main/docs/access.md) walks through it. each app gets its own docker network, and only the proxy is attached to all of them, so a compromised app can't talk to its neighbours.
 
 <figure class="diagram">
 <svg viewBox="0 0 600 232" role="img" aria-label="two independent paths in: public names through cloudflare and a tunnel to nginx proxy manager and per-app docker networks, private services only over tailscale between server, mac and phone">
@@ -90,7 +90,7 @@ a reboot is where the setup gets tested, because nobody is there to type command
 <figcaption>schematic of a cold boot. docker and tailscale start on their own; the tunnel is back as soon as its container is.</figcaption>
 </figure>
 
-- **containers.** every container has `restart: always` (the immich stack, uptime kuma) or `unless-stopped` (everything else), so docker brings them all back after a crash or a reboot. that's in the compose files. the difference matters only if i stop something by hand: `unless-stopped` stays stopped, `always` comes back.
+- **containers.** every container has `restart: always` (the immich stack) or `unless-stopped` (everything else), so docker brings them all back after a crash or a reboot. that's in the compose files. the difference matters only if i stop something by hand: `unless-stopped` stays stopped, `always` comes back.
 - **tunnel ordering.** the tunnel's compose file says it waits for the proxy's healthcheck. that's only true on `docker compose up`. on a cold boot docker restarts containers by policy and ignores health conditions, so the tunnel can come up first and return 502s for a few seconds until the proxy answers. harmless, but it's not the guarantee the compose file suggests.
 - **the photo database.** immich's postgres is pinned to an exact image digest and stores data checksums, so an upgrade only happens when i change the digest, and corruption from an unclean power cut gets reported instead of silently served.
 - **network tuning.** the tcp settings live in `/etc/sysctl.d/`, so they load on every boot.
@@ -109,16 +109,16 @@ the two paths in are there so a single failure doesn't lock me out. this is what
 | the thinkpad itself | this site, senior intern, and the uptime page, which then shows every app red | every self-hosted app |
 | home internet | everything, but only from inside the house | both paths, since both dial out |
 
-the last two rows are why the admin dashboard and this site don't run on the thinkpad.
+the last two rows are why the uptime dashboard and this site don't run on the thinkpad.
 
 ## watching it
 
-the old setup watched itself from the inside: uptime kuma and beszel run on the thinkpad, so when the thinkpad died, so did the thing that was supposed to notice. now there are two layers that live on cloudflare instead.
+the old setup watched itself from the inside: uptime kuma and beszel ran on the thinkpad, so when the thinkpad died, so did the thing that was supposed to notice. now there are two layers that live on cloudflare instead.
 
 - **the tunnel health alert.** cloudflare emails me when the tunnel's health changes. a dead box means a dead tunnel, so this catches the worst case with no code at all. it's included in the free zero trust plan.
 - **uptime.adhikrish.cloud.** a worker that requests each app through access and the tunnel, in parallel, whenever i open it and every five minutes on a schedule. it shows whether each one answered and how fast, plus its last 24 hours and its uptime over 30 days, kept in a d1 database. it tells apart an app that's down (a 5xx from the proxy), a tunnel that's down (cloudflare's 530), and a probe that access refused.
 
-the tunnel alert covers the whole box; the admin page covers each app on its own. beszel keeps cpu, memory, disk and temperature history on the box.
+the tunnel alert covers the whole box; the uptime page covers each app on its own. beszel keeps cpu, memory, disk and temperature history on the box.
 
 ## senior intern
 
@@ -149,7 +149,7 @@ before tuning anything, i timed a request from palo alto (in march, over about 1
 <figcaption>the same request, to scale. the server's own 30 ms is a small slice of the 182 ms before the first byte arrives, so the rest is distance.</figcaption>
 </figure>
 
-light in fibre needs about 68 ms each way over that distance, so no server tuning gets close to fixing this. the only lever is fewer round trips: bbr congestion control, tcp fast open, no slow start after idle connections, http/2 on every proxy host and gzip. keepalives detect a dead connection within about two minutes (60 seconds idle, then up to six probes 10 seconds apart). the configs and the measurement method are in [`private/infra/docs/latency.md`](https://github.com/adhikrysh/adhikrish.cloud/blob/main/private/infra/docs/latency.md). those settings only help connections that end on the box, like the tailnet. a visitor's tcp connection ends at cloudflare, and the tunnel itself runs over quic.
+light in fibre needs about 68 ms each way over that distance, so no server tuning gets close to fixing this. the only lever is fewer round trips: bbr congestion control, tcp fast open, no slow start after idle connections, http/2 on every proxy host and gzip. keepalives detect a dead connection within about two minutes (60 seconds idle, then up to six probes 10 seconds apart). the configs and the measurement method are in [`docs/latency.md`](https://github.com/adhikrysh/adhikrish.cloud/blob/main/docs/latency.md). those settings only help connections that end on the box, like the tailnet. a visitor's tcp connection ends at cloudflare, and the tunnel itself runs over quic.
 
 dns goes through adguard home, which blocks trackers and caches answers: about 123 ms for a fresh lookup, about 3 ms cached.
 

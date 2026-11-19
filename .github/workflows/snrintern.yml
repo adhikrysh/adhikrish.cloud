@@ -3,7 +3,7 @@ name: snrintern
 on:
   push:
     branches: [main]
-    paths: [private/snrintern/**, design/**, .github/workflows/snrintern.yml]
+    paths: [private/snrintern/**, docs/seniorintern-api.md, design/**, .github/workflows/snrintern.yml]
   workflow_dispatch:
 concurrency: snrintern
 permissions:

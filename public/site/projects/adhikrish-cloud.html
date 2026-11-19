@@ -148,7 +148,7 @@
       <div class="project-meta"><span class="pill">since dec 2024</span></div>
       <div class="readme">
 <p>everything i self-host lives under one domain now: this site, an
-admin dashboard, the api my personal agent writes to, and the photos,
+uptime dashboard, the api my personal agent writes to, and the photos,
 files and backups that run on an old thinkpad t480 in singapore. i work
 from palo alto, so two constraints drive every decision: nothing on the
 box is exposed to the internet, and every round trip across the pacific
@@ -199,10 +199,17 @@ adding an app is a compose file and a proxy entry, with no dns
 change.</p>
 <p>before a request reaches the tunnel, cloudflare access checks who's
 asking. people log in with github, google or an emailed code. machines
-carry a service token: the immich app on my phone has one, and the admin
-dashboard's prober gets its own. each app gets its own docker network,
-and only the proxy is attached to all of them, so a compromised app
-can't talk to its neighbours.</p>
+carry a service token: the immich app on my phone has one, and the
+uptime dashboard's prober gets its own. a wildcard app locks every
+subdomain by default, and a service gets its own app only when one extra
+visitor, like that phone, needs into it and nothing else. access never
+merges apps: the most specific name wins, so each of those apps repeats
+the full guest list. <a
+href="https://github.com/adhikrysh/adhikrish.cloud/blob/main/docs/access.md"
+target="_blank"
+rel="noopener noreferrer"><code>docs/access.md</code></a> walks through
+it. each app gets its own docker network, and only the proxy is attached
+to all of them, so a compromised app can't talk to its neighbours.</p>
 <figure class="diagram">
 <svg viewBox="0 0 600 232" role="img" aria-label="two independent paths in: public names through cloudflare and a tunnel to nginx proxy manager and per-app docker networks, private services only over tailscale between server, mac and phone">
 <defs><marker id="cloud-a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
@@ -263,7 +270,7 @@ type commands. here's the chain.</p>
 
 <ul>
 <li><strong>containers.</strong> every container has
-<code>restart: always</code> (the immich stack, uptime kuma) or
+<code>restart: always</code> (the immich stack) or
 <code>unless-stopped</code> (everything else), so docker brings them all
 back after a crash or a reboot. that's in the compose files. the
 difference matters only if i stop something by hand:
@@ -331,11 +338,11 @@ every app red</td>
 </tr>
 </tbody>
 </table></div>
-<p>the last two rows are why the admin dashboard and this site don't run
-on the thinkpad.</p>
+<p>the last two rows are why the uptime dashboard and this site don't
+run on the thinkpad.</p>
 <h2 id="watching-it">watching it</h2>
 <p>the old setup watched itself from the inside: uptime kuma and beszel
-run on the thinkpad, so when the thinkpad died, so did the thing that
+ran on the thinkpad, so when the thinkpad died, so did the thing that
 was supposed to notice. now there are two layers that live on cloudflare
 instead.</p>
 <ul>
@@ -351,9 +358,9 @@ d1 database. it tells apart an app that's down (a 5xx from the proxy), a
 tunnel that's down (cloudflare's 530), and a probe that access
 refused.</li>
 </ul>
-<p>the tunnel alert covers the whole box; the admin page covers each app
-on its own. beszel keeps cpu, memory, disk and temperature history on
-the box.</p>
+<p>the tunnel alert covers the whole box; the uptime page covers each
+app on its own. beszel keeps cpu, memory, disk and temperature history
+on the box.</p>
 <h2 id="senior-intern">senior intern</h2>
 <p>senior intern is the data store for my personal agent (an openai
 dot). it holds people i've met, forecasts i want to be scored on,
@@ -400,12 +407,12 @@ connections, http/2 on every proxy host and gzip. keepalives detect a
 dead connection within about two minutes (60 seconds idle, then up to
 six probes 10 seconds apart). the configs and the measurement method are
 in <a
-href="https://github.com/adhikrysh/adhikrish.cloud/blob/main/private/infra/docs/latency.md"
+href="https://github.com/adhikrysh/adhikrish.cloud/blob/main/docs/latency.md"
 target="_blank"
-rel="noopener noreferrer"><code>private/infra/docs/latency.md</code></a>.
-those settings only help connections that end on the box, like the
-tailnet. a visitor's tcp connection ends at cloudflare, and the tunnel
-itself runs over quic.</p>
+rel="noopener noreferrer"><code>docs/latency.md</code></a>. those
+settings only help connections that end on the box, like the tailnet. a
+visitor's tcp connection ends at cloudflare, and the tunnel itself runs
+over quic.</p>
 <p>dns goes through adguard home, which blocks trackers and caches
 answers: about 123 ms for a fresh lookup, about 3 ms cached.</p>
 <h2 id="backups">backups</h2>

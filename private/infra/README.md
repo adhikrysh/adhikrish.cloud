@@ -23,8 +23,8 @@ nightly (utc)
 | [`scripts/apply-tcp-tuning.sh`](scripts/apply-tcp-tuning.sh) | installs [`config/sysctl/99-network-latency.conf`](config/sysctl/99-network-latency.conf) |
 | [`config/nginx/custom-http.conf`](config/nginx/custom-http.conf) | gzip for nginx proxy manager |
 | [`config/systemd-user/second-brain-drive.service`](config/systemd-user/second-brain-drive.service) | rclone mount of the obsidian vaults on google drive |
-| [`docs/add-a-service.md`](docs/add-a-service.md) | the runbook for adding an app behind the tunnel |
-| [`docs/latency.md`](docs/latency.md) | measuring each request phase before tuning anything |
+| [`docs/add-a-service.md`](../../docs/add-a-service.md) | the runbook for adding an app behind the tunnel |
+| [`docs/latency.md`](../../docs/latency.md) | measuring each request phase before tuning anything |
 
 uptime and senior intern don't run here: they're cloudflare workers in [`../admin/`](../admin/) and [`../snrintern/`](../snrintern/), so they keep working when this box is off.
 

@@ -8,24 +8,25 @@ One repo for everything under `*.adhikrish.cloud`. The global AGENTS.md still ap
 |---|---|---|---|
 | `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare worker, assets only (`public/cloudflare.config.ts`) | `.github/workflows/public.yml` |
 | `private/admin/` | uptime.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
-| `private/snrintern/` | seniorintern.adhikrish.cloud ("senior intern"): people, forecasts, training, body; json api for the personal agent (contract: `private/snrintern/API.md`) | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
+| `private/snrintern/` | seniorintern.adhikrish.cloud ("senior intern"): people, forecasts, training, body; json api for the personal agent (contract: `docs/seniorintern-api.md`) | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
 | `private/infra/` | the thinkpad's compose files, scripts, configs, runbooks | thinkpad | by hand (see `private/infra/README.md`) |
+| `docs/` | how the cross-cutting mechanisms work (start with `docs/access.md`); rules for writing them in `docs/AGENTS.md` | | |
 | `design/` | shared css (`base.css`, `list.css`) and the html shell for the private sites (`html.ts`) | | triggers every site |
-| `services.json` | the list of services: admin's links and health probes | | triggers admin |
+| `services.json` | the list of services: the uptime page's links and health probes | | triggers admin |
 
 The full write-up of how it all fits together, including restart handling and failure modes: `public/content/projects/adhikrish-cloud.md` (served at /src/adhikrish-cloud).
 
 ## Where to add things
 
-- **A self-hosted service:** follow `private/infra/docs/add-a-service.md`. Its last step adds one entry to `services.json` (`name`, `url`, optional `health` url, `about`). Admin picks it up on the next deploy.
-- **A senior intern tab or column:** no code and no migration. The schema is data in d1: `PUT /api/_tabs/<slug>` with the definition (see `private/snrintern/API.md`). Rows are json documents checked against it (`private/snrintern/src/schema.ts`), and every change lands in `/api/_log`. What a tab opens on (charts, due lists) is the definition's `views` (`src/views.ts`), so a new tab or exercise needs no code. Migrations are only for the storage itself (`tabs`, `rows`, `schema_log`).
+- **A self-hosted service:** follow `docs/add-a-service.md`. Its last step adds one entry to `services.json` (`name`, `url`, optional `health` url, `about`). The uptime page picks it up on the next deploy.
+- **A senior intern tab or column:** no code and no migration. The schema is data in d1: `PUT /api/_tabs/<slug>` with the definition (see `docs/seniorintern-api.md`). Rows are json documents checked against it (`private/snrintern/src/schema.ts`), and every change lands in `/api/_log`. What a tab opens on (charts, due lists) is the definition's `views` (`src/views.ts`), so a new tab or exercise needs no code. Migrations are only for the storage itself (`tabs`, `rows`, `schema_log`).
 - **A write-up:** see `public/AGENTS.md`.
 
 ## Rules
 
-- Public vs private is about access, not hosting. Everything private sits behind cloudflare access; senior intern also verifies the access jwt itself (`private/snrintern/src/auth.ts`).
+- Public vs private is about access, not hosting. Everything private sits behind cloudflare access; senior intern also verifies the access jwt itself (`private/snrintern/src/auth.ts`). How apps, policies, service tokens and bypasses decide who gets in: `docs/access.md`.
 - No secrets in git, ever. 1password is the source of truth:
-  - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-uptime-prober` (the admin prober's access service token).
+  - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-uptime-prober` (the uptime prober's access service token).
   - vault `Personal`: `snrintern dots token` (the agent's access service token; its client id is in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`).
   - none of these expire. revoke in cloudflare (zero trust > service tokens, or profile > api tokens) if one leaks.
   - the thinkpad keeps per-app `.env` files that are never committed.

@@ -1,7 +1,4 @@
 .DS_Store
-.gstack/
-output/
-.wrangler/
 node_modules/
 .cloudflare/
 *.db
