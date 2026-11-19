@@ -1,0 +1,43 @@
+# adhikrish.cloud: check the committed html is what the sources render to, then upload public/site as an
+# assets-only worker. Same tool and shape as admin.yml and snrintern.yml; a failed run can be re-run from github.
+name: public
+on:
+  push:
+    branches: [main]
+    paths: [public/**, design/**, .github/workflows/public.yml]
+  workflow_dispatch:
+concurrency: public
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      # The renderer's html depends on the pandoc version, so pin the one the committed pages were made with.
+      - run: |
+          curl -fsSL -o /tmp/pandoc.deb https://github.com/jgm/pandoc/releases/download/3.11/pandoc-3.11-1-amd64.deb
+          sudo dpkg -i /tmp/pandoc.deb
+      # Fails when someone edited a template, a write-up or design/ and forgot to render.
+      - name: committed html matches the sources
+        run: |
+          bun scripts/render-projects.ts
+          git diff --exit-code -- site || { echo "public/site is stale: run 'bun public/scripts/render-projects.ts' and commit the result"; exit 1; }
+      - run: npm ci
+      # 1password is the source of truth for secrets; the service account can only read the ci vault.
+      - uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: op://adhikrish.cloud-ci/cloudflare-deploy/credential
+      - run: npm run deploy

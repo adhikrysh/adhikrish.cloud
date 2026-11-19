@@ -1,0 +1,12 @@
+{
+  "name": "adhikrish-cloud",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "bun scripts/render-projects.ts",
+    "deploy": "cf deploy site"
+  },
+  "devDependencies": {
+    "cf": "1.0.0-rc.1"
+  }
+}

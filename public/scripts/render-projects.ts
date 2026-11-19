@@ -213,6 +213,8 @@ ${metadata}      <div class="readme">
 ${body}      </div>
     </main>
   </div>
+<!-- cloudflare web analytics: visit counts, no cookies -->
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "5afdcbbc1c1e4d9b9aeb8116ad429e3b"}'></script>
 </body>
 </html>
 `);

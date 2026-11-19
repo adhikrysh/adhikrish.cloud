@@ -4,7 +4,7 @@ Rules for the public site. The repo-root AGENTS.md and the global AGENTS.md stil
 
 ## Layout
 
-- `site/` is exactly what cloudflare pages serves. `nsnip.html`, `_headers`, `_redirects` and `assets/` live here by hand; every other page is generated. Edit `templates/index.html`, `templates/txt.html` and `templates/404.html`, never their copies in `site/`.
+- `site/` is exactly what the worker serves (`cloudflare.config.ts`, deployed by `.github/workflows/public.yml`). `nsnip.html`, `_headers`, `_redirects` and `assets/` live here by hand; every other page is generated. Edit `templates/index.html`, `templates/txt.html` and `templates/404.html`, never their copies in `site/`.
 - `content/`, `templates/` and `scripts/` are sources. They are not served.
 - the templates pull shared css from `../design/` through `/* @design <file> */` lines. every size and colour is a variable in `design/base.css` (`--fs-*`, `--muted`, ...); use those, never a literal. the one exception is the svg diagrams' own text sizes.
 

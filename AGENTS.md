@@ -6,7 +6,7 @@ One repo for everything under `*.adhikrish.cloud`. The global AGENTS.md still ap
 
 | path | what | runs on | deploys when |
 |---|---|---|---|
-| `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare pages | `public/**` or `design/**` changes (pages build watch paths) |
+| `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare worker, assets only (`public/cloudflare.config.ts`) | `.github/workflows/public.yml` |
 | `private/admin/` | admin.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
 | `private/snrintern/` | snrintern.adhikrish.cloud ("snr intern"): people, forecasts, training, body; json api for the personal agent (contract: `private/snrintern/API.md`) | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
 | `private/infra/` | the thinkpad's compose files, scripts, configs, runbooks | thinkpad | by hand (see `private/infra/README.md`) |
@@ -29,14 +29,14 @@ The full write-up of how it all fits together, including restart handling and fa
   - vault `Personal`: `snrintern dots token` (the agent's access service token; its client id is in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`).
   - none of these expire. revoke in cloudflare (zero trust > service tokens, or profile > api tokens) if one leaks.
   - the thinkpad keeps per-app `.env` files that are never committed.
-- Anything that must work while the thinkpad is off runs on cloudflare (pages, the admin and snrintern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).
+- Anything that must work while the thinkpad is off runs on cloudflare (the public, admin and snrintern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).
 - One design for every site: `design/base.css` + `design/list.css` (through `design/html.ts` on the private sites, through the templates on the public one). Every size and colour is a variable in `base.css` (`--fs-*`, `--muted`, `--good`, ...); never write a literal.
   - links are always underlined; in a list row only the title is. no focus boxes: a focused link dims like a hovered one.
   - green (`--good`) and red (`--bad`) mean state, nothing else. labels and section headings are white pills; a state can be an outlined pill (white, green or red border).
   - every page below the top starts with a `←` to its parent instead of a link with the parent's name.
   - minimal: no counts, no dot separators, no filler words, no hardcoded targets or thresholds (show what happened, compare with its own history).
 - Code is typescript. The exceptions: the thinkpad's scripts in `private/infra/scripts/` are bash, and `public/scripts/navigation-preload.js` is plain js because it is inlined into pages. The public renderer is `public/scripts/render-projects.ts` (bun + pandoc).
-- Tests are end-to-end only. `cd private/snrintern && bun test` runs the worker in workerd on local d1 against a fake access key server, defines tabs from `test/fixtures/tabs.json` (keep it in step with production's definitions), and writes `test/artifacts/`. Admin: `cd private/admin && npm run check`, then `npx vite dev` to probe the real hostnames locally.
+- Tests are end-to-end only. `cd private/snrintern && bun test` runs the worker in workerd on local d1 against a fake access key server, defines tabs from `test/fixtures/tabs.json` (keep it in step with production's definitions), and writes `test/artifacts/`. Admin: `cd private/admin && npm run check`, then `npx vite dev` to probe the real hostnames locally. Public: `bun public/test/golden.ts <reference-origin> <candidate-origin>` asks both hosts every url (every page form, every `_redirects` rule, missing pages) and compares status, redirect target, cache headers, content type and body; run it before any change to `public/cloudflare.config.ts`, `_headers` or `_redirects`, against a `workersDev` copy. It writes `public/test/artifacts/`.
 - Cloudflare is managed with the `cf` cli (profile `adhi` is bound to this folder). Read freely; ask before any change.
 - Bot defences: browser integrity check and bot fight mode are on for the whole zone. One configuration rule (`http_config_settings`) turns browser integrity check off for `snrintern.adhikrish.cloud/api*`, because the agent's python client (user agent `Python-urllib`) is otherwise refused with error 1010 before access runs; access still demands the service token there. Bot fight mode can't be exempted per path on the free plan, so if the agent ever gets a challenge page, the fix is turning bot fight mode off for the zone (ask first).
 - Leave changes uncommitted for review unless told otherwise.

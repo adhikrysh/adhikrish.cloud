@@ -1,6 +1,6 @@
 # adhikrish.cloud (public site)
 
-static html and css in `site/`, deployed by cloudflare pages from `main` whenever `public/` or `design/` changes. every page and link works without javascript; one small inline script only warms the next page's html.
+static html and css in `site/`, served by an assets-only cloudflare worker (`cloudflare.config.ts`, no code). on every push to `main` that touches `public/` or `design/`, `.github/workflows/public.yml` re-renders the site, fails if the committed html differs, then runs `cf deploy site`. every page and link works without javascript; one small inline script only warms the next page's html.
 
 ## pages
 
@@ -36,3 +36,7 @@ the font is a local copy of inter v20 latin, preloaded by every page (and sent e
 ## navigation-preload.js
 
 `scripts/navigation-preload.js` fetches linked `/src` pages at low priority into the normal browser cache, so a click lands on a warm page: home warms the index, the index warms its write-ups, and hovering or touching a local link starts its fetch. it skips automatic warming on data-saving or 2g connections and renders nothing. the renderer embeds it in home, the index and every write-up; rerun it after changing the script.
+
+## testing a serving change
+
+before changing `cloudflare.config.ts`, `site/_headers` or `site/_redirects`: set `workersDev: true` and `domains: []` in a scratch copy of the config, `cf deploy site` it, then run `bun public/test/golden.ts https://adhikrish.cloud <the workers.dev url>`. it compares every url and saves the result in `test/artifacts/`. the live site's known, accepted differences from the old pages hosting (2026-11-19): legacy `/projects|/etc|/essays/<slug>.html` links take two redirects, `/index.html`-style urls redirect with 307, and missing pages are sent `max-age=0` (`/src/<missing>` 300s).
