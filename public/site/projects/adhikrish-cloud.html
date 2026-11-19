@@ -198,13 +198,13 @@ down it. one wildcard record sends every subdomain to the tunnel, so
 adding an app is a compose file and a proxy entry, with no dns
 change.</p>
 <p>before a request reaches the tunnel, cloudflare access checks who's
-asking. people log in with github, google or an emailed code. machines
-carry a service token: the immich app on my phone has one, and the
-uptime dashboard's prober gets its own. a wildcard app locks every
-subdomain by default, and a service gets its own app only when one extra
-visitor, like that phone, needs into it and nothing else. access never
-merges apps: the most specific name wins, so each of those apps repeats
-the full guest list. <a
+asking. people log in with google, and nothing else. machines carry a
+service token: the immich app on my phone has one, and the uptime
+dashboard's prober gets its own. a wildcard app locks every subdomain by
+default, and a service gets its own app only when one extra visitor,
+like that phone, needs into it and nothing else. access never merges
+apps: the most specific name wins, so each of those apps repeats the
+full guest list. <a
 href="https://github.com/adhikrysh/adhikrish.cloud/blob/main/docs/access.md"
 target="_blank"
 rel="noopener noreferrer"><code>docs/access.md</code></a> walks through

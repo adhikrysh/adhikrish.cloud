@@ -56,7 +56,7 @@ export default {
     const [now, history] = await Promise.all([latest(env.DB), uptime(env.DB, Date.now())]);
     const results = (services: Service[]) => services.map((s) => now.get(s.name) ?? waiting(s.name));
     const [pub, priv] = [results(publicSites), results(privateSites)];
-    return new Response(render([["public", publicSites, pub], ["self-hosted", privateSites, priv]], history), {
+    return new Response(render([["public", publicSites, pub], ["private/self-hosted", privateSites, priv]], history), {
       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     });
   },
