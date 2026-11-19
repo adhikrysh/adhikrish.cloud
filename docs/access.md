@@ -64,7 +64,7 @@ the layout follows from the trap above: lock everything by default, then make on
 |---|---|---|
 | the wildcard, `*.adhikrish.cloud` | the owner, the uptime prober | the default lock. any private name without its own app lands here, so a new service is guarded the moment it gets a hostname |
 | one app per extra visitor | the owner, the uptime prober, **plus that visitor** | a device, a family member or an agent needs into exactly one service and nothing else. giving them the wildcard would open every service |
-| one bypass app | everyone | the public site must stay public. without it, the wildcard would put a login in front of `www.` |
+| one bypass app per public page | everyone | some names under the wildcard must stay public (`www.`, the uptime page). without a bypass, the wildcard puts a login in front of them |
 | the app launcher | the owner | cloudflare's built-in page listing your apps. it comes with the account |
 
 the naming convention is that a policy is named after **who** it lets in (`owner_policy`, `uptime-prober_policy`, `<service>-<visitor>_policy`), and a token after the machine that carries it.
@@ -91,6 +91,8 @@ an app behind access can verify that signature against cloudflare's public keys 
 the audience tag belongs to the app, not to the hostname. renaming an app's hostname keeps its tag, so the code that checks the tag doesn't change. deleting and recreating the app makes a new tag, and every check against the old one fails. so rename apps in place, never delete and recreate them.
 
 a bypass app attaches no pass, because nobody was checked. anything that relies on the pass can't sit behind a bypass.
+
+a public page that does work on every visit can be used to make *you* do work. the uptime page used to probe every service on each load, about one request per service through the tunnel, so anyone reloading it in a loop could push traffic into the box. it went public only after it switched to reading what its 5-minute timer stored. before you bypass a page, check what a single visit costs.
 
 ## invariants
 

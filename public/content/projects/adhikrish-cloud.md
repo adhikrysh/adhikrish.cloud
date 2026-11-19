@@ -116,7 +116,7 @@ the last two rows are why the uptime dashboard and this site don't run on the th
 the old setup watched itself from the inside: uptime kuma and beszel ran on the thinkpad, so when the thinkpad died, so did the thing that was supposed to notice. now there are two layers that live on cloudflare instead.
 
 - **the tunnel health alert.** cloudflare emails me when the tunnel's health changes. a dead box means a dead tunnel, so this catches the worst case with no code at all. it's included in the free zero trust plan.
-- **uptime.adhikrish.cloud.** a worker that requests each app through access and the tunnel, in parallel, whenever i open it and every five minutes on a schedule. it shows whether each one answered and how fast, plus its last 24 hours and its uptime over 30 days, kept in a d1 database. it tells apart an app that's down (a 5xx from the proxy), a tunnel that's down (cloudflare's 530), and a probe that access refused.
+- **uptime.adhikrish.cloud.** a public page, linked from the corner of the home page. a worker requests each app through access and the tunnel, in parallel, every five minutes, and the page only reads what it stored, so a visit never touches the thinkpad. it shows whether each one answered and how fast, plus its last 24 hours and its uptime over 30 days, kept in a d1 database. it tells apart an app that's down (a 5xx from the proxy), a tunnel that's down (cloudflare's 530), and a probe that access refused.
 
 the tunnel alert covers the whole box; the uptime page covers each app on its own. beszel keeps cpu, memory, disk and temperature history on the box.
 
