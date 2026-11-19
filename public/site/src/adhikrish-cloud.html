@@ -25,7 +25,7 @@
     src: url('/assets/inter-latin-c940764593d0.woff2') format('woff2');
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
-  /* The only sizes and colours on any page: the public site, admin and snr intern all use these and nothing else. */
+  /* The only sizes and colours on any page: the public site, admin and senior intern all use these and nothing else. */
   :root {
     --fs-title: 24px;   /* page titles */
     --fs-heading: 20px; /* write-up section headings */
@@ -161,7 +161,7 @@ thinkpad is off runs on cloudflare, and that now includes my agent's
 data. the thinkpad keeps what needs a big local disk: photos, files and
 their backups. everything on cloudflare fits inside the free plan.</p>
 <figure class="diagram">
-<svg viewBox="0 0 600 300" role="img" aria-label="cloudflare runs the public site on pages, the admin dashboard and snrintern as workers with a d1 database, the access login and the tunnel endpoint; the thinkpad runs nginx proxy manager and the self-hosted apps">
+<svg viewBox="0 0 600 300" role="img" aria-label="cloudflare runs the public site on pages, the uptime dashboard and senior intern as workers with a d1 database, the access login and the tunnel endpoint; the thinkpad runs nginx proxy manager and the self-hosted apps">
 <defs><marker id="cloud-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
 <rect class="d-store" x="4" y="4" width="592" height="122" rx="14"/>
 <text class="d-t" x="20" y="28" text-anchor="start">cloudflare, keeps working when the thinkpad is off</text>
@@ -186,8 +186,8 @@ their backups. everything on cloudflare fits inside the free plan.</p>
 <p>all of it is one repo, <a
 href="https://github.com/adhikrysh/adhikrish.cloud" target="_blank"
 rel="noopener noreferrer">adhikrysh/adhikrish.cloud</a>.
-<code>public/</code> is this site, <code>private/</code> is the admin
-worker, snrintern and the server's compose files, and
+<code>public/</code> is this site, <code>private/</code> is the uptime
+worker, senior intern and the server's compose files, and
 <code>design/</code> is the css both halves share. ci deploys each piece
 only when its own files change.</p>
 <h2 id="no-open-ports">no open ports</h2>
@@ -320,8 +320,8 @@ files and the port list.</p>
 </tr>
 <tr>
 <td>the thinkpad itself</td>
-<td>this site, snrintern, and the admin page, which then shows every app
-red</td>
+<td>this site, senior intern, and the uptime page, which then shows
+every app red</td>
 <td>every self-hosted app</td>
 </tr>
 <tr>
@@ -343,7 +343,7 @@ instead.</p>
 the tunnel's health changes. a dead box means a dead tunnel, so this
 catches the worst case with no code at all. it's included in the free
 zero trust plan.</li>
-<li><strong>admin.adhikrish.cloud.</strong> a worker that requests each
+<li><strong>uptime.adhikrish.cloud.</strong> a worker that requests each
 app through access and the tunnel, in parallel, whenever i open it and
 every five minutes on a schedule. it shows whether each one answered and
 how fast, plus its last 24 hours and its uptime over 30 days, kept in a
@@ -354,12 +354,13 @@ refused.</li>
 <p>the tunnel alert covers the whole box; the admin page covers each app
 on its own. beszel keeps cpu, memory, disk and temperature history on
 the box.</p>
-<h2 id="snrintern">snrintern</h2>
-<p>snrintern is the data store for my personal agent (an openai dot). it
-holds people i've met, forecasts i want to be scored on, training
-sessions and weigh-ins: four tables in a cloudflare d1 database. it
-started as a google sheet. the agent writes to it with plain http calls,
-and i read it as a minimal page with a tab per table.</p>
+<h2 id="senior-intern">senior intern</h2>
+<p>senior intern is the data store for my personal agent (an openai
+dot). it holds people i've met, forecasts i want to be scored on,
+training sessions and weigh-ins: four tables in a cloudflare d1
+database. it started as a google sheet. the agent writes to it with
+plain http calls, and i read it as a minimal page with a tab per
+table.</p>
 <p>it's a worker, so it stays up when the thinkpad doesn't, and it costs
 nothing: the free plan allows 100,000 requests and 100,000 row writes a
 day, and the whole dataset is a few dozen rows. access sits in front of
