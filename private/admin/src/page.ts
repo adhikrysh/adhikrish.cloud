@@ -1,4 +1,4 @@
-// The dashboard: every service, whether it answered just now, how fast, and its last 24 hours.
+// The dashboard: every service, whether its last probe (at most 5 minutes old) answered, how fast, and its last 24 hours.
 import { escape, page } from "../../../design/html.ts";
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
@@ -32,7 +32,7 @@ function strip(u: Uptime | undefined): string {
 function items(services: Service[], results: ProbeResult[], history: Map<string, Uptime>): string {
   return services.map((service, i) => {
     const r = results[i];
-    const note = r.up ? `<small>${r.ms} ms</small>` : `<small class="bad">${escape(r.error)}</small>`;
+    const note = r.up ? (r.ms === null ? "" : `<small>${r.ms} ms</small>`) : `<small class="bad">${escape(r.error)}</small>`;
     const about = service.about ? `\n            <p>${escape(service.about)}</p>` : "";
     return `          <li>
             <a href="${escape(service.url)}"><span><i class="dot ${r.up ? "up" : "down"}"></i>${escape(service.name)}</span>${note}</a>${about}

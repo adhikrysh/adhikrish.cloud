@@ -24,6 +24,8 @@
   .links a { position: relative; display: inline-flex; align-items: center; min-height: 32px; flex-shrink: 0; white-space: nowrap; }
   /* The invisible target keeps short labels easy to click without adding visible gaps. */
   .links a::before { content: ''; position: absolute; top: 0; left: 50%; width: max(100%, 32px); height: 100%; transform: translateX(-50%); }
+  /* The way to the live status page: in a corner, apart from the content, easy to miss. */
+  .corner { position: fixed; right: 28px; bottom: 22px; color: var(--muted); font-size: var(--fs-small); }
   @media (max-width: 720px) { body { padding: 40px 28px; min-height: 100svh; } }
   @media (max-width: 360px) { body { padding-inline: 20px; } }
 </style>
@@ -46,6 +48,7 @@
       <a href="https://github.com/adhikrysh" target="_blank" rel="noopener noreferrer" aria-label="github" title="github">github</a>
     </nav>
   </main>
+  <a class="corner" href="https://uptime.adhikrish.cloud/">uptime</a>
 <!-- cloudflare web analytics: visit counts, no cookies -->
 <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "5afdcbbc1c1e4d9b9aeb8116ad429e3b"}'></script>
 </body>

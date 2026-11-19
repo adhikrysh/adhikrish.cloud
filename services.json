@@ -3,7 +3,7 @@
     {
       "name": "adhikrish.cloud",
       "url": "https://adhikrish.cloud/",
-      "about": "this site, static on cloudflare pages"
+      "about": "static site on cf pages"
     }
   ],
   "private": [
@@ -11,7 +11,7 @@
       "name": "senior intern (src of truth for agents)",
       "url": "https://seniorintern.adhikrish.cloud/",
       "health": "https://seniorintern.adhikrish.cloud/health",
-      "about": "people, outbound, forecasts, gym"
+      "about": "agents"
     },
     {
       "name": "npm",
