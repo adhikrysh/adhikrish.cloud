@@ -8,7 +8,7 @@ every app lives in its own folder with its own compose file and its own docker n
 4. restart the proxy: `docker compose up -d` in its folder. the tunnel waits for the proxy's healthcheck before reconnecting.
 5. start the service: `docker compose up -d` in its folder.
 6. in the proxy's admin ui, add a proxy host: domain `<service>.adhikrish.cloud`, scheme `http`, forward host = the container name, forward port = the container's internal port.
-7. access: every `*.adhikrish.cloud` name is already behind the wildcard access app (your login only). add a separate access app only if something else needs in, like a phone app's service token. include the `admin-prober` service token in that app's policies so admin can probe it.
+7. access: every `*.adhikrish.cloud` name is already behind the wildcard access app (your login only). add a separate access app only if something else needs in, like a phone app's service token. include the `uptime-prober` service token in that app's policies so admin can probe it.
 8. add the service to `services.json` at the repo root (`name`, `url`, optional `health`, `about`). uptime.adhikrish.cloud shows it after the next deploy.
 9. if the service keeps state, put it on `/srv/sambashare/data` (backed up nightly) or add it to [`scripts/backup_configs.sh`](../scripts/backup_configs.sh).
 

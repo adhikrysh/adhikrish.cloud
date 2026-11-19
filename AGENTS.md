@@ -25,7 +25,7 @@ The full write-up of how it all fits together, including restart handling and fa
 
 - Public vs private is about access, not hosting. Everything private sits behind cloudflare access; senior intern also verifies the access jwt itself (`private/snrintern/src/auth.ts`).
 - No secrets in git, ever. 1password is the source of truth:
-  - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-admin-prober` (the admin prober's access service token).
+  - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-uptime-prober` (the admin prober's access service token).
   - vault `Personal`: `snrintern dots token` (the agent's access service token; its client id is in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`).
   - none of these expire. revoke in cloudflare (zero trust > service tokens, or profile > api tokens) if one leaks.
   - the thinkpad keeps per-app `.env` files that are never committed.
