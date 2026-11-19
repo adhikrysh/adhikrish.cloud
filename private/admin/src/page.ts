@@ -2,7 +2,7 @@
 import { escape, page } from "../../../design/html.ts";
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
-import type { ProbeResult, Service } from "./probe.ts";
+import { publicSites, type ProbeResult, type Service } from "./probe.ts";
 
 export type Uptime = { ticks: (boolean | null)[]; ratio: number | null };
 export type Group = [title: string, services: Service[], results: ProbeResult[]];
@@ -29,10 +29,25 @@ function strip(u: Uptime | undefined): string {
   return `<p class="uptime"><span class="ticks" title="last 24 hours">${ticks}</span>${ratio}</p>`;
 }
 
+// Cloudflare names its data centers by the nearest airport's code. The ones probes have run from so far, plus neighbours.
+const CITY: Record<string, string> = {
+  SIN: "singapore", SJC: "san jose", SFO: "san francisco", LAX: "los angeles", SEA: "seattle", PDX: "portland",
+  IAD: "ashburn", EWR: "newark", ORD: "chicago", DFW: "dallas", HKG: "hong kong", NRT: "tokyo", FRA: "frankfurt", LHR: "london",
+};
+const place = (colo: string | null) => (colo ? `cloudflare ${colo}${CITY[colo] ? ` (${CITY[colo]})` : ""}` : "an unrecorded cloudflare data center");
+
+/** The hover note: where the probe started, and the road it took. See docs/uptime-probes.md. */
+function origin(service: Service, colo: string | null): string {
+  if (service.binding) return `measured from ${place(colo)} over a service binding. ${service.name.split(" (")[0]} runs next to its database, placed at aws:us-west-2`;
+  if (publicSites.includes(service)) return `measured from ${place(colo)}, answered by the nearest cloudflare data center`;
+  return `measured from ${place(colo)}, through access and the tunnel to the thinkpad`;
+}
+
 function items(services: Service[], results: ProbeResult[], history: Map<string, Uptime>): string {
   return services.map((service, i) => {
     const r = results[i];
-    const note = r.up ? (r.ms === null ? "" : `<small>${r.ms} ms</small>`) : `<small class="bad">${escape(r.error)}</small>`;
+    const where = escape(origin(service, r.colo ?? null));
+    const note = r.up ? (r.ms === null ? "" : `<small title="${where}">${r.ms} ms</small>`) : `<small class="bad" title="${where}">${escape(r.error)}</small>`;
     const about = service.about ? `\n            <p>${escape(service.about)}</p>` : "";
     return `          <li>
             <a href="${escape(service.url)}"><span><i class="dot ${r.up ? "up" : "down"}"></i>${escape(service.name)}</span>${note}</a>${about}

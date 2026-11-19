@@ -120,7 +120,7 @@ test("requests that did not come through access are refused", async () => {
   expect((await call("no jwt", "/api")).status).toBe(401);
   expect((await call("jwt for another app", "/api", { token: await sign({ email: "me@example.com" }, { aud: "other-app" }) })).status).toBe(401);
   expect((await call("jwt signed by the wrong key", "/api", { token: await sign({ email: "me@example.com" }, { forged: true }) })).status).toBe(401);
-  expect((await call("health from outside the uptime binding needs a jwt", "/health")).status).toBe(401);
+  expect((await call("health needs no jwt (access guards it in production)", "/health")).status).toBe(200);
   expect((await call("a service token that is not a listed agent may not read data", "/api", { token: await sign({ common_name: "some-other-token-id" }) })).status).toBe(403);
 });
 

@@ -1,17 +1,22 @@
 // uptime.adhikrish.cloud
-//   scheduled (every 5 minutes): ask this worker's own fetch handler, through SELF, to probe. Placement pins the fetch
-//     handler near singapore but never moves the timer, so the probing happens there, not wherever the timer ran.
-//   fetch /_probe (only with the timer's key): probe every service and store the result; drop rows older than 30 days once a day.
+//   scheduled (every 5 minutes): probe the public site and the cloudflare workers right here, and hand the self-hosted
+//     apps to this worker's own fetch handler through SELF. Placement pins that handler near singapore, next to the
+//     thinkpad, but never moves the timer. Drop rows older than 30 days once a day.
+//   fetch /_probe (only with the timer's key): probe the self-hosted apps from singapore and store the results.
 //   fetch: read only what the timer stored. A visit never probes, so reloading the page can't push traffic
 //   through the tunnel to the thinkpad, and the page is at most 5 minutes old.
-import { privateSites, probe, publicSites, type ProbeResult, type Service } from "./probe.ts";
+import { here, privateSites, probe, publicSites, type ProbeResult, type Service } from "./probe.ts";
 import { render, type Uptime } from "./page.ts";
 
 type Env = { DB: D1Database; SELF: Fetcher; SENIORINTERN: Fetcher; ACCESS_CLIENT_ID: string; ACCESS_CLIENT_SECRET: string };
 
 const HOUR = 3_600_000;
 const KEEP = 30 * 24 * HOUR;
-const all = [...publicSites, ...privateSites];
+// Where each probe starts. Self-hosted apps sit behind the tunnel in singapore, so they're probed from there. The public
+// site is answered at the nearest edge and a cloudflare worker runs where its own placement says, so both are probed
+// straight from the timer.
+const selfHosted = privateSites.filter((s) => !s.binding);
+const direct = [...publicSites, ...privateSites.filter((s) => s.binding)];
 const token = (env: Env) => ({ id: env.ACCESS_CLIENT_ID, secret: env.ACCESS_CLIENT_SECRET });
 // Only self-hosted apps sit behind access on the road the probe takes. The public site is open, and a binding skips access.
 const needsToken = (s: Service) => !publicSites.includes(s) && !s.binding;
@@ -24,7 +29,7 @@ async function uptime(db: D1Database, now: number): Promise<Map<string, Uptime>>
     db.prepare("SELECT service, AVG(up) AS ratio FROM probes WHERE at >= ? GROUP BY service").bind(now - KEEP).all<{ service: string; ratio: number }>(),
   ]);
   const out = new Map<string, Uptime>();
-  for (const s of all) out.set(s.name, { ticks: Array.from({ length: 24 }, () => null), ratio: null });
+  for (const s of [...publicSites, ...privateSites]) out.set(s.name, { ticks: Array.from({ length: 24 }, () => null), ratio: null });
   for (const h of hours.results) {
     const i = Math.round((h.hour - start) / HOUR);
     const u = out.get(h.service);
@@ -37,29 +42,35 @@ async function uptime(db: D1Database, now: number): Promise<Map<string, Uptime>>
 /** The newest stored probe of each service, or a placeholder until the first timer run. */
 async function latest(db: D1Database): Promise<Map<string, ProbeResult>> {
   const rows = await db.prepare(
-    "SELECT service, at, up, status, ms, error FROM probes p WHERE at = (SELECT MAX(at) FROM probes WHERE service = p.service)",
-  ).all<{ service: string; at: number; up: number; status: number | null; ms: number | null; error: string | null }>();
+    "SELECT service, at, up, status, ms, error, colo FROM probes p WHERE at = (SELECT MAX(at) FROM probes WHERE service = p.service)",
+  ).all<{ service: string; at: number; up: number; status: number | null; ms: number | null; error: string | null; colo: string | null }>();
   const out = new Map<string, ProbeResult>();
   for (const r of rows.results) out.set(r.service, { ...r, up: r.up === 1 });
   return out;
 }
 const waiting = (service: string): ProbeResult => ({ service, at: 0, up: false, status: null, ms: null, error: "no probe yet" });
 
-/** Probe every service in parallel and store one row each; once a day also drop rows past 30 days. */
-async function probeAll(env: Env, at: number): Promise<void> {
-  const results = await Promise.all(all.map((s: Service) => probe(s, needsToken(s) ? token(env) : null, { SENIORINTERN: env.SENIORINTERN })));
-  const insert = env.DB.prepare("INSERT INTO probes (service, at, up, status, ms, error) VALUES (?, ?, ?, ?, ?, ?)");
-  const statements = results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error));
-  const t = new Date(at);
-  if (t.getUTCHours() === 0 && t.getUTCMinutes() < 5) statements.push(env.DB.prepare("DELETE FROM probes WHERE at < ?").bind(at - KEEP));
-  await env.DB.batch(statements);
+/** Probe the given services in parallel and store one row each. */
+async function probeAndStore(env: Env, services: Service[], at: number): Promise<void> {
+  const [colo, results] = await Promise.all([
+    here(),
+    Promise.all(services.map((s) => probe(s, needsToken(s) ? token(env) : null, { SENIORINTERN: env.SENIORINTERN }))),
+  ]);
+  const insert = env.DB.prepare("INSERT INTO probes (service, at, up, status, ms, error, colo) VALUES (?, ?, ?, ?, ?, ?, ?)");
+  await env.DB.batch(results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error, colo)));
 }
 
 export default {
   async scheduled(controller, env) {
-    // The prober's secret proves the call came from inside this worker: it never leaves cloudflare's secret storage.
-    const response = await env.SELF.fetch(`https://self/_probe?at=${controller.scheduledTime}`, { headers: { "x-probe-key": env.ACCESS_CLIENT_SECRET } });
-    console.log(`probe run: ${response.status} ${await response.text()}`);
+    const at = controller.scheduledTime;
+    const [, singapore] = await Promise.all([
+      probeAndStore(env, direct, at),
+      // The prober's secret proves the call came from inside this worker: it never leaves cloudflare's secret storage.
+      env.SELF.fetch(`https://self/_probe?at=${at}`, { headers: { "x-probe-key": env.ACCESS_CLIENT_SECRET } }),
+    ]);
+    if (!singapore.ok) console.log(`self-hosted probe run failed: ${singapore.status}`);
+    const t = new Date(at);
+    if (t.getUTCHours() === 0 && t.getUTCMinutes() < 5) await env.DB.prepare("DELETE FROM probes WHERE at < ?").bind(at - KEEP).run();
   },
 
   async fetch(request, env) {
@@ -68,8 +79,8 @@ export default {
       // Only the timer knows the key. Props would be cleaner, but cloudflare delivers them only to named entrypoints,
       // and placement doesn't move named entrypoints, so the run has to land on this default fetch handler.
       if (request.headers.get("x-probe-key") !== env.ACCESS_CLIENT_SECRET) return new Response("not found", { status: 404 });
-      await probeAll(env, Number(url.searchParams.get("at")) || Date.now());
-      return new Response(`probed from ${(request.cf as { colo?: string } | undefined)?.colo ?? "unknown"}`);
+      await probeAndStore(env, selfHosted, Number(url.searchParams.get("at")) || Date.now());
+      return new Response("ok");
     }
     if (url.pathname !== "/") return new Response("not found", { status: 404 });
     const [now, history] = await Promise.all([latest(env.DB), uptime(env.DB, Date.now())]);

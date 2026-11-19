@@ -3,7 +3,19 @@
 import services from "../../../services.json";
 
 export type Service = { name: string; url: string; health?: string; binding?: string; about?: string };
-export type ProbeResult = { service: string; at: number; up: boolean; status: number | null; ms: number | null; error: string | null };
+export type ProbeResult = { service: string; at: number; up: boolean; status: number | null; ms: number | null; error: string | null; colo?: string | null };
+
+/** The cloudflare data center this code is running in, by its airport code (SIN, SJC, ...). A worker's request from a
+ * service binding or a timer carries no location of its own, so ask cloudflare's trace endpoint, which names the data
+ * center the request left from. Not timed, and run beside the probes. */
+export async function here(): Promise<string | null> {
+  try {
+    const text = await (await fetch("https://adhikrish.cloud/cdn-cgi/trace", { signal: AbortSignal.timeout(3_000) })).text();
+    return /^colo=(\w+)$/m.exec(text)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export const publicSites: Service[] = services.public;
 export const privateSites: Service[] = services.private;

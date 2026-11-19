@@ -20,15 +20,15 @@ export default defineConfig({
     // fetches and d1 queries) in the dashboard. Free plan: a shared 0.5 GB/day; past it cloudflare stops ingesting
     // until 00:00 utc, it never bills.
     observability: { enabled: true, logs: { enabled: true, invocationLogs: true }, traces: { enabled: true } },
-    // Probe from near the thinkpad, which is in singapore. Placement only moves the fetch handler, so the timer
-    // hands its work to this worker's own fetch handler through SELF (see src/index.ts).
+    // Probe the self-hosted apps from near the thinkpad, which is in singapore. Placement only moves the fetch handler,
+    // so the timer hands that part of its work to this worker's own fetch handler through SELF (see src/index.ts).
     placement: { region: "aws:ap-southeast-1" },
     triggers: [triggers.scheduled({ schedule: "*/5 * * * *" })],
     env: {
       // This worker, bound to itself, so the timer can hand its run to the placed fetch handler (see src/index.ts).
       SELF: bindings.worker({ worker: "admin" }),
-      // Senior intern's Health entrypoint: a named export with no url, so only this binding can call it.
-      SENIORINTERN: bindings.worker({ worker: "snrintern", exportName: "Health" }),
+      // Senior intern, called directly for its /health. It runs where its own placement puts it: next to its database.
+      SENIORINTERN: bindings.worker({ worker: "snrintern" }),
       DB: bindings.d1({ name: "admin-uptime", id: "4ec47cb9-170e-4c74-a5f0-ddece6429df7" }),
       // An access service token, so probes get through access to each service.
       ACCESS_CLIENT_ID: bindings.secret(),
