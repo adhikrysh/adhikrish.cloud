@@ -50,7 +50,7 @@ a probe is timed from wherever its code runs. so the honest place to start a pro
 | service | where it really lives | so the probe starts |
 |---|---|---|
 | self-hosted apps | the thinkpad in singapore, behind a tunnel that connects only to cloudflare's singapore data centers | near singapore |
-| senior intern | a worker pinned next to its database, which is in western north america (d1 region `WNAM`) | at the timer. the worker it calls runs next to its database either way |
+| senior intern | a worker pinned next to its database, whose primary is in cloudflare SJC, san jose (d1 region `WNAM`) | at the timer, but the number is timed inside senior intern, so the start doesn't matter |
 | the public site | static files served by every cloudflare data center | at the timer. any data center answers from right where it is |
 
 before this split, every probe ran wherever the timer ran, mostly the us. every self-hosted app measured about 550 ms, and almost all of that was the ocean, not the box. after it, they measure about 50 ms.
@@ -116,10 +116,14 @@ senior intern is another worker, so the timer calls it directly through a servic
 **senior intern has its own placement.** [`private/snrintern/cloudflare.config.ts`](../private/snrintern/cloudflare.config.ts) pins it next to its database:
 
 ```ts
-placement: { region: "aws:us-west-2" },   // amazon's oregon region, the nearest cloud region to d1's WNAM
+placement: { region: "aws:us-west-1" },   // amazon's northern california region, next to the database's primary in SJC
 ```
 
 this matters far more for the agent than for this page. every agent request runs several database queries, and each one is now a short trip instead of a crossing from wherever the request came in.
+
+**senior intern times itself.** `/health` answers with a small report: `{ ok, ms, ran, db }`. `ms` is how long its own `SELECT 1` took, measured inside senior intern. `ran` is cloudflare's `cf-placement` header: `remote-SJC` means placement moved it next to the database, and `local-ATL` would mean it ran where the call arrived. `db` is the data center the database answered from. the uptime page shows senior intern's own `ms`, so its number is the database's speed for senior intern, wherever cloudflare happened to run the timer. the hover note shows where senior intern ran.
+
+**how we found the database.** a d1 query's metadata names the data center that served it: `served_by_colo: "SJC"`, `served_by_primary: true`. the first pin was `aws:us-west-2` (oregon), chosen from the region name alone. the metadata showed the primary is in san jose, so the pin moved to `aws:us-west-1`.
 
 **why `/health` touches the database.** a check that only proves the worker's code runs is a *liveness* check. on cloudflare that's almost always true, so it would show green forever, even on a day when every real request fails because the database is down. a check that proves the service can do its job, by reaching what it depends on, is a *readiness* check. `SELECT 1` is the smallest question a database can answer ("give me the number 1"). it reads no table and only proves the database replied.
 

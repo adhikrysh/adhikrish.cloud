@@ -57,7 +57,7 @@ async function probeAndStore(env: Env, services: Service[], at: number): Promise
     Promise.all(services.map((s) => probe(s, needsToken(s) ? token(env) : null, { SENIORINTERN: env.SENIORINTERN }))),
   ]);
   const insert = env.DB.prepare("INSERT INTO probes (service, at, up, status, ms, error, colo) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  await env.DB.batch(results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error, colo)));
+  await env.DB.batch(results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error, r.colo ?? colo)));
 }
 
 export default {

@@ -46,6 +46,12 @@ export async function probe(service: Service, token: { id: string; secret: strin
       const error = response.status === 530 ? "tunnel unreachable" : `server error ${response.status}`;
       return { service: service.name, at, up: false, status: response.status, ms, error };
     }
+    // A cloudflare worker reports its own numbers: how long its database query took, measured inside it, and where it ran
+    // (cf-placement, e.g. "remote-SJC"). Its own time doesn't depend on where this probe started.
+    if (target) {
+      const report = (await response.json().catch(() => ({}))) as { ms?: number; ran?: string | null };
+      return { service: service.name, at, up: true, status: response.status, ms: report.ms ?? ms, error: null, colo: report.ran ?? null };
+    }
     return { service: service.name, at, up: true, status: response.status, ms, error: null };
   } catch (cause) {
     const timedOut = cause instanceof Error && cause.name === "TimeoutError";

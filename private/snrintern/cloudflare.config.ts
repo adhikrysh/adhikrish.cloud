@@ -13,9 +13,9 @@ export default defineConfig(({ mode }) => ({
     compatibilityDate: "2026-11-01",
     // Only reachable through seniorintern.adhikrish.cloud, behind the seniorintern_app access application.
     domains: ["seniorintern.adhikrish.cloud"],
-    // Run next to the d1 database (region WNAM, western north america), so each request's queries are short trips.
-    // Placement only moves the default fetch handler, which is where every request and /health land.
-    placement: { region: "aws:us-west-2" },
+    // Run next to the d1 database, whose primary is in SJC (san jose; region WNAM), so each request's queries are short
+    // trips. aws:us-west-1 is northern california. Placement only moves the default fetch handler, where every request lands.
+    placement: { region: "aws:us-west-1" },
     workersDev: false,
     previewUrls: false,
     // Logs and traces in the dashboard (see private/admin/cloudflare.config.ts). Query strings are redacted:
