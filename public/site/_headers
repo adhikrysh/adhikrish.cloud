@@ -35,5 +35,5 @@
 /logo.png
   Cache-Control: public, max-age=86400, must-revalidate
 
-/assets/favicon-7330e902055f.png
+/assets/favicon-d2c62bf5320a.png
   Cache-Control: public, max-age=31536000, immutable
