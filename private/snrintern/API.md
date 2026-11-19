@@ -1,6 +1,6 @@
 # senior intern api
 
-base url: `https://snrintern.adhikrish.cloud`. the agent writes through this api; the pages are read-only. everything a page shows comes from rows and tab definitions, so new tabs, columns, exercises and charts need no code change.
+base url: `https://seniorintern.adhikrish.cloud`. the agent writes through this api; the pages are read-only. everything a page shows comes from rows and tab definitions, so new tabs, columns, exercises and charts need no code change.
 
 ## auth
 
@@ -106,21 +106,21 @@ errors come back as `{ "error": "<what to fix>" }`: `400` names the field and th
 
 ```bash
 H=(-H "CF-Access-Client-Id: $ID" -H "CF-Access-Client-Secret: $SECRET")
-curl -s "${H[@]}" https://snrintern.adhikrish.cloud/api
+curl -s "${H[@]}" https://seniorintern.adhikrish.cloud/api
 curl -s "${H[@]}" -X POST -H "content-type: application/json" \
   -d '{"at":"2026-11-18T18:00-08:00","type":"strength","title":"chest","lifts":"flat db press: 50x8, 55x8, 60x6; tricep pushdown: 50x8x3","duration_min":60}' \
-  https://snrintern.adhikrish.cloud/api/training
+  https://seniorintern.adhikrish.cloud/api/training
 curl -s "${H[@]}" -X POST -H "content-type: application/json" -d '{"at":"2026-11-18","bodyweight_kg":69.2}' \
-  https://snrintern.adhikrish.cloud/api/body
+  https://seniorintern.adhikrish.cloud/api/body
 curl -s "${H[@]}" -X PATCH -H "content-type: application/json" -d '{"verdict":"right","status":"closed"}' \
-  https://snrintern.adhikrish.cloud/api/forecasts/2
+  https://seniorintern.adhikrish.cloud/api/forecasts/2
 ```
 
 ## instructions to give the agent
 
 paste this into the dot's instructions, with the two values from 1password:
 
-> you keep my senior intern database at https://snrintern.adhikrish.cloud. send CF-Access-Client-Id: <client-id> and CF-Access-Client-Secret: <client-secret> on every request.
+> you keep my senior intern database at https://seniorintern.adhikrish.cloud. send CF-Access-Client-Id: <client-id> and CF-Access-Client-Secret: <client-secret> on every request.
 > 1. start with GET /api. it lists the tabs, their fields and the formats. read it first; tabs change.
 > 2. one thing that happened = one row in the tab it belongs to. a session goes in training, a weigh-in in body, a new person in people, a prediction in forecasts.
 > 3. training: write lifts as "exercise: 45x10, 50x8; pull up: bwx10, +25x6" (weights in lb, bw = bodyweight, +25 = added). reuse the exercise names already in recent training rows.

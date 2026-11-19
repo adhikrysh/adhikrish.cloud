@@ -1,4 +1,4 @@
-// snrintern.adhikrish.cloud
+// seniorintern.adhikrish.cloud
 //   /health          liveness for the admin dashboard
 //   /api/...         json api (src/api.ts): dots and scripts
 //   /, /<tab>, /<tab>/<id>, /<tab>/lifts/<exercise>  read-only pages (src/page.ts). all writes go through the api.

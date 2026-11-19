@@ -1,4 +1,4 @@
-# snrintern.adhikrish.cloud: test, apply d1 migrations, deploy the worker.
+# seniorintern.adhikrish.cloud: test, apply d1 migrations, deploy the worker.
 name: snrintern
 on:
   push:
