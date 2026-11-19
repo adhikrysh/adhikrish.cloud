@@ -25,7 +25,7 @@ const CSS = `
 function strip(u: Uptime | undefined): string {
   if (!u) return "";
   const ticks = u.ticks.map((t) => `<i class="${t === null ? "" : t ? "up" : "down"}"></i>`).join("");
-  const ratio = u.ratio === null ? "" : `<span>${Number((u.ratio * 100).toFixed(1))}%</span>`;
+  const ratio = u.ratio === null ? "" : `<span>${Number((u.ratio * 100).toFixed(2))}%</span>`;
   return `<p class="uptime"><span class="ticks" title="last 24 hours">${ticks}</span>${ratio}</p>`;
 }
 
