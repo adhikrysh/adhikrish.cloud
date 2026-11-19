@@ -1,4 +1,4 @@
-// admin.adhikrish.cloud
+// uptime.adhikrish.cloud
 //   scheduled (every 5 minutes): probe every service and store up/down; drop rows older than 30 days once a day.
 //   fetch: probe every service live for the current state, and read the stored history for the uptime strips.
 import { privateSites, probe, publicSites, type Service } from "./probe.ts";

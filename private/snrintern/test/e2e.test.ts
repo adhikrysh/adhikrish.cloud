@@ -192,7 +192,7 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(after).toContain('hammer curl</a><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
   expect(after.split('<div class="strip">')[1].split("</div>")[0].match(/class="up"/g)).toHaveLength(6);
   expect(after).toContain("last session yesterday");
-  expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to snr intern">←</a><a class="external"'); // a tab goes back home
+  expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to senior intern">←</a><a class="external"'); // a tab goes back home
   writeFileSync(join(artifacts, "page-training.html"), after);
   // every lift opens its own page: each session plotted and listed, the best in green
   expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
@@ -218,7 +218,7 @@ test("the contract is served by the api itself, as the agent sees it", async () 
   const res = await call("docs", "/api/_docs", { token: await dots() });
   expect(res.status).toBe(200);
   const doc = res.body as string;
-  expect(doc).toStartWith("# snr intern api");
+  expect(doc).toStartWith("# senior intern api");
   expect(doc).toContain("GET /api/_docs (same headers)");
   expect(doc).toBe(readFileSync(join(import.meta.dir, "../API.md"), "utf8")); // exactly the file in the repo
   expect((await call("api index", "/api", { token: await dots() })).body.api.docs).toStartWith("GET /api/_docs");
@@ -318,7 +318,7 @@ test("home is just the visible tabs, no numbers", async () => {
   expect(page).not.toContain('href="/body"'); // hidden
   expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
-  expect(page).toContain('<nav aria-label="site"><a class="external" href="https://admin.adhikrish.cloud/">admin</a></nav>'); // only admin, top right
+  expect(page).toContain('<nav aria-label="site"><a class="external" href="https://uptime.adhikrish.cloud/">uptime</a></nav>'); // only uptime, top right
   writeFileSync(join(artifacts, "page-home.html"), page);
 });
 

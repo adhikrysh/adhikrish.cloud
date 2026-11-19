@@ -23,7 +23,6 @@ services:
       - immich-network
       - backrest-network
       - files-network
-      - kuma-network
       - adguard-network
       - beszel-network
   tunnel:
@@ -48,8 +47,6 @@ networks:
   backrest-network:
     external: true
   files-network:
-    external: true
-  kuma-network:
     external: true
   adguard-network:
     external: true

@@ -8,7 +8,7 @@ browser / agent
   -> outbound tunnel          opened by the server; no inbound ports
   -> nginx proxy manager      routes by hostname
   -> one docker network per app
-       immich · filebrowser · backrest · beszel · adguard · uptime kuma
+       immich · filebrowser · backrest · beszel · adguard
 
 nightly (utc)
   01:30  config bundle (pg_dumpall, root-only configs via docker exec, sqlite online backup)
@@ -26,7 +26,7 @@ nightly (utc)
 | [`docs/add-a-service.md`](docs/add-a-service.md) | the runbook for adding an app behind the tunnel |
 | [`docs/latency.md`](docs/latency.md) | measuring each request phase before tuning anything |
 
-admin and snrintern don't run here: they're cloudflare workers in [`../admin/`](../admin/) and [`../snrintern/`](../snrintern/), so they keep working when this box is off.
+uptime and senior intern don't run here: they're cloudflare workers in [`../admin/`](../admin/) and [`../snrintern/`](../snrintern/), so they keep working when this box is off.
 
 ## not verified on the box yet
 

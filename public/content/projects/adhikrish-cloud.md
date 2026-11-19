@@ -7,7 +7,7 @@ everything i self-host lives under one domain now: this site, an admin dashboard
 the split is simple. anything that has to keep working when the thinkpad is off runs on cloudflare, and that now includes my agent's data. the thinkpad keeps what needs a big local disk: photos, files and their backups. everything on cloudflare fits inside the free plan.
 
 <figure class="diagram">
-<svg viewBox="0 0 600 300" role="img" aria-label="cloudflare runs the public site on pages, the admin dashboard and snrintern as workers with a d1 database, the access login and the tunnel endpoint; the thinkpad runs nginx proxy manager and the self-hosted apps">
+<svg viewBox="0 0 600 300" role="img" aria-label="cloudflare runs the public site on pages, the uptime dashboard and senior intern as workers with a d1 database, the access login and the tunnel endpoint; the thinkpad runs nginx proxy manager and the self-hosted apps">
 <defs><marker id="cloud-a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
 <rect class="d-store" x="4" y="4" width="592" height="122" rx="14"/>
 <text class="d-t" x="20" y="28" text-anchor="start">cloudflare, keeps working when the thinkpad is off</text>
@@ -29,7 +29,7 @@ the split is simple. anything that has to keep working when the thinkpad is off 
 <figcaption>schematic. the bottom row only exists while the thinkpad is on; the top row doesn't care.</figcaption>
 </figure>
 
-all of it is one repo, [adhikrysh/adhikrish.cloud](https://github.com/adhikrysh/adhikrish.cloud). `public/` is this site, `private/` is the admin worker, snrintern and the server's compose files, and `design/` is the css both halves share. ci deploys each piece only when its own files change.
+all of it is one repo, [adhikrysh/adhikrish.cloud](https://github.com/adhikrysh/adhikrish.cloud). `public/` is this site, `private/` is the uptime worker, senior intern and the server's compose files, and `design/` is the css both halves share. ci deploys each piece only when its own files change.
 
 ## no open ports
 
@@ -106,7 +106,7 @@ the two paths in are there so a single failure doesn't lock me out. this is what
 |---|---|---|
 | cloudflare, or the tunnel container | ssh and samba over tailscale; everything on the home network | every `*.adhikrish.cloud` name, the immich phone app |
 | tailscale on the server (or an expired key) | every app through cloudflare | ssh, samba |
-| the thinkpad itself | this site, snrintern, and the admin page, which then shows every app red | every self-hosted app |
+| the thinkpad itself | this site, senior intern, and the uptime page, which then shows every app red | every self-hosted app |
 | home internet | everything, but only from inside the house | both paths, since both dial out |
 
 the last two rows are why the admin dashboard and this site don't run on the thinkpad.
@@ -116,13 +116,13 @@ the last two rows are why the admin dashboard and this site don't run on the thi
 the old setup watched itself from the inside: uptime kuma and beszel run on the thinkpad, so when the thinkpad died, so did the thing that was supposed to notice. now there are two layers that live on cloudflare instead.
 
 - **the tunnel health alert.** cloudflare emails me when the tunnel's health changes. a dead box means a dead tunnel, so this catches the worst case with no code at all. it's included in the free zero trust plan.
-- **admin.adhikrish.cloud.** a worker that requests each app through access and the tunnel, in parallel, whenever i open it and every five minutes on a schedule. it shows whether each one answered and how fast, plus its last 24 hours and its uptime over 30 days, kept in a d1 database. it tells apart an app that's down (a 5xx from the proxy), a tunnel that's down (cloudflare's 530), and a probe that access refused.
+- **uptime.adhikrish.cloud.** a worker that requests each app through access and the tunnel, in parallel, whenever i open it and every five minutes on a schedule. it shows whether each one answered and how fast, plus its last 24 hours and its uptime over 30 days, kept in a d1 database. it tells apart an app that's down (a 5xx from the proxy), a tunnel that's down (cloudflare's 530), and a probe that access refused.
 
 the tunnel alert covers the whole box; the admin page covers each app on its own. beszel keeps cpu, memory, disk and temperature history on the box.
 
-## snrintern
+## senior intern
 
-snrintern is the data store for my personal agent (an openai dot). it holds people i've met, forecasts i want to be scored on, training sessions and weigh-ins: four tables in a cloudflare d1 database. it started as a google sheet. the agent writes to it with plain http calls, and i read it as a minimal page with a tab per table.
+senior intern is the data store for my personal agent (an openai dot). it holds people i've met, forecasts i want to be scored on, training sessions and weigh-ins: four tables in a cloudflare d1 database. it started as a google sheet. the agent writes to it with plain http calls, and i read it as a minimal page with a tab per table.
 
 it's a worker, so it stays up when the thinkpad doesn't, and it costs nothing: the free plan allows 100,000 requests and 100,000 row writes a day, and the whole dataset is a few dozen rows. access sits in front of it. the agent carries its own service token, and the worker still checks the signed jwt that access attaches to every request it lets through, which is also how every row records who wrote it last. the api is generic over tables: `GET /api` lists every tab with its fields, so adding a tab is a schema change the agent discovers on its own, not a new endpoint. backups come from d1 itself, which can restore the database to any minute in the last 30 days.
 

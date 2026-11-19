@@ -7,8 +7,8 @@ One repo for everything under `*.adhikrish.cloud`. The global AGENTS.md still ap
 | path | what | runs on | deploys when |
 |---|---|---|---|
 | `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare worker, assets only (`public/cloudflare.config.ts`) | `.github/workflows/public.yml` |
-| `private/admin/` | admin.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
-| `private/snrintern/` | snrintern.adhikrish.cloud ("snr intern"): people, forecasts, training, body; json api for the personal agent (contract: `private/snrintern/API.md`) | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
+| `private/admin/` | uptime.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
+| `private/snrintern/` | snrintern.adhikrish.cloud ("senior intern"): people, forecasts, training, body; json api for the personal agent (contract: `private/snrintern/API.md`) | cloudflare worker + d1 | `.github/workflows/snrintern.yml` |
 | `private/infra/` | the thinkpad's compose files, scripts, configs, runbooks | thinkpad | by hand (see `private/infra/README.md`) |
 | `design/` | shared css (`base.css`, `list.css`) and the html shell for the private sites (`html.ts`) | | triggers every site |
 | `services.json` | the list of services: admin's links and health probes | | triggers admin |
@@ -18,18 +18,18 @@ The full write-up of how it all fits together, including restart handling and fa
 ## Where to add things
 
 - **A self-hosted service:** follow `private/infra/docs/add-a-service.md`. Its last step adds one entry to `services.json` (`name`, `url`, optional `health` url, `about`). Admin picks it up on the next deploy.
-- **A snrintern tab or column:** no code and no migration. The schema is data in d1: `PUT /api/_tabs/<slug>` with the definition (see `private/snrintern/API.md`). Rows are json documents checked against it (`private/snrintern/src/schema.ts`), and every change lands in `/api/_log`. What a tab opens on (charts, due lists) is the definition's `views` (`src/views.ts`), so a new tab or exercise needs no code. Migrations are only for the storage itself (`tabs`, `rows`, `schema_log`).
+- **A senior intern tab or column:** no code and no migration. The schema is data in d1: `PUT /api/_tabs/<slug>` with the definition (see `private/snrintern/API.md`). Rows are json documents checked against it (`private/snrintern/src/schema.ts`), and every change lands in `/api/_log`. What a tab opens on (charts, due lists) is the definition's `views` (`src/views.ts`), so a new tab or exercise needs no code. Migrations are only for the storage itself (`tabs`, `rows`, `schema_log`).
 - **A write-up:** see `public/AGENTS.md`.
 
 ## Rules
 
-- Public vs private is about access, not hosting. Everything private sits behind cloudflare access; snrintern also verifies the access jwt itself (`private/snrintern/src/auth.ts`).
+- Public vs private is about access, not hosting. Everything private sits behind cloudflare access; senior intern also verifies the access jwt itself (`private/snrintern/src/auth.ts`).
 - No secrets in git, ever. 1password is the source of truth:
   - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-admin-prober` (the admin prober's access service token).
   - vault `Personal`: `snrintern dots token` (the agent's access service token; its client id is in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`).
   - none of these expire. revoke in cloudflare (zero trust > service tokens, or profile > api tokens) if one leaks.
   - the thinkpad keeps per-app `.env` files that are never committed.
-- Anything that must work while the thinkpad is off runs on cloudflare (the public, admin and snrintern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).
+- Anything that must work while the thinkpad is off runs on cloudflare (the public, uptime and senior intern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).
 - One design for every site: `design/base.css` + `design/list.css` (through `design/html.ts` on the private sites, through the templates on the public one). Every size and colour is a variable in `base.css` (`--fs-*`, `--muted`, `--good`, ...); never write a literal.
   - links are always underlined; in a list row only the title is. no focus boxes: a focused link dims like a hovered one.
   - green (`--good`) and red (`--bad`) mean state, nothing else. labels and section headings are white pills; a state can be an outlined pill (white, green or red border).

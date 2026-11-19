@@ -1,4 +1,4 @@
-# admin.adhikrish.cloud: deploy the worker when its code, the shared design or the service list changes.
+# uptime.adhikrish.cloud: deploy the worker when its code, the shared design or the service list changes.
 name: admin
 on:
   push:

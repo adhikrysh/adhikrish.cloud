@@ -161,10 +161,10 @@ const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
   return p ? escape(day(p, where === "detail" ? "long" : "short")) : escape(v);
 };
 
-/** Admin top right on every page; below home, an arrow back to the parent on the left (a tab goes home, a row or lift goes to its tab). */
+/** Uptime top right on every page; below home, an arrow back to the parent on the left (a tab goes home, a row or lift goes to its tab). */
 function nav(parent?: { href: string; label: string }): string {
-  const admin = `<a class="external" href="https://admin.adhikrish.cloud/">admin</a>`;
-  return parent ? `<a class="back" href="${parent.href}" aria-label="back to ${escape(parent.label)}">←</a>${admin}` : admin;
+  const uptime = `<a class="external" href="https://uptime.adhikrish.cloud/">uptime</a>`;
+  return parent ? `<a class="back" href="${parent.href}" aria-label="back to ${escape(parent.label)}">←</a>${uptime}` : uptime;
 }
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
@@ -174,11 +174,11 @@ export async function homePage(design: Design, database: D1Database): Promise<st
             <a href="/${tab.slug}"><span>${escape(tab.label)}</span></a>
             <p>${escape(tab.about)}</p>
           </li>`);
-  const body = `      <h1>snr intern</h1>
+  const body = `      <h1>senior intern</h1>
       <ul class="project-list">
 ${items.join("\n")}
       </ul>`;
-  return page({ design, title: "snr intern", nav: nav(), body, css: CSS });
+  return page({ design, title: "senior intern", nav: nav(), body, css: CSS });
 }
 
 /** Rows a page shows. A tab grouped by a value (people by topic) is one page: its groups are collapsed, and pages would split a topic. */
@@ -233,7 +233,7 @@ ${pager(tab, q, at, older)}
       </div>
       ${schemaLink(tab)}
       ${LIVE_SEARCH}`;
-  return page({ design, title: `${tab.label} | snr intern`, nav: nav({ href: "/", label: "snr intern" }), body, css: CSS + VIEW_CSS });
+  return page({ design, title: `${tab.label} | senior intern`, nav: nav({ href: "/", label: "senior intern" }), body, css: CSS + VIEW_CSS });
 }
 
 /** "← newer" and "older →" under a paged list; the search, if any, comes along. */
@@ -269,12 +269,12 @@ export function rowPage(design: Design, tab: Tab, row: db.Row): string {
       ${rest.length ? `<dl>${rest.join("")}</dl>` : ""}
       </article>
       ${schemaLink(tab)}`;
-  return page({ design, title: `${row[tab.title] ?? "untitled"} | snr intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });
+  return page({ design, title: `${row[tab.title] ?? "untitled"} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });
 }
 
 /** One exercise's history (from the tab's progress view): a full chart and every session. */
 export async function exercisePage(design: Design, database: D1Database, tab: Tab, exercise: string): Promise<string | null> {
   const body = await liftPage(tab, database, exercise);
   if (!body) return null;
-  return page({ design, title: `${exercise} | snr intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS + LIFT_CSS });
+  return page({ design, title: `${exercise} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS + LIFT_CSS });
 }

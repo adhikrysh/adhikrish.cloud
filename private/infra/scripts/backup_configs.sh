@@ -20,10 +20,6 @@ echo "[$(date "+%Y-%m-%d %H:%M:%S")] Copying AdGuard config..."
 mkdir -p "$BACKUP_DIR/adguard"
 docker exec adguard cat /opt/adguardhome/conf/AdGuardHome.yaml > "$BACKUP_DIR/adguard/AdGuardHome.yaml"
 
-# Uptime Kuma data
-echo "[$(date "+%Y-%m-%d %H:%M:%S")] Copying Uptime Kuma data..."
-rsync -a /home/drc/uptime-kuma/data/ "$BACKUP_DIR/uptime-kuma/"
-
 # Backrest config — same root-owned 0600 problem; read via docker exec.
 # NOTE: config.json contains the B2 keys + restic repo password. This copy is for
 # reconstructing Backrest's SETTINGS; it is NOT a recovery path for the password

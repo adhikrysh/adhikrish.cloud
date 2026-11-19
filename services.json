@@ -8,7 +8,7 @@
   ],
   "private": [
     {
-      "name": "snr intern",
+      "name": "senior intern (src of truth for agents)",
       "url": "https://snrintern.adhikrish.cloud/",
       "health": "https://snrintern.adhikrish.cloud/health",
       "about": "people, outbound, forecasts, gym"
@@ -34,11 +34,6 @@
       "name": "backrest",
       "url": "https://backrest.adhikrish.cloud/",
       "about": "restic backups to b2"
-    },
-    {
-      "name": "uptime",
-      "url": "https://uptime.adhikrish.cloud/dashboard",
-      "about": "uptime kuma, retired once admin's prober is trusted"
     },
     {
       "name": "files",

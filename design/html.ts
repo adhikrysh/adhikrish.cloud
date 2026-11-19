@@ -1,4 +1,4 @@
-// Shared page shell for the private sites (admin, snrintern).
+// Shared page shell for the private sites (uptime, senior intern).
 // The public site inlines the same base.css and list.css through public/scripts/render-projects.ts.
 // Each worker imports the two css files with vite's `?raw` and passes them in as `design`.
 export type Design = { base: string; list: string };

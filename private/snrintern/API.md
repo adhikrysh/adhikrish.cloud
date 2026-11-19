@@ -1,4 +1,4 @@
-# snr intern api
+# senior intern api
 
 base url: `https://snrintern.adhikrish.cloud`. the agent writes through this api; the pages are read-only. everything a page shows comes from rows and tab definitions, so new tabs, columns, exercises and charts need no code change.
 
@@ -120,7 +120,7 @@ curl -s "${H[@]}" -X PATCH -H "content-type: application/json" -d '{"verdict":"r
 
 paste this into the dot's instructions, with the two values from 1password:
 
-> you keep my snr intern database at https://snrintern.adhikrish.cloud. send CF-Access-Client-Id: <client-id> and CF-Access-Client-Secret: <client-secret> on every request.
+> you keep my senior intern database at https://snrintern.adhikrish.cloud. send CF-Access-Client-Id: <client-id> and CF-Access-Client-Secret: <client-secret> on every request.
 > 1. start with GET /api. it lists the tabs, their fields and the formats. read it first; tabs change.
 > 2. one thing that happened = one row in the tab it belongs to. a session goes in training, a weigh-in in body, a new person in people, a prediction in forecasts.
 > 3. training: write lifts as "exercise: 45x10, 50x8; pull up: bwx10, +25x6" (weights in lb, bw = bodyweight, +25 = added). reuse the exercise names already in recent training rows.

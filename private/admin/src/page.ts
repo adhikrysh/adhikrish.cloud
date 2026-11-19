@@ -46,7 +46,7 @@ export function render(groups: Group[], history: Map<string, Uptime>): string {
       <ul class="project-list">
 ${items(services, results, history)}
       </ul>`);
-  const body = `      <h1>admin</h1>
+  const body = `      <h1>uptime</h1>
 ${sections.join("\n")}`;
-  return page({ design: { base, list }, title: "admin", nav: "", body, css: CSS });
+  return page({ design: { base, list }, title: "uptime", nav: "", body, css: CSS });
 }
