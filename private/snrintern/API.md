@@ -100,7 +100,7 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 
 an html page instead of json (a 403 with "error 1010", or a challenge page) means cloudflare refused the request before it reached the api: nothing was read or written, retrying won't help, and adhi has to change a cloudflare setting.
 
-errors come back as `{ "error": "<what to fix>" }`: `400` names the field and the problem, `401` not signed by access, `403` token may only call /health, `404` no such tab or row (a bad tab name lists the real ones), `405` wrong method, `409` deleting a tab that still has rows.
+errors come back as `{ "error": "<what to fix>" }`: `400` names the field and the problem, `401` not signed by access, `403` this token may not read data, `404` no such tab or row (a bad tab name lists the real ones), `405` wrong method, `409` deleting a tab that still has rows.
 
 ## examples
 

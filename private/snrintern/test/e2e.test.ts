@@ -33,7 +33,7 @@ async function startWorker() {
     stdout: "pipe", stderr: "pipe",
   });
   for (let i = 0; i < 100; i++) {
-    try { if ((await fetch(`http://localhost:${port}/health`)).ok) return; } catch {}
+    try { await fetch(`http://localhost:${port}/`); return; } catch {} // any answer means the server is up
     await Bun.sleep(200);
   }
   throw new Error("worker did not start");
@@ -120,7 +120,7 @@ test("requests that did not come through access are refused", async () => {
   expect((await call("no jwt", "/api")).status).toBe(401);
   expect((await call("jwt for another app", "/api", { token: await sign({ email: "me@example.com" }, { aud: "other-app" }) })).status).toBe(401);
   expect((await call("jwt signed by the wrong key", "/api", { token: await sign({ email: "me@example.com" }, { forged: true }) })).status).toBe(401);
-  expect((await call("health needs no jwt", "/health")).status).toBe(200);
+  expect((await call("health from outside the uptime binding needs a jwt", "/health")).status).toBe(401);
   expect((await call("the admin prober may not read data", "/api", { token: await sign({ common_name: "admin-prober-id" }) })).status).toBe(403);
 });
 
