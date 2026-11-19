@@ -5,9 +5,9 @@
 //   GET    /api/<tab>?q=&limit=&offset=    PUT    /api/_tabs/<slug>      create or replace a tab definition
 //   GET    /api/<tab>/<id>                 DELETE /api/_tabs/<slug>      only when the tab has no rows
 //   POST   /api/<tab>                      GET    /api/_log?limit=       recent schema changes
-//   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (docs/seniorintern-api.md), as markdown
+//   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (API.md), as markdown
 //   DELETE /api/<tab>/<id>
-import docs from "../../../docs/seniorintern-api.md?raw"; // bundled at deploy, so the contract always matches the running code
+import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
 import * as db from "./db.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 

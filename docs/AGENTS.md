@@ -1,6 +1,6 @@
 # AGENTS.md (docs/: how the system works)
 
-Docs for whoever maintains this repo next. The repo-root AGENTS.md and the global AGENTS.md still apply. Every doc lives here: how the mechanisms work, runbooks, and api contracts. Folder READMEs only say what a folder holds and link here; public write-ups stay in `public/content/`.
+Docs for whoever maintains this repo next. The repo-root AGENTS.md and the global AGENTS.md still apply. Every doc about how the system works lives here: mechanisms and runbooks. A file that ships with one service stays with that service, like senior intern's api contract (`private/snrintern/API.md`), which the worker serves and a test checks. Folder READMEs only say what a folder holds and link here; public write-ups stay in `public/content/`.
 
 ## The repo is public
 
@@ -29,4 +29,3 @@ Plain words, short sentences, lowercase prose like the rest of the private docs,
 - [`access.md`](access.md): cloudflare access apps, policies, service tokens, bypasses, and the signed pass.
 - [`add-a-service.md`](add-a-service.md): runbook for putting a new self-hosted app behind the tunnel.
 - [`latency.md`](latency.md): measuring each request phase before tuning anything.
-- [`seniorintern-api.md`](seniorintern-api.md): senior intern's json api contract. The worker serves this exact file at `/api/_docs` and a test checks they match, so edit it with the code.
