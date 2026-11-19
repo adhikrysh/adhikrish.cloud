@@ -28,4 +28,5 @@ Plain words, short sentences, lowercase prose like the rest of the private docs,
 
 - [`access.md`](access.md): cloudflare access apps, policies, service tokens, bypasses, and the signed pass.
 - [`add-a-service.md`](add-a-service.md): runbook for putting a new self-hosted app behind the tunnel.
+- [`uptime-probes.md`](uptime-probes.md): how the uptime page checks every service: the timer, placement near singapore, the three roads, and who can start a probe.
 - [`latency.md`](latency.md): measuring each request phase before tuning anything.

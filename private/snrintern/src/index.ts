@@ -3,6 +3,7 @@
 //   /api/...         json api (src/api.ts): dots and scripts
 //   /, /<tab>, /<tab>/<id>, /<tab>/lifts/<exercise>  read-only pages (src/page.ts). all writes go through the api.
 // Every request except /health must carry the jwt cloudflare access signs for requests it let in.
+import { WorkerEntrypoint } from "cloudflare:workers";
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
@@ -16,16 +17,19 @@ const design = { base, list };
 const html = (body: string, status = 200) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
 let caller: ReturnType<typeof verifier> | undefined; // one key cache per isolate
 
+/** Readiness for the uptime worker: a trivial query, so uptime turns red when the database is unreachable, not only
+ * when the worker is. A named entrypoint has no url: only a service binding that names it (uptime's SENIORINTERN) can
+ * call it, so nobody on the internet can reach it. */
+export class Health extends WorkerEntrypoint<Env> {
+  async fetch(): Promise<Response> {
+    try { await this.env.DB.prepare("SELECT 1").first(); return new Response("ok"); }
+    catch { return new Response("database unreachable", { status: 503 }); }
+  }
+}
+
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
-    // Readiness for the uptime worker: a trivial query, so uptime turns red when the database is unreachable, not
-    // only when the worker is. It answers only calls through uptime's service binding, which carry props; from the
-    // internet, /health is just another path that needs an access jwt.
-    if (url.pathname === "/health" && (ctx.props as { health?: boolean } | undefined)?.health) {
-      try { await env.DB.prepare("SELECT 1").first(); return new Response("ok"); }
-      catch { return new Response("database unreachable", { status: 503 }); }
-    }
 
     caller ??= verifier({ team: env.ACCESS_TEAM, aud: env.ACCESS_AUD, certsUrl: env.ACCESS_CERTS_URL });
     const who = await caller(request);

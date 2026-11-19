@@ -121,7 +121,7 @@ test("requests that did not come through access are refused", async () => {
   expect((await call("jwt for another app", "/api", { token: await sign({ email: "me@example.com" }, { aud: "other-app" }) })).status).toBe(401);
   expect((await call("jwt signed by the wrong key", "/api", { token: await sign({ email: "me@example.com" }, { forged: true }) })).status).toBe(401);
   expect((await call("health from outside the uptime binding needs a jwt", "/health")).status).toBe(401);
-  expect((await call("the admin prober may not read data", "/api", { token: await sign({ common_name: "admin-prober-id" }) })).status).toBe(403);
+  expect((await call("a service token that is not a listed agent may not read data", "/api", { token: await sign({ common_name: "some-other-token-id" }) })).status).toBe(403);
 });
 
 test("lifts are normalized on the way in, and malformed ones are refused with the reason", async () => {

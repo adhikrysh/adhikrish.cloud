@@ -1,7 +1,7 @@
 // uptime.adhikrish.cloud
 //   scheduled (every 5 minutes): ask this worker's own fetch handler, through SELF, to probe. Placement pins the fetch
 //     handler near singapore but never moves the timer, so the probing happens there, not wherever the timer ran.
-//   fetch /_probe (only through SELF): probe every service and store the result; drop rows older than 30 days once a day.
+//   fetch /_probe (only with the timer's key): probe every service and store the result; drop rows older than 30 days once a day.
 //   fetch: read only what the timer stored. A visit never probes, so reloading the page can't push traffic
 //   through the tunnel to the thinkpad, and the page is at most 5 minutes old.
 import { privateSites, probe, publicSites, type ProbeResult, type Service } from "./probe.ts";
@@ -13,6 +13,8 @@ const HOUR = 3_600_000;
 const KEEP = 30 * 24 * HOUR;
 const all = [...publicSites, ...privateSites];
 const token = (env: Env) => ({ id: env.ACCESS_CLIENT_ID, secret: env.ACCESS_CLIENT_SECRET });
+// Only self-hosted apps sit behind access on the road the probe takes. The public site is open, and a binding skips access.
+const needsToken = (s: Service) => !publicSites.includes(s) && !s.binding;
 
 /** Per service: the last 24 hours as hourly ticks (true = every probe up, false = any down, null = no data) and 30-day uptime. */
 async function uptime(db: D1Database, now: number): Promise<Map<string, Uptime>> {
@@ -45,7 +47,7 @@ const waiting = (service: string): ProbeResult => ({ service, at: 0, up: false, 
 
 /** Probe every service in parallel and store one row each; once a day also drop rows past 30 days. */
 async function probeAll(env: Env, at: number): Promise<void> {
-  const results = await Promise.all(all.map((s: Service) => probe(s, token(env), { SENIORINTERN: env.SENIORINTERN })));
+  const results = await Promise.all(all.map((s: Service) => probe(s, needsToken(s) ? token(env) : null, { SENIORINTERN: env.SENIORINTERN })));
   const insert = env.DB.prepare("INSERT INTO probes (service, at, up, status, ms, error) VALUES (?, ?, ?, ?, ?, ?)");
   const statements = results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error));
   const t = new Date(at);
@@ -55,15 +57,17 @@ async function probeAll(env: Env, at: number): Promise<void> {
 
 export default {
   async scheduled(controller, env) {
-    const response = await env.SELF.fetch(`https://self/_probe?at=${controller.scheduledTime}`);
+    // The prober's secret proves the call came from inside this worker: it never leaves cloudflare's secret storage.
+    const response = await env.SELF.fetch(`https://self/_probe?at=${controller.scheduledTime}`, { headers: { "x-probe-key": env.ACCESS_CLIENT_SECRET } });
     console.log(`probe run: ${response.status} ${await response.text()}`);
   },
 
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/_probe") {
-      // props exist only on calls through the SELF binding; a request from the internet has none.
-      if (!(ctx.props as { probe?: boolean } | undefined)?.probe) return new Response("not found", { status: 404 });
+      // Only the timer knows the key. Props would be cleaner, but cloudflare delivers them only to named entrypoints,
+      // and placement doesn't move named entrypoints, so the run has to land on this default fetch handler.
+      if (request.headers.get("x-probe-key") !== env.ACCESS_CLIENT_SECRET) return new Response("not found", { status: 404 });
       await probeAll(env, Number(url.searchParams.get("at")) || Date.now());
       return new Response(`probed from ${(request.cf as { colo?: string } | undefined)?.colo ?? "unknown"}`);
     }

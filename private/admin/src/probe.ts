@@ -11,7 +11,8 @@ export const privateSites: Service[] = services.private;
 // Short enough that the page never hangs: a slow service shows as down.
 const TIMEOUT_MS = 5_000;
 
-export async function probe(service: Service, token: { id: string; secret: string }, bindings: Record<string, Fetcher>): Promise<ProbeResult> {
+/** `token` is the prober's access service token; pass null where nothing checks it (the public site, a binding). */
+export async function probe(service: Service, token: { id: string; secret: string } | null, bindings: Record<string, Fetcher>): Promise<ProbeResult> {
   const at = Date.now();
   try {
     const target = service.binding ? bindings[service.binding] : undefined;
@@ -20,7 +21,7 @@ export async function probe(service: Service, token: { id: string; secret: strin
     const response = await send(service.health ?? service.url, {
       // Never follow redirects: a redirect to the access login means the probe was refused.
       redirect: "manual",
-      headers: { "CF-Access-Client-Id": token.id, "CF-Access-Client-Secret": token.secret },
+      headers: token ? { "CF-Access-Client-Id": token.id, "CF-Access-Client-Secret": token.secret } : {},
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const ms = Date.now() - at;

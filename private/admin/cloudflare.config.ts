@@ -25,10 +25,10 @@ export default defineConfig({
     placement: { region: "aws:ap-southeast-1" },
     triggers: [triggers.scheduled({ schedule: "*/5 * * * *" })],
     env: {
-      // This worker, bound to itself. Only calls through this binding carry props, so only the timer can start a probe run.
-      SELF: bindings.worker({ worker: "admin", props: { probe: true } }),
-      // Senior intern, called directly: its /health answers only calls that carry these props.
-      SENIORINTERN: bindings.worker({ worker: "snrintern", props: { health: true } }),
+      // This worker, bound to itself, so the timer can hand its run to the placed fetch handler (see src/index.ts).
+      SELF: bindings.worker({ worker: "admin" }),
+      // Senior intern's Health entrypoint: a named export with no url, so only this binding can call it.
+      SENIORINTERN: bindings.worker({ worker: "snrintern", exportName: "Health" }),
       DB: bindings.d1({ name: "admin-uptime", id: "4ec47cb9-170e-4c74-a5f0-ddece6429df7" }),
       // An access service token, so probes get through access to each service.
       ACCESS_CLIENT_ID: bindings.secret(),

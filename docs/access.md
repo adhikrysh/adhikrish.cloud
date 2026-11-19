@@ -96,7 +96,7 @@ a public page that does work on every visit can be used to make *you* do work. t
 
 ## invariants
 
-- every private hostname is covered by exactly one winning app, and that app's list includes the owner and the uptime prober. if the prober is missing, the uptime page shows the service as refused, not down.
+- every private hostname is covered by exactly one winning app, and that app's list includes the owner. a self-hosted service's app also lists the uptime prober; if it's missing, the uptime page shows that service as refused, not down. a service on cloudflare that uptime checks over a service binding doesn't need the prober on its app at all (see [`uptime-probes.md`](uptime-probes.md)).
 - access protects requests that come through cloudflare. it doesn't protect ports the server publishes on its own networks. those need their own firewall rules.
 - service tokens are created with a duration. ours are set far into the future, so they don't silently expire. revoke a leaked one in zero trust → access → service auth. that takes effect at once, and the program carrying it gets the login redirect from then on.
 - token secrets live in 1password, never in git. the repo may name a 1password item, but never contain its value.
@@ -104,7 +104,7 @@ a public page that does work on every visit can be used to make *you* do work. t
 ## changing access safely
 
 - **a new private service:** do nothing. the wildcard already guards it. see [the add-a-service runbook](add-a-service.md).
-- **a new visitor for one service:** create a token (for a machine) or an allow policy (for a person), then an exact-name app with the owner policy, the prober policy and the new policy.
+- **a new visitor for one service:** create a token (for a machine) or an allow policy (for a person), then an exact-name app with the owner policy, the prober policy (for a self-hosted service) and the new policy.
 - **moving a service to a new hostname:** change the existing app's hostname first, then deploy the service on the new name. that way the new name is never reachable without a login.
 - **cloudflare changes are made with the `cf` cli**, and always asked about first (see the root `AGENTS.md`).
 
