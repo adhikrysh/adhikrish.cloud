@@ -5,21 +5,21 @@
 //   fetch /_probe (only with the timer's key): probe the self-hosted apps from singapore and store the results.
 //   fetch: read only what the timer stored. A visit never probes, so reloading the page can't push traffic
 //   through the tunnel to the thinkpad, and the page is at most 5 minutes old.
-import { here, privateSites, probe, publicSites, type ProbeResult, type Service } from "./probe.ts";
+import { privateSites, probe, publicSites, type ProbeResult, type Service } from "./probe.ts";
 import { render, type Uptime } from "./page.ts";
 
-type Env = { DB: D1Database; SELF: Fetcher; SENIORINTERN: Fetcher; ACCESS_CLIENT_ID: string; ACCESS_CLIENT_SECRET: string };
+type Env = { DB: D1Database; SELF: Fetcher; ACCESS_CLIENT_ID: string; ACCESS_CLIENT_SECRET: string };
 
 const HOUR = 3_600_000;
 const KEEP = 30 * 24 * HOUR;
 // Where each probe starts. Self-hosted apps sit behind the tunnel in singapore, so they're probed from there. The public
 // site is answered at the nearest edge and a cloudflare worker runs where its own placement says, so both are probed
 // straight from the timer.
-const selfHosted = privateSites.filter((s) => !s.binding);
-const direct = [...publicSites, ...privateSites.filter((s) => s.binding)];
+const selfHosted = privateSites.filter((s) => !s.cloudflare);
+const direct = [...publicSites, ...privateSites.filter((s) => s.cloudflare)];
 const token = (env: Env) => ({ id: env.ACCESS_CLIENT_ID, secret: env.ACCESS_CLIENT_SECRET });
-// Only self-hosted apps sit behind access on the road the probe takes. The public site is open, and a binding skips access.
-const needsToken = (s: Service) => !publicSites.includes(s) && !s.binding;
+// Everything private sits behind access; the public site doesn't.
+const needsToken = (s: Service) => !publicSites.includes(s);
 
 /** Per service: the last 24 hours as hourly ticks (true = every probe up, false = any down, null = no data) and 30-day uptime. */
 async function uptime(db: D1Database, now: number): Promise<Map<string, Uptime>> {
@@ -42,8 +42,8 @@ async function uptime(db: D1Database, now: number): Promise<Map<string, Uptime>>
 /** The newest stored probe of each service, or a placeholder until the first timer run. */
 async function latest(db: D1Database): Promise<Map<string, ProbeResult>> {
   const rows = await db.prepare(
-    "SELECT service, at, up, status, ms, error, colo FROM probes p WHERE at = (SELECT MAX(at) FROM probes WHERE service = p.service)",
-  ).all<{ service: string; at: number; up: number; status: number | null; ms: number | null; error: string | null; colo: string | null }>();
+    "SELECT service, at, up, status, ms, error FROM probes p WHERE at = (SELECT MAX(at) FROM probes WHERE service = p.service)",
+  ).all<{ service: string; at: number; up: number; status: number | null; ms: number | null; error: string | null }>();
   const out = new Map<string, ProbeResult>();
   for (const r of rows.results) out.set(r.service, { ...r, up: r.up === 1 });
   return out;
@@ -52,12 +52,9 @@ const waiting = (service: string): ProbeResult => ({ service, at: 0, up: false, 
 
 /** Probe the given services in parallel and store one row each. */
 async function probeAndStore(env: Env, services: Service[], at: number): Promise<void> {
-  const [colo, results] = await Promise.all([
-    here(),
-    Promise.all(services.map((s) => probe(s, needsToken(s) ? token(env) : null, { SENIORINTERN: env.SENIORINTERN }))),
-  ]);
-  const insert = env.DB.prepare("INSERT INTO probes (service, at, up, status, ms, error, colo) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  await env.DB.batch(results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error, r.colo ?? colo)));
+  const results = await Promise.all(services.map((s) => probe(s, needsToken(s) ? token(env) : null)));
+  const insert = env.DB.prepare("INSERT INTO probes (service, at, up, status, ms, error) VALUES (?, ?, ?, ?, ?, ?)");
+  await env.DB.batch(results.map((r) => insert.bind(r.service, at, r.up ? 1 : 0, r.status, r.ms, r.error)));
 }
 
 export default {

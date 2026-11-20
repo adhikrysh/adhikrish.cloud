@@ -27,8 +27,6 @@ export default defineConfig({
     env: {
       // This worker, bound to itself, so the timer can hand its run to the placed fetch handler (see src/index.ts).
       SELF: bindings.worker({ worker: "admin" }),
-      // Senior intern, called directly for its /health. It runs where its own placement puts it: next to its database.
-      SENIORINTERN: bindings.worker({ worker: "snrintern" }),
       DB: bindings.d1({ name: "admin-uptime", id: "4ec47cb9-170e-4c74-a5f0-ddece6429df7" }),
       // An access service token, so probes get through access to each service.
       ACCESS_CLIENT_ID: bindings.secret(),

@@ -2,7 +2,7 @@
 import { escape, page } from "../../../design/html.ts";
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
-import { publicSites, type ProbeResult, type Service } from "./probe.ts";
+import type { ProbeResult, Service } from "./probe.ts";
 
 export type Uptime = { ticks: (boolean | null)[]; ratio: number | null };
 export type Group = [title: string, services: Service[], results: ProbeResult[]];
@@ -16,10 +16,6 @@ const CSS = `
   .project-list { margin-top: 18px; }
   .project-list li + li { margin-top: 22px; }
   .uptime { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: var(--fs-tiny); color: var(--faint); }
-  /* Where the number was measured from: hidden until the row is hovered or tapped, so the page stays quiet. */
-  /* Where the number was measured: a faint label beside it, shown while the row is hovered or tapped. */
-  .origin { margin-left: 10px; color: var(--faint); font-size: var(--fs-tiny); opacity: 0; transition: opacity .15s; white-space: nowrap; }
-  li:hover .origin, li:focus-within .origin { opacity: 1; }
   .ticks { display: flex; gap: 2px; }
   .ticks i { width: 6px; height: 14px; border-radius: 2px; background: var(--line); }
   .ticks i.up { background: var(--good); } .ticks i.down { background: var(--bad); }
@@ -30,28 +26,13 @@ function strip(u: Uptime | undefined): string {
   if (!u) return "";
   const ticks = u.ticks.map((t) => `<i class="${t === null ? "" : t ? "up" : "down"}"></i>`).join("");
   const ratio = u.ratio === null ? "" : `<span>${Number((u.ratio * 100).toFixed(2))}%</span>`;
-  return `<p class="uptime"><span class="ticks">${ticks}</span>${ratio}</p>`;
+  return `<p class="uptime"><span class="ticks" title="last 24 hours">${ticks}</span>${ratio}</p>`;
 }
-
-// Cloudflare names its data centers by the nearest airport's code. The ones probes have run from so far, plus neighbours.
-const CITY: Record<string, string> = {
-  SIN: "singapore", SJC: "san jose", SFO: "san francisco", LAX: "los angeles", SEA: "seattle", PDX: "portland",
-  ATL: "atlanta", WAW: "warsaw", AMS: "amsterdam", CDG: "paris", IAD: "ashburn", EWR: "newark", ORD: "chicago", DFW: "dallas", HKG: "hong kong", NRT: "tokyo", FRA: "frankfurt", LHR: "london",
-};
-const place = (colo: string | null) => {
-  const code = colo?.replace(/^(remote|local)-/, "") ?? null;
-  return code ? `${CITY[code] ?? code} (${code})` : "an unrecorded data center";
-};
-
-/** The hover note: just where the number was measured. See docs/uptime-probes.md for the roads behind it. */
-const origin = (colo: string | null) => `measured from ${place(colo)}`;
 
 function items(services: Service[], results: ProbeResult[], history: Map<string, Uptime>): string {
   return services.map((service, i) => {
     const r = results[i];
-    const where = escape(origin(r.colo ?? null));
-    const tip = `<span class="origin">${where}</span>`;
-    const note = r.up ? (r.ms === null ? "" : `<small>${r.ms} ms${tip}</small>`) : `<small class="bad">${escape(r.error)}${tip}</small>`;
+    const note = r.up ? (r.ms === null ? "" : `<small>${r.ms} ms</small>`) : `<small class="bad">${escape(r.error)}</small>`;
     const about = service.about ? `\n            <p>${escape(service.about)}</p>` : "";
     return `          <li>
             <a href="${escape(service.url)}"><span><i class="dot ${r.up ? "up" : "down"}"></i>${escape(service.name)}</span>${note}</a>${about}

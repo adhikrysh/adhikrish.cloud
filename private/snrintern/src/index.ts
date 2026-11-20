@@ -22,17 +22,14 @@ export default {
     // Readiness for the uptime worker, which calls it over a service binding: a trivial query, so uptime turns red when
     // the database is unreachable, not only when the worker is. No jwt needed: from the internet, access still stands in
     // front of it (only you and the agent get through), and all it can do is answer "1".
-    // It reports where it ran (cloudflare's cf-placement header: "remote-SJC" when placement moved it, "local-ATL" when
-    // it ran where the call arrived), how long its own query took, and which data center the database answered from.
+    // It reports how long its own query took, so uptime shows the database's speed for senior intern.
     if (url.pathname === "/health") {
-      const ran = request.headers.get("cf-placement");
       const start = Date.now();
       try {
-        const { meta } = await env.DB.prepare("SELECT 1").all();
-        const db = (meta as { served_by_colo?: string }).served_by_colo ?? null;
-        return Response.json({ ok: true, ms: Date.now() - start, ran, db });
+        await env.DB.prepare("SELECT 1").first();
+        return Response.json({ ok: true, ms: Date.now() - start });
       } catch {
-        return Response.json({ ok: false, ms: Date.now() - start, ran, db: null }, { status: 503 });
+        return Response.json({ ok: false, ms: Date.now() - start }, { status: 503 });
       }
     }
 
