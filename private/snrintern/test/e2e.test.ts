@@ -56,6 +56,7 @@ async function call(scenario: string, path: string, init: RequestInit & { token?
 
 const me = () => sign({ email: "me@example.com" });
 const dots = () => sign({ common_name: "dots-client-id" });
+const instinct = () => sign({ common_name: "instinct-client-id" }); // a second agent, with its own token
 const send = (token: string, path: string, body: unknown, method = "POST") =>
   call(`${method} ${path}`, path, { method, token, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
@@ -160,6 +161,11 @@ test("the agent adds, edits, finds and deletes rows", async () => {
   expect((await call("search ignores field names", "/api/people?q=last_contact", { token })).body.rows).toEqual([]);
   expect((await call("delete", `/api/people/${id}`, { method: "DELETE", token })).status).toBe(200);
   expect((await call("gone", `/api/people/${id}`, { token })).status).toBe(404);
+  // a second agent writes the same way, and the row says which agent wrote it
+  const other = await send(await instinct(), "/api/people", { name: "Fay Second Agent" });
+  expect(other.status).toBe(201);
+  expect(other.body.row.updated_by).toBe("service:instinct-client-id");
+  expect((await call("second agent deletes", `/api/people/${other.body.row.id}`, { method: "DELETE", token: await instinct() })).status).toBe(200);
 });
 
 test("the training page is built from the data: a strip of sessions, progress, bodyweight", async () => {

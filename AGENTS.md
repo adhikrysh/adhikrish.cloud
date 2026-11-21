@@ -27,7 +27,7 @@ The full write-up of how it all fits together, including restart handling and fa
 - Public vs private is about access, not hosting. Everything private sits behind cloudflare access; senior intern also verifies the access jwt itself (`private/snrintern/src/auth.ts`). How apps, policies, service tokens and bypasses decide who gets in: `docs/access.md`.
 - No secrets in git, ever. 1password is the source of truth:
   - vault `adhikrish.cloud-ci` (the only vault ci can read, through the service account "github-actions adhikrish.cloud", whose token is the github secret `OP_SERVICE_ACCOUNT_TOKEN`): `cloudflare-deploy` (api token: workers + d1 write, workers routes + dns write on adhikrish.cloud) and `access-uptime-prober` (the uptime prober's access service token).
-  - vault `Personal`: `snrintern dots token` (the agent's access service token; its client id is in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`).
+  - the agents' access service tokens, one per agent, each with its own service-auth policy on `seniorintern_app` and its client id in `AGENT_CLIENT_IDS` in `private/snrintern/cloudflare.config.ts`: `snrintern dots token` (vault `adhikrish.cloud-ci`) and `snrintern instinct token` (vault `Personal`).
   - none of these expire. revoke in cloudflare (zero trust > service tokens, or profile > api tokens) if one leaks.
   - the thinkpad keeps per-app `.env` files that are never committed.
 - Anything that must work while the thinkpad is off runs on cloudflare (the public, uptime and senior intern workers, d1). The thinkpad only runs the self-hosted apps in `private/infra/`. Stay inside cloudflare's free plan (workers: 100k requests/day, 10 ms cpu each; d1: 5M rows read, 100k written per day, 5 GB).

@@ -4,7 +4,7 @@ base url: `https://seniorintern.adhikrish.cloud`. the agent writes through this 
 
 ## auth
 
-send both headers on every request. the values are in 1password: `Personal › snrintern dots token`.
+send both headers on every request. each agent has its own token, in 1password: `adhikrish.cloud-ci › snrintern dots token` for dots, `Personal › snrintern instinct token` for instinct. rows record which one wrote them (`updated_by`).
 
 ```
 CF-Access-Client-Id: <client-id>
