@@ -112,7 +112,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, forecasts: 4, training: 4, body: 2 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, forecasts: 4, training: 4, body: 2, books: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -300,6 +300,54 @@ test("forecasts open on what is upcoming and how calibrated; scoring one (by the
   writeFileSync(join(artifacts, "page-forecasts.html"), after);
 });
 
+test("books open on what is being read and what is next; the agent moves a book through its life", async () => {
+  const token = await me(), agent = await dots();
+  const add = async (row: Record<string, unknown>) => (await send(agent, "/api/books", row)).body.row;
+  const old = await add({ title: "The Old Recommendation", author: "A. Writer", status: "to read", recommended_by: "priya" });
+  await add({ title: "A Newer Pick", status: "to read", recommended_by: "a podcast" });
+  await add({ title: "Slow Read", status: "reading", started: day(-400) }); // a year in: still not late, nothing goes red
+  await add({ title: "Done Book", author: "B. Author", status: "finished", started: day(-60), finished: day(-30), take: "the second half argues against the first" });
+  await add({ title: "Quit Book", status: "dropped", started: day(-90) });
+  expect((await send(agent, "/api/books", { title: "No Status" })).body.error).toStartWith('"status" is required');
+  expect((await send(agent, "/api/books", { title: "Bad Status", status: "someday" })).body.error).toStartWith('"status" must be one of: to read, reading, finished, dropped');
+  const views = (html: string) => html.split('<div class="views">')[1].split('<form class="search"')[0];
+  const section = (html: string, label: string) => views(html).split(`<h2><span class="pill">${label}</span></h2>`)[1]?.split("</section>")[0] ?? "";
+  const titles = (html: string) => [...html.matchAll(/<a href="\/books\/\d+">([^<]+)<\/a>/g)].map((m) => m[1]);
+
+  const page = (await call("books page", "/books", { token })).body as string;
+  expect(titles(section(page, "reading"))).toEqual(["Slow Read"]);
+  expect(section(page, "reading")).toContain("<small>13 months ago</small>");
+  expect(titles(section(page, "to read"))).toEqual(["A Newer Pick", "The Old Recommendation"]); // newest recommendation first
+  expect(section(page, "to read")).toContain("<small>priya</small>");
+  expect(views(page)).not.toContain("Quit Book"); // dropped: only in the log
+  expect(views(page)).not.toContain("Done Book");
+  expect(views(page)).not.toContain('class="bad"');
+  expect(views(page).indexOf("reading")).toBeLessThan(views(page).indexOf("to read"));
+  // the log under the search: every book, finished ones by date, the take previewed
+  const log = page.split('<div class="rows">')[1];
+  for (const t of ["Done Book", "Quit Book", "Slow Read", "A Newer Pick", "The Old Recommendation"]) expect(log).toContain(t);
+  expect(log.indexOf("Done Book")).toBeLessThan(log.indexOf("Quit Book"));
+  expect(log).toContain('<p class="snippet">the second half argues against the first</p>');
+  expect((await call("search books by who recommended", "/api/books?q=priya", { token: agent })).body.rows.map((r: any) => r.title)).toEqual(["The Old Recommendation"]);
+
+  // the agent starts the old recommendation, then finishes it after a conversation: one row the whole way
+  await send(agent, `/api/books/${old.id}`, { status: "reading", started: day(-14) }, "PATCH");
+  const reading = (await call("books page after starting", "/books", { token })).body as string;
+  expect(titles(section(reading, "reading"))).toEqual(["The Old Recommendation", "Slow Read"]);
+  expect(titles(section(reading, "to read"))).toEqual(["A Newer Pick"]);
+  await send(agent, `/api/books/${old.id}`, { status: "finished", finished: day(0), take: "convincing on habits, wrong about willpower" }, "PATCH");
+  const done = (await call("books page after finishing", "/books", { token })).body as string;
+  expect(titles(section(done, "reading"))).toEqual(["Slow Read"]);
+  expect(views(done)).not.toContain("The Old Recommendation");
+  const doneLog = done.split('<div class="rows">')[1];
+  expect(doneLog.indexOf("The Old Recommendation")).toBeLessThan(doneLog.indexOf("Done Book")); // finished today, so first
+  expect(doneLog).toContain("convincing on habits, wrong about willpower");
+  const row = (await call("finished book row", `/books/${old.id}`, { token })).body as string;
+  expect(row).toContain("convincing on habits, wrong about willpower");
+  expect(row).toContain("priya"); // who recommended it stays on the row
+  writeFileSync(join(artifacts, "page-books.html"), done);
+});
+
 test("people are a search and their groups, nothing above", async () => {
   const token = await me();
   const page = (await call("people page", "/people", { token })).body as string;
@@ -339,7 +387,8 @@ test("tabs and columns are added through the api, with no migration, and every c
     [{ ...thoughts, fields: [{ name: "mood", type: "enum" }] }, 'field "mood": enum fields need "options"'],
     [{ ...thoughts, views: [{ kind: "progress", field: "text" }] }, 'views[0] (progress): "field" must name a lifts field'],
     [{ ...thoughts, views: [{ kind: "line", field: "nope" }] }, 'views[0] (line): "field" must name a number field'],
-    [{ ...thoughts, views: [{ kind: "weekly" }] }, "views[0]: kind must be one of progress, strip, line, upcoming, calibration"],
+    [{ ...thoughts, views: [{ kind: "weekly" }] }, "views[0]: kind must be one of progress, strip, line, upcoming, calibration, list"],
+    [{ ...thoughts, views: [{ kind: "list", label: "now", where: { nope: "x" } }] }, 'views[0] (list): "where" must map fields to values'],
   ];
   for (const [d, message] of bad) expect((await send(token, "/api/_tabs/scratch", d, "PUT")).body.error).toStartWith(message);
   const log = (await call("schema log", "/api/_log", { token })).body.changes;

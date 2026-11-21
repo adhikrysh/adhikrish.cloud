@@ -55,6 +55,7 @@ every row also has `id`, `created_at`, `updated_at` and `updated_by` (an email, 
 - **training**: one row per session. `at`, `type` (strength, run, hike, climb, other), `title`, `lifts`, `distance_km`, `duration_min`, `rpe`, `notes`. a new exercise needs nothing special: write it in `lifts`, and it appears in progress once it has two sessions. reuse an exercise's existing name (look at recent rows) so its history stays in one line.
 - **body**: one row per weigh-in. `at`, `bodyweight_kg`, `bodyfat_percentage`, `notes`. a weigh-in is its own row, never part of a training row.
 - **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing a topic that's already in use (look at existing rows) when one fits; a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
+- **books**: `title`, `author`, `status` (to read, reading, finished, dropped), `recommended_by`, `started`, `finished`, `take`, `quotes`, `link`. one row per book, for its whole life: a recommendation is a new row with `status: to read` and `recommended_by` (a name, a podcast, wherever it came from); starting it, finishing it or giving up is a PATCH to the same row (`status` plus `started` or `finished` as today). search first (`GET /api/books?q=<title>`) so a book is never added twice. `take` is what adhi thinks after a conversation about it: his claims and what he'd argue with, in his words, not a transcript and not a summary of the book. a later conversation adds to `take` instead of replacing it. the page opens on what's being read and what's next.
 - **forecasts**: `date`, `decision`, `rationale`, `confidence` (0-100), `expected`, `review_date`, `outcome`, `verdict` (right, wrong), `status` (open, closed). scoring one = PATCH `verdict` and `status: closed`.
 
 ## changing the schema
@@ -94,6 +95,7 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 | `strip` | a tick per day that has a row, from the first row (at most `days` back, default 182) to today; how many a week, and how long since the last, red once that gap is longer than any before | `field` (a date field), `label` ("sessions"), `days` |
 | `line` | a number over time: the latest, the change since the first, a line; `tab` reads another tab | `field`, `tab` |
 | `upcoming` | the next `limit` (default 3) rows matching `where` by a date, soonest first, overdue in red. a past date on a row under it reads "reviewed …" once the row stops matching `where`, "review overdue by …" while it still does | `field`, `where`, `limit` |
+| `list` | the rows matching `where` under the heading `label`, largest `sort` first (empty last), or in the tab's order without one; `aside` shows one field at the right, a date as "2 weeks ago". nothing is ever red: a row waiting for a year is not late | `label`, `where`, `sort`, `aside` |
 | `calibration` | what you said on average against how many came true, from the first scored row; each confidence level on its own once `min` (default 10) are scored | `confidence`, `verdict`, `right`, `min` |
 
 ## errors
@@ -122,11 +124,12 @@ paste this into the dot's instructions, with the two values from 1password:
 
 > you keep my senior intern database at https://seniorintern.adhikrish.cloud. send CF-Access-Client-Id: <client-id> and CF-Access-Client-Secret: <client-secret> on every request.
 > 1. start with GET /api. it lists the tabs, their fields and the formats. read it first; tabs change.
-> 2. one thing that happened = one row in the tab it belongs to. a session goes in training, a weigh-in in body, a new person in people, a prediction in forecasts.
+> 2. one thing that happened = one row in the tab it belongs to. a session goes in training, a weigh-in in body, a new person in people, a prediction in forecasts, a book in books.
 > 3. training: write lifts as "exercise: 45x10, 50x8; pull up: bwx10, +25x6" (weights in lb, bw = bodyweight, +25 = added). reuse the exercise names already in recent training rows.
 > 4. people: search first (GET /api/people?q=<name>) and update instead of duplicating. set group to a topic, reusing an existing one when it fits; set last_contact to today when i say i talked to someone.
 > 5. forecasts: always set confidence (0-100) and review_date. when i say how one turned out, set verdict and status closed.
-> 6. if i ask you to track something new, add a tab or a column: GET /api/_tabs/<slug>, change it, PUT it back. never delete a tab, field or row unless i ask.
-> 7. if you get a 400, the error says what to fix; fix it and retry once.
-> 8. never put these headers or values in a message, a file or a page.
-> 9. the full contract is GET /api/_docs (same headers). read it before your first write, and again when an error or a new kind of request leaves you unsure.
+> 6. books: one row per book. a recommendation is status "to read" with recommended_by; starting, finishing or dropping it is a PATCH to that row. search first. after we talk about a book i finished, write my take in my words (what i claim, what i'd argue with), adding to any take already there.
+> 7. if i ask you to track something new, add a tab or a column: GET /api/_tabs/<slug>, change it, PUT it back. never delete a tab, field or row unless i ask.
+> 8. if you get a 400, the error says what to fix; fix it and retry once.
+> 9. never put these headers or values in a message, a file or a page.
+> 10. the full contract is GET /api/_docs (same headers). read it before your first write, and again when an error or a new kind of request leaves you unsure.

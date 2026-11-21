@@ -25,6 +25,7 @@ export type View =
   | { kind: "strip"; field: string; label?: string; days?: number } // a tick per day with a row, from the first (at most `days` back) to today
   | { kind: "line"; field: string; tab?: string } // a number over time, from this tab or another
   | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number } // the next rows by a date, overdue first
+  | { kind: "list"; label: string; where: Record<string, string>; sort?: string; aside?: string } // the rows matching `where`, by `sort` or in the tab's order
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number }; // how often each confidence level came true
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
@@ -166,7 +167,14 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
         if (v.limit !== undefined && (!Number.isInteger(v.limit) || v.limit < 1 || v.limit > 20)) return `${where}: "limit" must be a whole number from 1 to 20`;
         break;
       case "calibration": if (!isField(v.confidence, ["int", "number"]) || !isField(v.verdict, ["enum"]) || typeof v.right !== "string") return `${where}: needs a number "confidence", an enum "verdict" and the "right" value`; break;
-      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration`;
+      case "list":
+        if (typeof v.label !== "string" || !v.label.trim()) return `${where}: "label" must be a heading like "reading"`;
+        if (typeof v.where !== "object" || v.where === null || Array.isArray(v.where) || !Object.keys(v.where).length
+          || Object.entries(v.where).some(([k, val]) => !types.has(k) || typeof val !== "string")) return `${where}: "where" must map fields to values, like { "status": "reading" }`;
+        if (v.sort !== undefined && !types.has(v.sort)) return `${where}: "sort" must name a field`;
+        if (v.aside !== undefined && !types.has(v.aside)) return `${where}: "aside" must name a field`;
+        break;
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list`;
     }
     views.push(v as View);
   }

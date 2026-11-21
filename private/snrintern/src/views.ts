@@ -163,6 +163,23 @@ function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows }: Ctx): s
   return section("upcoming", `<ul class="rowlist">${html.join("")}</ul>`);
 }
 
+/** The rows matching `where`, headed by `label`: largest `sort` first (empty last, then the tab's order), or the tab's order; `aside` shows one field at the right (a date as "2 weeks ago").
+ * No dates are judged here: a book on the reading list for a year is not overdue. */
+function list(v: Extract<View, { kind: "list" }>, { tab, rows }: Ctx): string {
+  const key = (row: db.Row) => (v.sort && row[v.sort] !== undefined && row[v.sort] !== "" ? String(row[v.sort]) : null);
+  const matching = rows.filter((row) => matches(v.where, row));
+  if (v.sort) matching.sort((a, b) => { const x = key(a), y = key(b); return x === y ? 0 : x === null ? 1 : y === null ? -1 : y.localeCompare(x, undefined, { numeric: true }); });
+  if (!matching.length) return "";
+  const type = tab.fields.find((f) => f.name === v.aside)?.type;
+  const aside = (row: db.Row) => {
+    if (!v.aside || row[v.aside] === undefined || row[v.aside] === "") return "";
+    const t = type === "date" || type === "datetime" ? dayOf(row[v.aside]) : null;
+    return `<small>${t !== null ? ago(t) : escape(row[v.aside])}</small>`;
+  };
+  const html = matching.map((row) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a>${aside(row)}</li>`);
+  return section(v.label, `<ul class="rowlist">${html.join("")}</ul>`);
+}
+
 /** Plain rows: your average confidence and how many came true; once `min` (default 10) are scored, the same for each confidence level. Nothing until one is scored. */
 function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): string {
   const scored = rows.filter((row) => row[v.verdict] !== undefined && Number.isFinite(Number(row[v.confidence])));
@@ -246,6 +263,7 @@ export async function renderViews(tab: Tab, database: D1Database): Promise<strin
       case "line": return line(v, ctx);
       case "upcoming": return upcoming(v, ctx);
       case "calibration": return calibration(v, ctx);
+      case "list": return list(v, ctx);
     }
   }));
   const html = parts.filter(Boolean).join("\n");
