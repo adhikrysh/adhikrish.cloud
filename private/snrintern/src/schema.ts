@@ -32,8 +32,13 @@ export type View =
   | { kind: "list"; label: string; where: Record<string, string>; sort?: string; aside?: string } // the rows matching `where`, by `sort` or in the tab's order
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
   | { kind: "metrics"; label: string; metrics: Metric[] }; // each number's last 7 days against its usual, its best, 90 days of it
-/** better: which way is good (lower resting heart rate, higher hrv). Without it a metric is never coloured and has no best. */
-export type Metric = { field: string; better?: "higher" | "lower" };
+/** How one number is drawn. better: which way is good (lower resting hr, higher hrv); without it a metric is never coloured
+ * and has no best. chart: "line" (default) for a level, "bars" for a tally that restarts each day (steps).
+ * low/high: two fields giving each day's range, drawn as a candle (heart rate: min to max, the dot at resting).
+ * band: two fields giving a normal zone drawn behind the line (hrv's balanced baseline). parts: a tab part's label, drawn as
+ * one stacked bar per day (stress: rest, low, medium, high). stream: a series name (series table) that holds the same thing
+ * within a day; the dashboard then shows the newest day of it, and the full page opens on it. */
+export type Metric = { field: string; better?: "higher" | "lower"; chart?: "line" | "bars"; low?: string; high?: string; band?: [string, string]; parts?: string; stream?: string };
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
 export type Data = Record<string, Value>;
@@ -123,9 +128,6 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (typeof d.group !== "string" || !["date", "datetime", "enum", "text"].includes(types.get(d.group) ?? "")) return `"group" must name a date, datetime, text or enum field`;
     group = d.group;
   }
-  const views = checkViews(d.views, types);
-  if (typeof views === "string") return views;
-  if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
   const parts: Part[] = [];
   if (d.parts !== undefined) {
     if (!Array.isArray(d.parts)) return '"parts" must be a list';
@@ -136,6 +138,9 @@ export function checkDefinition(input: unknown): TabDefinition | string {
       parts.push({ label: p.label, fields: p.fields as string[] });
     }
   }
+  const views = checkViews(d.views, types, parts.map((p) => p.label));
+  if (typeof views === "string") return views;
+  if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
   return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}),
     ...(group ? { group } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), ...(parts.length ? { parts } : {}), fields };
 }
@@ -163,7 +168,7 @@ export function checkRow(tab: Tab, body: unknown, { partial }: { partial: boolea
   return { set, unset };
 }
 
-function checkViews(input: unknown, types: Map<string, FieldType>): View[] | string {
+function checkViews(input: unknown, types: Map<string, FieldType>, partLabels: string[] = []): View[] | string {
   if (input === undefined) return [];
   if (!Array.isArray(input)) return '"views" must be a list';
   const views: View[] = [];
@@ -198,8 +203,20 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
       case "metrics":
         if (typeof v.label !== "string" || !v.label.trim()) return `${where}: "label" must be a heading like "sleep"`;
         if (!Array.isArray(v.metrics) || !v.metrics.length || !v.metrics.every((m: any) => typeof m === "object" && m !== null
-          && isField(m.field, ["int", "number"]) && (m.better === undefined || m.better === "higher" || m.better === "lower")))
-          return `${where}: "metrics" must list { "field": <a number field>, "better": "higher" or "lower" (optional) }`;
+          && isField(m.field, ["int", "number"]) && (m.better === undefined || m.better === "higher" || m.better === "lower")
+          && (m.chart === undefined || m.chart === "line" || m.chart === "bars")))
+          return `${where}: "metrics" must list { "field": <a number field>, "better": "higher" or "lower", "chart": "line" or "bars" } (better and chart optional)`;
+        for (const m of v.metrics as any[]) {
+          const bad = Object.keys(m).find((k) => !["field", "better", "chart", "low", "high", "band", "parts", "stream"].includes(k));
+          if (bad) return `${where}: unknown metric key "${bad}"`;
+          if ((m.low === undefined) !== (m.high === undefined) || (m.low !== undefined && (!isField(m.low, ["int", "number"]) || !isField(m.high, ["int", "number"]))))
+            return `${where}: "low" and "high" go together, each naming a number field`;
+          if (m.band !== undefined && (!Array.isArray(m.band) || m.band.length !== 2 || !m.band.every((b: unknown) => isField(b, ["int", "number"]))))
+            return `${where}: "band" must name two number fields, low then high`;
+          if (m.parts !== undefined && (typeof m.parts !== "string" || !partLabels.includes(m.parts)))
+            return `${where}: "parts" must be the label of one of the tab's parts`;
+          if (m.stream !== undefined && (typeof m.stream !== "string" || !m.stream.trim())) return `${where}: "stream" must name a series, like "heart rate"`;
+        }
         break;
       default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics`;
     }

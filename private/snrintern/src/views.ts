@@ -2,8 +2,9 @@
 // tab definition (`views`), so a tab added later can use them too. A view with nothing to say renders nothing.
 // Charts are small inline svgs; green is good, red is bad, everything else is grey.
 import { escape } from "../../../design/html.ts";
+import { chart, type Chart, type ChartPoint, type ChartStream } from "./charts.ts";
 import * as db from "./db.ts";
-import { parseLifts, type Field, type Tab, type View } from "./schema.ts";
+import { parseLifts, type Field, type Metric, type Tab, type View } from "./schema.ts";
 
 export const VIEW_CSS = `
   .views { margin-top: 32px; display: grid; gap: 40px; }
@@ -19,15 +20,9 @@ export const VIEW_CSS = `
   .strip i.up { background: var(--good); }
   .strip-ends { display: flex; justify-content: space-between; color: var(--faint); font-size: var(--fs-tiny); margin-top: 6px; }
   .lifts { display: grid; gap: 16px; }
-  .lift { display: grid; grid-template-columns: minmax(0, 1fr) 92px; column-gap: 16px; align-items: center; }
+  .lift { display: grid; grid-template-columns: minmax(0, 1fr); }
   .lift .name { color: var(--bright); }
-  .lift .sub { grid-column: 1; margin-top: 2px; }
-  .lift svg { grid-row: 1 / span 2; grid-column: 2; }
-  svg.spark { width: 92px; height: 26px; overflow: visible; }
-  svg.spark polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-  svg.spark circle { fill: var(--bright); }
-  svg.line { width: 100%; height: 80px; display: block; margin-top: 14px; overflow: visible; }
-  svg.line polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+  .lift .sub { margin-top: 2px; }
   .rowlist { list-style: none; display: grid; gap: 10px; }
   .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 24px; margin: 0; }
   .facts dt { color: var(--muted); }
@@ -35,13 +30,13 @@ export const VIEW_CSS = `
   .rowlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; }
   .rowlist small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
   .rowlist small.good { color: var(--good); } .rowlist small.bad { color: var(--bad); }
-  .metrics { display: grid; gap: 18px; }
-  .metric { display: grid; grid-template-columns: minmax(0, 1fr) auto 92px; column-gap: 16px; align-items: center; }
+  .metrics { display: grid; gap: 30px; }
+  .metric { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: baseline; }
   .metric .name { color: var(--bright); }
   .metric .val { color: var(--bright); text-align: right; white-space: nowrap; }
+  .metric .val small { color: var(--muted); font-size: var(--fs-tiny); margin-left: 6px; }
   .metric .val.good { color: var(--good); } .metric .val.bad { color: var(--bad); }
-  .metric .sub { grid-column: 1 / span 2; margin-top: 2px; }
-  .metric svg { grid-row: 1 / span 2; grid-column: 3; }
+  .metric .sub { grid-column: 1 / -1; margin-top: 0; }
 `;
 
 const DAY = 86_400_000;
@@ -60,14 +55,8 @@ function ago(t: number): string {
   return days < 0 ? `${span} ago` : `in ${span}`;
 }
 
-function spark(values: number[]): string {
-  const min = Math.min(...values), range = Math.max(...values) - min || 1;
-  const pts = values.map((v, i) => [(i / (values.length - 1)) * 92, 24 - ((v - min) / range) * 22]);
-  const [lx, ly] = pts.at(-1)!;
-  return `<svg class="spark" viewBox="0 0 92 26" aria-hidden="true"><polyline points="${pts.map((p) => p.map((x) => x.toFixed(1)).join(",")).join(" ")}"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2"/></svg>`;
-}
 
-type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database; recent: () => Promise<db.Row[]> };
+type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database; recent: () => Promise<db.Row[]>; streams: () => Promise<{ id: number; date: string; series: db.Series }[]> };
 const dateField = (tab: Tab) => (tab.sort !== "id" ? tab.sort : tab.group ?? "created_at");
 const title = (tab: Tab, row: db.Row) => escape(row[tab.title] ?? "untitled");
 // every view is headed by a white pill, the way admin labels its sections
@@ -110,7 +99,12 @@ function progress(v: Extract<View, { kind: "progress" }>, { tab, rows }: Ctx): s
     // green: the latest session is the best and beats the first. red: the latest is below the best.
     const tone = last === best && last.top > first.top ? "good" : last.top < best.top ? "bad" : "";
     const latest = last === best ? "" : `<span>latest ${escape(last.label)}</span>`;
-    return `<div class="lift"><a class="name" href="/${tab.slug}/lifts/${encodeURIComponent(name)}">${escape(name)}</a><span class="sub"><span class="${tone}">best ${escape(best.label)}</span>${latest}</span>${spark(pts.map((p) => p.top))}</div>`;
+    // the same chart as everywhere: one dot per session day, a click opens the exercise's own page
+    const href = `/${tab.slug}/lifts/${encodeURIComponent(name)}`;
+    const byDay = new Map<string, ChartPoint>();
+    for (const p of pts) { const d = new Date(p.t).toISOString().slice(0, 10), had = byDay.get(d); if (!had || p.top >= had[1]) byDay.set(d, [d, p.top, p.row.id]); }
+    const mini = chart({ points: [...byDay.values()].sort((a, b) => (a[0] < b[0] ? -1 : 1)), mini: true, href, base: `/${tab.slug}/`, unit: tab.fields.find((f) => f.name === v.field)?.unit ?? "lb" });
+    return `<div class="lift"><a class="name" href="${href}">${escape(name)}</a><span class="sub"><span class="${tone}">best ${escape(best.label)}</span>${latest}</span>${mini}</div>`;
   });
   return section("progress", `<div class="lifts">${html.join("")}</div>`);
 }
@@ -134,6 +128,13 @@ function strip(v: Extract<View, { kind: "strip" }>, { rows }: Ctx): string {
 <p class="sub"><span class="${sorted.length > 1 && now - last > longest ? "bad" : ""}">last ${escape(heading.replace(/s$/, ""))} ${ago(last)}</span></p></section>`;
 }
 
+/** Chart points, one per day (a day with two rows keeps the later). */
+function perDay(pts: { t: number; y: number; id: number }[]): ChartPoint[] {
+  const byDay = new Map<string, ChartPoint>();
+  for (const p of pts) { const d = new Date(p.t).toISOString().slice(0, 10); byDay.set(d, [d, p.y, p.id]); }
+  return [...byDay.values()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+
 /** A number over time: the latest, the change since the first, and a line. `tab` reads another tab's rows. No targets: it shows what happened. */
 async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }: Ctx): Promise<string> {
   const source = v.tab ? await db.tab(database, v.tab) : tab;
@@ -141,20 +142,15 @@ async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }:
   const sourceRows = v.tab ? await db.list(database, source) : rows;
   const unit = source.fields.find((f) => f.name === v.field)?.unit;
   const u = unit ? (unit === "%" ? "%" : ` ${unit}`) : "";
-  const pts = sourceRows.map((row) => ({ t: dayOf(row[dateField(source)]), y: Number(row[v.field]) }))
-    .filter((p): p is { t: number; y: number } => p.t !== null && Number.isFinite(p.y) && p.y !== 0).sort((a, b) => a.t - b.t);
+  const pts = sourceRows.map((row) => ({ t: dayOf(row[dateField(source)]), y: Number(row[v.field]), id: row.id }))
+    .filter((p): p is { t: number; y: number; id: number } => p.t !== null && Number.isFinite(p.y) && p.y !== 0).sort((a, b) => a.t - b.t);
   if (!pts.length) return "";
   const first = pts[0], last = pts.at(-1)!, change = last.y - first.y;
   const sub = pts.length > 1 ? `<span>${change >= 0 ? "+" : ""}${fmt(change)}${u} since ${short(first.t)}</span>` : `<span>${short(last.t)}</span>`;
-  let chart = "";
-  if (pts.length > 1) {
-    const ys = pts.map((p) => p.y);
-    const min = Math.min(...ys), range = Math.max(...ys) - min || 1, span = last.t - first.t || 1;
-    const X = (t: number) => ((t - first.t) / span) * 100, Y = (y: number) => 74 - ((y - min) / range) * 68;
-    chart = `<svg class="line" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map((p) => `${X(p.t).toFixed(2)},${Y(p.y).toFixed(1)}`).join(" ")}" vector-effect="non-scaling-stroke"/></svg>`;
-  }
+  // every day since the first, zoomable; a dot opens that day's row
+  const plot = pts.length > 1 ? chart({ points: perDay(pts), base: `/${source.slug}/`, unit, int: source.fields.find((f) => f.name === v.field)?.type === "int" }) : "";
   const name = v.field.replaceAll("_", " ").replace(/ (kg|lb|percentage|cm)$/, "");
-  return section(name, `<p class="big">${fmt(last.y)}${escape(u)}</p><p class="sub">${sub}</p>${chart}`);
+  return section(name, `<p class="big">${fmt(last.y)}${escape(u)}</p><p class="sub">${sub}</p>${plot}`);
 }
 
 /** Does a row match a view's `where` (every key equal)? */
@@ -189,90 +185,118 @@ function list(v: Extract<View, { kind: "list" }>, { tab, rows }: Ctx): string {
 
 // ---- metrics: numbers that come every day (health) ----
 
-const RECENT = 120; // days of rows a metrics view reads: 7 to show, 28 before them as the usual, 90 for the sparkline
+const GLANCE = 10; // days a metric's mini chart shows; a click opens every day since the first
+const RECENT = 35; // rows a metrics view reads: this week and the 28 days before it (its usual), which covers the glance
 const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
 
-/** A value in its unit: minutes past an hour read "7h 40m". */
+/** A value in its unit, as precise as the field: whole numbers for int fields, one decimal otherwise; minutes past an hour read "7h 40m". */
 export function amount(f: Field | undefined, v: number): string {
   if (f?.unit === "min" && v >= 60) return `${Math.floor(v / 60)}h${Math.round(v % 60) ? ` ${Math.round(v % 60)}m` : ""}`;
-  const n = Math.abs(v) >= 100 ? Math.round(v).toLocaleString("en-US") : fmt(Math.round(v * 10) / 10);
+  const n = Math.abs(v) >= 100 || f?.type === "int" ? Math.round(v).toLocaleString("en-US") : fmt(Math.round(v * 10) / 10);
   return f?.unit ? `${n}${f.unit === "%" ? "" : " "}${f.unit}` : n;
 }
 /** "resting_hr" -> "resting hr", "hrv_ms" -> "hrv": the unit is shown with the value. */
 export const metricName = (name: string) => name.replace(/_(ms|min|kg|km|bpm)$/, "").replaceAll("_", " ");
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+const finite = (y: number) => Number.isFinite(y);
+type Pt = { t: number; y: number };
+
+const STREAM_DAYS = 3; // the newest days whose streams the pages carry: the dashboard shows the newest, the full page 1d and 3d
+
+/** How a metric is drawn per day, from its options. */
+const kindOf = (m: Metric) => (m.parts ? "stack" : m.low ? "candles" : m.band ? "band" : m.chart === "bars" ? "bars" : "line") as Chart["kind"];
+/** The fields a day's mark needs, value first: candles add low and high, a band its two edges, a stack each part. */
+const fieldsOf = (tab: Tab, m: Metric) => [m.field, ...(m.low && m.high ? [m.low, m.high] : m.band ?? (m.parts ? tab.parts?.find((p) => p.label === m.parts)?.fields ?? [] : []))];
+/** One chart point per day (a day with two rows keeps the later): date, value, row id, then the extra fields. */
+function dayPoints(entries: { id: number; date: string; values: (number | null)[] }[]): ChartPoint[] {
+  const byDay = new Map<string, ChartPoint>();
+  for (const e of entries) if (e.values[0] !== null) byDay.set(e.date.slice(0, 10), [e.date.slice(0, 10), e.values[0], e.id, ...e.values.slice(1).map((x) => x ?? (null as unknown as number))]);
+  return [...byDay.values()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+/** The streams of the newest days that have this one, oldest first. */
+const streamsOf = (recent: { id: number; date: string; series: db.Series }[], name: string): ChartStream[] =>
+  recent.filter((r) => r.series[name]?.points?.length).map((r) => ({ date: r.date, id: r.id, points: r.series[name].points })).reverse();
 
 /**
- * Each metric: the average of its last 7 days (ending at the newest day with data), coloured only when that week is unusual
- * for you: green or red when it sits more than two standard errors from the 28 days before it (better or worse by `better`).
- * Under it, that usual and the best ever (sqlite finds it over every row). A sparkline of 90 days. A metric that hasn't
- * moved in a week (weight, vo2max) shows its latest value and when.
+ * Each metric the way training shows a number: its name and this week's average (the 7 days ending at the newest day with
+ * data), green or red only when that week sits more than two standard errors from the 28 days before it, by `better`; under
+ * it that usual. Then the finest view there is: the newest day's stream for a metric that has one (heart rate every 2
+ * minutes), else its last 10 days (dots, bars, candles or stacked bars). The name or the chart opens the full page.
+ * A metric with nothing for weeks (no weigh-in) shows its latest value and when.
  */
-async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, database, recent }: Ctx): Promise<string> {
-  const rows = await recent(), dateF = dateField(tab);
-  const ranked = v.metrics.filter((m): m is { field: string; better: "higher" | "lower" } => !!m.better);
-  const best = new Map((await db.bests(database, tab, dateF, ranked)).map((b, i) => [ranked[i].field, b]));
-  const items = v.metrics.map((m) => {
-    const f = tab.fields.find((x) => x.name === m.field);
-    const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]), id: r.id })).filter((p): p is { t: number; y: number; id: number } =>
-      p.t !== null && finite(p.y)).sort((a, b) => a.t - b.t);
-    if (!pts.length) return "";
+async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, database, recent, streams }: Ctx): Promise<string> {
+  const rows = await recent(), dateF = dateField(tab), end = today();
+  const recentStreams = v.metrics.some((m) => m.stream) ? await streams() : [];
+  const quiet: string[] = [];
+  const series = v.metrics.map((m) => {
+    const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]) })).filter((p): p is Pt => p.t !== null && finite(p.y)).sort((a, b) => a.t - b.t);
+    if (!pts.length) quiet.push(m.field);
+    return pts;
+  });
+  const lasts = new Map((await db.latest(database, tab, dateF, quiet)).map((l, i) => [quiet[i], l]));
+  const items = v.metrics.map((m, i) => {
+    const f = tab.fields.find((x) => x.name === m.field), pts = series[i];
+    const name = `<a class="name" href="/${tab.slug}/metrics/${m.field}">${escape(metricName(m.field))}</a>`;
+    if (!pts.length) {
+      const l = lasts.get(m.field), t = l ? dayOf(l.date) : null;
+      return l && t !== null ? `<div class="metric">${name}<span class="val">${escape(amount(f, Number(l.value)))} <small>${short(t)}</small></span></div>` : "";
+    }
     const newest = pts.at(-1)!.t;
     const week = pts.filter((p) => p.t > newest - 7 * DAY).map((p) => p.y);
     const before = pts.filter((p) => p.t <= newest - 7 * DAY && p.t > newest - 35 * DAY).map((p) => p.y);
-    const name = `<a class="name" href="/${tab.slug}/metrics/${m.field}">${escape(metricName(m.field))}</a>`;
-    const sub: string[] = [];
-    let val: string, tone = "";
-    if (newest < today() - 7 * DAY) { // nothing this week: the latest, and when
-      val = amount(f, pts.at(-1)!.y);
-      sub.push(`<span>${short(newest)}</span>`);
-    } else {
-      const avg = mean(week);
-      val = amount(f, avg);
-      if (before.length) sub.push(`<span>usual ${escape(amount(f, mean(before)))}</span>`);
-      if (m.better && week.length >= 3 && before.length >= 10) {
-        const mb = mean(before), sd = Math.sqrt(mean(before.map((x) => (x - mb) ** 2)));
-        const z = sd > 0 ? (avg - mb) / (sd / Math.sqrt(week.length)) : 0;
-        if (Math.abs(z) >= 2) tone = (z > 0) === (m.better === "higher") ? "good" : "bad";
-      }
+    let tone = "";
+    if (m.better && week.length >= 3 && before.length >= 10) {
+      const mb = mean(before), sd = Math.sqrt(mean(before.map((x) => (x - mb) ** 2)));
+      const z = sd > 0 ? (mean(week) - mb) / (sd / Math.sqrt(week.length)) : 0;
+      if (Math.abs(z) >= 2) tone = (z > 0) === (m.better === "higher") ? "good" : "bad";
     }
-    const b = best.get(m.field);
-    if (b && Number.isFinite(Number(b.value))) {
-      const bt = dayOf(b.date);
-      sub.push(`<span>best <a href="/${tab.slug}/${b.id}">${escape(amount(f, Number(b.value)))}</a>${bt === null ? "" : ` ${short(bt)}`}</span>`);
-    }
-    const spk = pts.filter((p) => p.t > newest - 90 * DAY).map((p) => p.y);
-    return `<div class="metric">${name}<span class="val${tone ? ` ${tone}` : ""}">${escape(val)}</span><span class="sub">${sub.join("")}</span>${spk.length > 1 ? spark(spk) : "<span></span>"}</div>`;
+    const val = newest < end - 7 * DAY ? `${escape(amount(f, pts.at(-1)!.y))} <small>${short(newest)}</small>` : escape(amount(f, mean(week)));
+    const stream = m.stream ? streamsOf(recentStreams, m.stream).slice(-1) : [];
+    const fields = fieldsOf(tab, m);
+    const glance = dayPoints(rows.filter((r) => { const t = dayOf(r[dateF]); return t !== null && t > end - GLANCE * DAY; })
+      .map((r) => ({ id: r.id, date: String(r[dateF]), values: fields.map((n) => (finite(Number(r[n])) && r[n] !== undefined ? Number(r[n]) : null)) })));
+    const mini = stream.length || glance.length > 1
+      ? chart({ points: glance, kind: kindOf(m), streams: stream, mini: true, href: `/${tab.slug}/metrics/${m.field}`, base: `/${tab.slug}/`, unit: f?.unit, int: f?.type === "int" })
+      : "";
+    const shown = stream.length ? `<span>${escape(m.stream!)}, ${short(dayOf(stream[0].date)!)}</span>` : `<span>last ${GLANCE} days</span>`;
+    const sub = `<p class="sub">${before.length ? `<span>usual ${escape(amount(f, mean(before)))}</span>` : ""}${mini ? shown : ""}</p>`;
+    return `<div class="metric">${name}<span class="val${tone ? ` ${tone}` : ""}">${val}</span>${sub}${mini}</div>`;
   }).filter(Boolean);
   return items.length ? section(v.label, `<div class="metrics">${items.join("")}</div>`) : "";
 }
-const finite = (y: number) => Number.isFinite(y);
 
-/** One metric's whole history: every day plotted, the best in green, and the last two weeks, each linking to its day. */
+/** One metric's full page: opens on its streams (the newest days) when it has them, zooms out to every day since the first;
+ * its best week in green, and the last two weeks, each linking to its day. */
 export async function metricPage(tab: Tab, database: D1Database, name: string): Promise<string | null> {
   const metric = tab.views?.flatMap((v) => (v.kind === "metrics" ? v.metrics : [])).find((m) => m.field === name);
   const f = tab.fields.find((x) => x.name === name);
   if (!metric || !f) return null;
-  const pts = (await db.history(database, tab, dateField(tab), name)).map((h) => ({ t: dayOf(h.date), y: Number(h.value), id: h.id }))
-    .filter((p): p is { t: number; y: number; id: number } => p.t !== null && finite(p.y));
+  const [entries, recentStreams] = await Promise.all([db.history(database, tab, dateField(tab), fieldsOf(tab, metric)),
+    metric.stream ? db.recentSeries(database, tab.slug, dateField(tab), STREAM_DAYS) : Promise.resolve([])]);
+  const pts = entries.map((h) => ({ t: dayOf(h.date), y: Number(h.values[0]), id: h.id })).filter((p): p is { t: number; y: number; id: number } => p.t !== null && finite(p.y));
   const head = `<h1>${escape(metricName(name))}</h1>`;
   if (!pts.length) return `${head}<p class="lift-best">nothing yet</p>`;
-  const best = metric.better ? pts.reduce((a, p) => ((metric.better === "higher" ? p.y > a.y : p.y < a.y) ? p : a)) : null;
-  const W = 600, L = 52, T = 12, H = 220, B = 26;
-  const ys = pts.map((p) => p.y), min = Math.min(...ys), max = Math.max(...ys), range = max - min || 1;
-  const t0 = pts[0].t, span = pts.at(-1)!.t - t0 || 1;
-  const X = (t: number) => (pts.length === 1 ? (L + W) / 2 : L + ((t - t0) / span) * (W - L - 8));
-  const Y = (y: number) => T + (1 - (y - min) / range) * (H - T - B);
-  const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(metricName(name))} every day">
-<text x="${L - 8}" y="${Y(max) + 4}" text-anchor="end">${escape(amount(f, max))}</text><text x="${L - 8}" y="${Y(min) + 4}" text-anchor="end">${escape(amount(f, min))}</text>
-<text x="${L}" y="${H - 6}" text-anchor="start">${short(t0)}</text><text x="${W - 8}" y="${H - 6}" text-anchor="end">${short(pts.at(-1)!.t)}</text>
-<polyline points="${pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ")}"/>
-${best ? `<a href="/${tab.slug}/${best.id}"><circle class="best" cx="${X(best.t).toFixed(1)}" cy="${Y(best.y).toFixed(1)}" r="4"><title>${short(best.t)}: ${escape(amount(f, best.y))}</title></circle></a>` : ""}
-</svg>`;
-  const lastDays = [...pts].reverse().slice(0, 14).map((p) => `<li><a href="/${tab.slug}/${p.id}">${short(p.t)}</a><span class="sets"><span${best && p === best ? ' class="good"' : ""}>${escape(amount(f, p.y))}</span></span></li>`);
+  // best week: the seven days with a value whose average is best; fewer than seven, the best day
+  let best: { from: number; to: number; avg: number } | null = null;
+  if (metric.better) {
+    const n = Math.min(7, pts.length), better = (a: number, b: number) => (metric.better === "higher" ? a > b : a < b);
+    for (let i = n - 1; i < pts.length; i++) {
+      const avg = mean(pts.slice(i - n + 1, i + 1).map((p) => p.y));
+      if (!best || better(avg, best.avg)) best = { from: i - n + 1, to: i, avg };
+    }
+  }
+  const week = best ? pts.slice(best.from, best.to + 1) : [];
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const plot = chart({ points: dayPoints(entries), kind: kindOf(metric), streams: metric.stream ? streamsOf(recentStreams, metric.stream) : undefined,
+    base: `/${tab.slug}/`, unit: f.unit, int: f.type === "int", best: week.length > 1 && kindOf(metric) !== "stack" ? [iso(week[0].t), iso(week.at(-1)!.t)] : undefined });
+  const inBest = new Set(week.map((p) => p.id));
+  const lastDays = [...pts].reverse().slice(0, 14).map((p) => `<li><a href="/${tab.slug}/${p.id}">${short(p.t)}</a><span class="sets"><span${inBest.has(p.id) ? ' class="good"' : ""}>${escape(amount(f, p.y))}</span></span></li>`);
+  const bestLine = best && week.length
+    ? `<p class="lift-best">best ${week.length === 7 ? "week" : "day"} <span class="good">${escape(amount(f, best.avg))}</span>, ${week.length === 7 ? `<a href="/${tab.slug}/${week[0].id}">${short(week[0].t)}</a> to ` : ""}<a href="/${tab.slug}/${week.at(-1)!.id}">${short(week.at(-1)!.t)}</a></p>`
+    : "";
   return `${head}
-${best ? `<p class="lift-best">best <span class="good">${escape(amount(f, best.y))}</span> on ${short(best.t)}</p>` : ""}
-${chart}
+${bestLine}
+${plot}
 <ul class="sessions">${lastDays.join("")}</ul>`;
 }
 
@@ -292,55 +316,28 @@ function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): 
 }
 
 
-/** One exercise: every session plotted, then every session's sets (the best in green), each linking to its session. */
-/** A date under every point. One that would touch the date before it drops to a second line; only when both lines are taken
- * (three or more sessions bunched together) does an in-between date give way. The first and the latest always show. */
-function dates(ts: number[], X: (t: number) => number, y: number): { svg: string; lines: number } {
-  const GAP = 48, rows: { x: number; t: number }[][] = [[], []];
-  const room = (row: { x: number }[], x: number) => !row.length || x - row.at(-1)!.x >= GAP;
-  ts.forEach((t, i) => {
-    const x = X(t), line = room(rows[0], x) ? 0 : room(rows[1], x) ? 1 : -1;
-    if (line >= 0) rows[line].push({ x, t });
-    else if (i === ts.length - 1) { rows[0] = rows[0].filter((p) => x - p.x >= GAP); rows[0].push({ x, t }); }
-  });
-  const anchor = (t: number) => (ts.length > 1 && t === ts[0] ? "start" : ts.length > 1 && t === ts.at(-1) ? "end" : "middle");
-  const svg = rows.flatMap((row, line) => row.map(({ x, t }) => `<text x="${x.toFixed(1)}" y="${y + line * 15}" text-anchor="${anchor(t)}">${short(t)}</text>`)).join("");
-  return { svg, lines: rows[1].length ? 2 : 1 };
-}
-
+/** One exercise: every session on a zoomable chart (a dot opens its session), then every session's sets, the best in green. */
 export async function liftPage(tab: Tab, database: D1Database, exercise: string): Promise<string | null> {
   const field = tab.views?.find((v): v is Extract<View, { kind: "progress" }> => v.kind === "progress")?.field;
   if (!field) return null;
   const pts = liftSeries(tab, await db.list(database, tab), field).get(exercise);
   if (!pts) return null;
-  const W = 600, L = 44, T = 12;
-  const tops = pts.map((p) => p.top), min = Math.min(...tops), max = Math.max(...tops), range = max - min || 1;
-  const t0 = pts[0].t, span = pts.at(-1)!.t - t0 || 1;
-  const X = (t: number) => (pts.length === 1 ? (L + W) / 2 : L + ((t - t0) / span) * (W - L - 8));
-  const plot = 182; // the line's own height; dates go under it, on one line or two
-  const labels = dates(pts.map((p) => p.t), X, T + plot + 20);
-  const B = labels.lines === 2 ? 41 : 26, H = T + plot + B;
-  const Y = (y: number) => T + (1 - (y - min) / range) * (H - T - B);
   const best = pts.reduce((a, p) => (p.top > a.top || (p.top === a.top && p.reps > a.reps) ? p : a));
-  const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(exercise)}: best set per session">
-<text x="${L - 8}" y="${Y(max) + 4}" text-anchor="end">${fmt(max)}</text><text x="${L - 8}" y="${Y(min) + 4}" text-anchor="end">${fmt(min)}</text>
-${labels.svg}
-<polyline points="${pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.top).toFixed(1)}`).join(" ")}"/>
-${pts.map((p) => `<a href="/${tab.slug}/${p.row.id}"><circle class="${p === best ? "best" : ""}" cx="${X(p.t).toFixed(1)}" cy="${Y(p.top).toFixed(1)}" r="4"><title>${short(p.t)}: ${escape(p.label)}</title></circle></a>`).join("")}
-</svg>`;
+  // one dot per session day (a day with two sessions keeps its heavier best set); the best session in green
+  const byDay = new Map<string, (typeof pts)[number]>();
+  for (const p of pts) { const d = new Date(p.t).toISOString().slice(0, 10), had = byDay.get(d); if (!had || p.top >= had.top) byDay.set(d, p); }
+  const bestDay = new Date(best.t).toISOString().slice(0, 10);
+  const plot = chart({ points: [...byDay].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, p]) => [d, p.top, p.row.id]), base: `/${tab.slug}/`,
+    unit: tab.fields.find((f) => f.name === field)?.unit ?? "lb", int: false, best: [bestDay, bestDay] });
   const sessions = [...pts].reverse().map((p) => `<li><a href="/${tab.slug}/${p.row.id}">${short(p.t)}</a><span class="sets">${p.sets.map((s) => { const cls = s === p.label ? (p === best ? "good" : "top") : ""; return `<span${cls ? ` class="${cls}"` : ""}>${escape(s)}</span>`; }).join("")}</span></li>`);
   return `<h1>${escape(exercise)}</h1>
 <p class="lift-best">best <span class="good">${escape(best.label)}</span> on ${short(best.t)}</p>
-${chart}
+${plot}
 <ul class="sessions">${sessions.join("")}</ul>`;
 }
 
 export const LIFT_CSS = `
   .lift-best { color: var(--muted); font-size: var(--fs-small); margin-top: 8px; }
-  svg.chart { width: 100%; height: auto; display: block; margin-top: 28px; overflow: visible; }
-  svg.chart polyline { fill: none; stroke: var(--faint); stroke-width: 1.5; }
-  svg.chart circle { fill: var(--muted); } svg.chart circle.best { fill: var(--good); } svg.chart a:hover circle { fill: var(--bright); }
-  svg.chart text { fill: var(--faint); font-size: var(--fs-tiny); }
   .sessions { list-style: none; margin-top: 36px; display: grid; gap: 12px; }
   .sessions li { display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: baseline; }
   .sessions li > a { color: var(--muted); font-size: var(--fs-small); }
@@ -352,9 +349,10 @@ export const LIFT_CSS = `
  * metrics read a window of recent rows and let sqlite find the bests, so a tab with years of days stays cheap. */
 export async function renderViews(tab: Tab, database: D1Database): Promise<string> {
   if (!tab.views?.length) return "";
-  let recent: Promise<db.Row[]> | undefined;
+  let recent: Promise<db.Row[]> | undefined, streams: Promise<{ id: number; date: string; series: db.Series }[]> | undefined;
   const ctx: Ctx = { tab, rows: tab.views.some((v) => v.kind !== "metrics") ? await db.list(database, tab) : [], database,
-    recent: () => (recent ??= db.since(database, tab, dateField(tab), isoDay(today() - (RECENT - 1) * DAY))) };
+    recent: () => (recent ??= db.since(database, tab, dateField(tab), isoDay(today() - (RECENT - 1) * DAY))),
+    streams: () => (streams ??= db.recentSeries(database, tab.slug, dateField(tab), STREAM_DAYS)) };
   const parts = await Promise.all(tab.views.map((v) => {
     switch (v.kind) {
       case "progress": return progress(v, ctx);

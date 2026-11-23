@@ -16,6 +16,11 @@ const DB_ID = "7d86a3be-7d4b-45c6-97b1-d9990ae1d484";
 const TEAM = "adhikrish";
 const AUD = "e58f31f732ff5d00f7561ff36e3a9a23161176cdb806319370d50e6e2c0f387c"; // the real app's tag, as configured
 const report: { scenario: string; status: number; detail?: unknown }[] = [];
+/** The charts a page embeds: each one's data as the drawing script receives it. */
+const charts = (html: string) => [...html.matchAll(/data-chart="([^"]*)"/g)].map((m) => JSON.parse(m[1].replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&#39;", "'")));
+/** A page that opens from disk: the chart library inlined instead of fetched from the worker, so the artifact draws its charts. */
+const CHART_LIB = readFileSync(join(import.meta.dir, "../node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"), "utf8");
+const standalone = (html: string) => html.replace(/<script src="\/_charts-[\d.]+\.js"><\/script>/, () => `<script>${CHART_LIB}</script>`);
 mkdirSync(artifacts, { recursive: true }); // ignored by git, so a fresh checkout does not have it
 
 let jwks: ReturnType<typeof Bun.serve>;
@@ -204,25 +209,38 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(after.split('<div class="strip">')[1].split("</div>")[0].match(/class="up"/g)).toHaveLength(6);
   expect(after).toContain("last session yesterday");
   expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to senior intern">←</a><a class="external"'); // a tab goes back home
-  writeFileSync(join(artifacts, "page-training.html"), after);
+  expect(charts(after).some((c) => c.base === "/body/")).toBe(true); // bodyweight: every weigh-in, each dot opening its day
+  // every exercise in progress has the same mini chart, one dot per session day, opening its own page
+  const press = charts(after).find((c) => c.href === "/training/lifts/flat%20db%20press");
+  expect(press).toMatchObject({ mini: true, unit: "lb" });
+  expect(press.points.map((p: unknown[]) => p[1])).toEqual([50, 60]);
+  writeFileSync(join(artifacts, "page-training.html"), standalone(after));
   // every lift opens its own page: each session plotted and listed, the best in green
   expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
   const lift = (await call("lift page", "/training/lifts/flat%20db%20press", { token })).body as string;
-  expect(lift.match(/<circle /g)).toHaveLength(2);
-  expect(lift.match(/<text [^>]*text-anchor="(start|middle|end)">[a-z]{3} \d+<\/text>/g)).toHaveLength(2); // a date under every session
+  // a zoomable chart: one dot per session day, each opening its session; the best one marked
+  const liftChart = charts(lift)[0];
+  expect(liftChart.points).toHaveLength(2);
+  expect(liftChart.points.map((p: unknown[]) => p[1])).toEqual([50, 60]);
+  expect(liftChart.base).toBe("/training/");
+  expect(liftChart.best).toEqual([liftChart.points[1][0], liftChart.points[1][0]]);
+  expect(lift).toContain('<script src="/_charts-5.2.1.js"></script>');
   // sessions at -60, -20, -16, -13 days: -16 sits too close to -20, so its date drops to a second line; every date still shows
   for (const [d, sets] of [[-60, "40x10"], [-16, "55x8"]] as const)
     await send(dotsToken, "/api/training", { at: `${day(d)}T18:00-08:00`, type: "strength", title: "chest", lifts: `flat db press: ${sets}` });
   const crowded = (await call("lift page with close sessions", "/training/lifts/flat%20db%20press", { token })).body as string;
-  const labels = [...crowded.matchAll(/<text x="[\d.]+" y="(\d+)" text-anchor="(?:start|middle|end)">([a-z]{3} \d+)<\/text>/g)];
-  expect(labels).toHaveLength(4);
-  expect(new Set(labels.map((m) => m[1])).size).toBe(2);
-  writeFileSync(join(artifacts, "page-lift-crowded.html"), crowded);
+  expect(charts(crowded)[0].points).toHaveLength(4); // close sessions are still one dot each; the chart zooms instead of crowding labels
+  writeFileSync(join(artifacts, "page-lift-crowded.html"), standalone(crowded));
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
   expect(lift).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a lift goes back to its tab
-  writeFileSync(join(artifacts, "page-lift.html"), lift);
+  writeFileSync(join(artifacts, "page-lift.html"), standalone(lift));
+  // the library is served by the worker itself, cached forever
+  const lib = await fetch(`http://localhost:${port}/_charts-5.2.1.js`, { headers: { "cf-access-jwt-assertion": token } });
+  expect(lib.status).toBe(200);
+  expect(lib.headers.get("cache-control")).toContain("immutable");
+  expect(await lib.text()).toContain("LightweightCharts");
 });
 
 test("the contract is served by the api itself, as the agent sees it", async () => {
@@ -427,21 +445,59 @@ test("garmin fills health: full backfill under the request cap, merged days, int
 
   // the tab page: this week judged against the 28 days before it, in the right direction for each metric
   const tabPage = (await call("health page", "/health", { token })).body as string;
-  const metric = (name: string) => tabPage.split(`/health/metrics/${name}">`)[1].split("</div>")[0];
+  const metric = (name: string) => tabPage.split(`/health/metrics/${name}">`)[1].split(/<div class="metric">|<\/section>/)[0];
   expect(metric("hrv_ms")).toContain('class="val good"'); // up, and higher is better
   expect(metric("resting_hr")).toContain('class="val good"'); // down, and lower is better
   expect(metric("stress_avg")).toContain('class="val bad"'); // up, and lower is better
   expect(metric("steps")).not.toMatch(/class="val (good|bad)"/); // ordinary week: grey
-  expect(metric("hrv_ms")).toContain("best <a href=\"/health/");
-  expect(metric("weight_kg")).not.toContain("best"); // no direction, no best
-  expect(metric("weight_kg")).toContain("70.1 kg");
-  expect(tabPage).not.toContain("vo2max</a>"); // never had a value: no line for it
+  // ints are whole numbers; the headline is this week's average, with its usual under it
+  const hrvWeek = Math.round([0, 1, 2, 3, 4, 5, 6].reduce((sum, n) => sum + numbers(iso(n)).hrv, 0) / 7); // the week ends today, the newest day
+  expect(metric("hrv_ms")).toContain(`>${hrvWeek} ms</span>`);
+  expect(metric("hrv_ms")).toContain("<span>usual ");
+  // the finest view first: a metric with a stream shows the newest day of it
+  const mini = (name: string) => charts(metric(name))[0];
+  expect(mini("resting_hr").streams).toHaveLength(1);
+  expect(mini("resting_hr").streams[0]).toMatchObject({ date: iso(0) });
+  expect(mini("resting_hr").streams[0].points).toHaveLength(720 - 20 - 1);
+  expect(metric("resting_hr")).toContain(`<span>heart rate, `);
+  expect(mini("hrv_ms").streams[0].points[0]).toEqual([-20, 60]); // last night, from 11:40pm
+  expect(mini("body_battery_high").streams[0].points).toHaveLength(5);
+  // no stream: the last 10 days, drawn by kind: stacked parts for stress and sleep, bars for tallies
+  expect(mini("stress_avg")).toMatchObject({ kind: "stack", streams: [] });
+  expect(mini("stress_avg").points.at(-1).slice(3)).toEqual([420, 300, 120, 30]); // rest, low, medium, high minutes
+  expect(mini("sleep_min").kind).toBe("stack");
+  expect(mini("steps")).toMatchObject({ kind: "bars", mini: true, href: "/health/metrics/steps" });
+  expect(mini("steps").points).toHaveLength(10 - (NOT_WORN < 10 ? 1 : 0));
+  expect(metric("steps")).toContain("<span>last 10 days</span>");
+  // weight: one weigh-in 20 days ago, so no chart: its value and when; vo2max never had a value: no line
+  expect(metric("weight_kg")).toContain("70.1 kg <small>");
+  expect(metric("weight_kg")).not.toContain("data-chart");
+  expect(tabPage).not.toContain("vo2max</a>");
   expect(tabPage.indexOf("recovery")).toBeLessThan(tabPage.indexOf('<form class="search"'));
-  writeFileSync(join(artifacts, "page-health.html"), tabPage);
+  writeFileSync(join(artifacts, "page-health.html"), standalone(tabPage));
+  // the full page opens on the streams (1d, 3d), and zooms out to every day since the first, as candles of each day's range
+  const hrPage = (await call("resting hr page", "/health/metrics/resting_hr", { token })).body as string;
+  const heart = charts(hrPage)[0];
+  expect(heart.kind).toBe("candles");
+  expect(heart.streams.map((s: any) => s.date)).toEqual([iso(2), iso(1), iso(0)]);
+  expect(heart.points).toHaveLength(HISTORY);
+  expect(heart.points.at(-1).slice(1, 5)).toEqual([46, heart.points.at(-1)[2], 42, 151]); // resting, id, min, max
+  for (const r of ["1d", "3d", "10d", "1m", "3m", "1y", "all"]) expect(hrPage).toContain(`>${r}</button>`);
+  writeFileSync(join(artifacts, "page-health-heart.html"), standalone(hrPage));
+  // hrv: its balanced band behind the line, and the best week in green
   const hist = (await call("metric page", "/health/metrics/hrv_ms", { token })).body as string;
-  expect(hist).toContain('<circle class="best"');
+  const full = charts(hist)[0];
+  expect(full.kind).toBe("band");
+  expect(full.points.at(-1).slice(3)).toEqual([48, 62]);
+  expect(full.points[0][0]).toBe(iso(HISTORY));
+  expect(full.base).toBe("/health/");
+  expect(full.best).toEqual([iso(6), iso(0)]); // this week: hrv in the 70s
+  expect(hist).toMatch(/best week <span class="good">7[23] ms<\/span>/);
   expect(hist.match(/<li>/g)).toHaveLength(14);
-  writeFileSync(join(artifacts, "page-health-metric.html"), hist);
+  // a metric without a stream has no 1d / 3d
+  const stepsPage = (await call("steps page", "/health/metrics/steps", { token })).body as string;
+  expect(stepsPage).not.toContain(">1d</button>");
+  writeFileSync(join(artifacts, "page-health-metric.html"), standalone(hist));
   expect((await call("unknown metric", "/health/metrics/nope", { token })).status).toBe(404);
 }, 240_000);
 

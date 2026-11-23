@@ -155,18 +155,28 @@ export async function since(db: D1Database, t: Tab, dateField: string, from: str
     .bind(t.slug, `$.${dateField}`, from, `$.${dateField}`).all<RowRecord>()).results.map(toRow);
 }
 
-/** One number's whole history as (date, value) pairs, oldest first: sqlite picks the two values out, so years of rows cost no parsing here. */
-export async function history(db: D1Database, t: Tab, dateField: string, field: string): Promise<{ date: string; value: number; id: number }[]> {
-  return (await db.prepare("SELECT id, json_extract(data, ?) AS date, json_extract(data, ?) AS value FROM rows WHERE tab = ? AND value IS NOT NULL AND date IS NOT NULL ORDER BY date")
-    .bind(`$.${dateField}`, `$.${field}`, t.slug).all<{ date: string; value: number; id: number }>()).results;
+/** Several numbers' whole history, one entry per row that has the first of them, oldest first: sqlite picks the values out, so
+ * years of rows cost no json parsing here. values[i] is fields[i] (null where the row lacks it). */
+export async function history(db: D1Database, t: Tab, dateField: string, fields: string[]): Promise<{ id: number; date: string; values: (number | null)[] }[]> {
+  const cols = fields.map((_, i) => `json_extract(data, ?${i + 3}) AS v${i}`).join(", ");
+  const r = await db.prepare(`SELECT id, json_extract(data, ?1) AS date, ${cols} FROM rows WHERE tab = ?2 AND v0 IS NOT NULL AND date IS NOT NULL ORDER BY date`)
+    .bind(`$.${dateField}`, t.slug, ...fields.map((f) => `$.${f}`)).all<Record<string, number | string | null>>();
+  return r.results.map((x) => ({ id: Number(x.id), date: String(x.date), values: fields.map((_, i) => (x[`v${i}`] === null ? null : Number(x[`v${i}`]))) }));
 }
 
-/** Each field's best value and its date (largest or smallest), in one round trip. */
-export async function bests(db: D1Database, t: Tab, dateField: string, metrics: { field: string; better: "higher" | "lower" }[]) {
-  if (!metrics.length) return [];
-  const results = await db.batch<{ value: number; date: string; id: number }>(metrics.map((m) =>
-    db.prepare(`SELECT id, json_extract(data, ?) AS value, json_extract(data, ?) AS date FROM rows WHERE tab = ? AND value IS NOT NULL ORDER BY value ${m.better === "higher" ? "DESC" : "ASC"}, date DESC LIMIT 1`)
-      .bind(`$.${m.field}`, `$.${dateField}`, t.slug)));
+/** The newest `n` days of a tab that have series, newest first, with their streams. */
+export async function recentSeries(db: D1Database, slug: string, dateField: string, n: number): Promise<{ id: number; date: string; series: Series }[]> {
+  const r = await db.prepare(`SELECT rows.id AS id, json_extract(rows.data, ?) AS date, series.data AS data FROM rows JOIN series ON series.row_id = rows.id
+    WHERE rows.tab = ? AND series.data != '{}' ORDER BY date DESC LIMIT ?`).bind(`$.${dateField}`, slug, n).all<{ id: number; date: string; data: string }>();
+  return r.results.map((x) => ({ id: x.id, date: x.date, series: JSON.parse(x.data) }));
+}
+
+/** Each field's newest value and its date: for a metric that has gone quiet (no weigh-in for months), one row per field. */
+export async function latest(db: D1Database, t: Tab, dateField: string, fields: string[]): Promise<({ value: number; date: string } | null)[]> {
+  if (!fields.length) return [];
+  const results = await db.batch<{ value: number; date: string }>(fields.map((f) =>
+    db.prepare("SELECT json_extract(data, ?) AS value, json_extract(data, ?) AS date FROM rows WHERE tab = ? AND value IS NOT NULL ORDER BY date DESC LIMIT 1")
+      .bind(`$.${f}`, `$.${dateField}`, t.slug)));
   return results.map((r) => r.results[0] ?? null);
 }
 

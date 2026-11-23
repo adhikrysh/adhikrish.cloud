@@ -410,20 +410,32 @@
     "label": "recovery",
     "metrics": [
      {
-      "field": "hrv_ms",
-      "better": "higher"
+      "field": "resting_hr",
+      "better": "lower",
+      "low": "min_hr",
+      "high": "max_hr",
+      "stream": "heart rate"
      },
      {
-      "field": "resting_hr",
-      "better": "lower"
+      "field": "hrv_ms",
+      "better": "higher",
+      "band": [
+       "hrv_baseline_low",
+       "hrv_baseline_high"
+      ],
+      "stream": "overnight hrv"
+     },
+     {
+      "field": "body_battery_high",
+      "better": "higher",
+      "low": "body_battery_low",
+      "high": "body_battery_high",
+      "stream": "body battery"
      },
      {
       "field": "stress_avg",
-      "better": "lower"
-     },
-     {
-      "field": "body_battery_charged",
-      "better": "higher"
+      "better": "lower",
+      "parts": "stress"
      }
     ]
    },
@@ -433,7 +445,8 @@
     "metrics": [
      {
       "field": "sleep_min",
-      "better": "higher"
+      "better": "higher",
+      "parts": "sleep"
      },
      {
       "field": "sleep_score",
@@ -447,11 +460,13 @@
     "metrics": [
      {
       "field": "steps",
-      "better": "higher"
+      "better": "higher",
+      "chart": "bars"
      },
      {
       "field": "intensity_min",
-      "better": "higher"
+      "better": "higher",
+      "chart": "bars"
      }
     ]
    },

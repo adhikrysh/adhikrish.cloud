@@ -1,9 +1,13 @@
 // The read-only pages: home (the tabs), a tab (its views, then a searchable list), a row (everything about it).
 // Everything comes from the tab definition, so a tab added through the api gets the same layout.
-import { escape, page, type Design } from "../../../design/html.ts";
+import { escape, page as shell, type Design } from "../../../design/html.ts";
+import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
 import { amount, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
+
+/** Every page goes through here: a page with a chart gets the chart library and its drawing script. */
+const page = (p: Parameters<typeof shell>[0]) => shell({ ...p, body: withCharts(p.body), css: `${p.css ?? ""}${p.body.includes("data-chart=") ? CHART_CSS : ""}` });
 
 const CSS = `
   nav { flex-wrap: wrap; row-gap: 6px; }

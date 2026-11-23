@@ -4,7 +4,7 @@ base url: `https://seniorintern.adhikrish.cloud`. the agent writes through this 
 
 ## auth
 
-send both headers on every request. each agent has its own token, in 1password: `adhikrish.cloud-ci › snrintern dots token` for dots, `Personal › snrintern instinct token` for instinct. rows record which one wrote them (`updated_by`).
+send both headers on every request. each agent has its own token, in 1password: `adhikrish.cloud-ci › snrintern dots token` for dots, `adhikrish.cloud-ci › snrintern instinct token` for instinct. rows record which one wrote them (`updated_by`).
 
 ```
 CF-Access-Client-Id: <client-id>
@@ -99,7 +99,7 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 | `line` | a number over time: the latest, the change since the first, a line; `tab` reads another tab | `field`, `tab` |
 | `upcoming` | the next `limit` (default 3) rows matching `where` by a date, soonest first, overdue in red. a past date on a row under it reads "reviewed …" once the row stops matching `where`, "review overdue by …" while it still does | `field`, `where`, `limit` |
 | `list` | the rows matching `where` under the heading `label`, largest `sort` first (empty last), or in the tab's order without one; `aside` shows one field at the right, a date as "2 weeks ago". nothing is ever red: a row waiting for a year is not late | `label`, `where`, `sort`, `aside` |
-| `metrics` | one line per metric: its average over the last 7 days (ending at the newest day with data), green or red only when that week sits more than two standard errors from the 28 days before it, then that usual, the best ever and a 90-day sparkline; the name opens its whole history. `better` ("higher" or "lower") says which way is good; without it a metric is never coloured and has no best. a metric with nothing in the last week shows its latest value and when | `label`, `metrics: [{ field, better }]` |
+| `metrics` | one line per metric: its average over the last 7 days (ending at the newest day with data), green or red only when that week sits more than two standard errors from the 28 days before it, that usual under it, then 90 days of it: `chart: "line"` (default, for a level: the 7-day rolling average over faint daily values) or `"bars"` (for a daily tally like steps or sleep: one bar per day from zero, this week brighter). the name opens its whole history since the first day, with the best week drawn in. `better` ("higher" or "lower") says which way is good; without it a metric is never coloured and has no best. a metric with nothing in the last week shows its latest value and when | `label`, `metrics: [{ field, better, chart }]` |
 | `calibration` | what you said on average against how many came true, from the first scored row; each confidence level on its own once `min` (default 10) are scored | `confidence`, `verdict`, `right`, `min` |
 
 ## errors
