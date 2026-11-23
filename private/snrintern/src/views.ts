@@ -3,7 +3,7 @@
 // Charts are small inline svgs; green is good, red is bad, everything else is grey.
 import { escape } from "../../../design/html.ts";
 import * as db from "./db.ts";
-import { parseLifts, type Tab, type View } from "./schema.ts";
+import { parseLifts, type Field, type Tab, type View } from "./schema.ts";
 
 export const VIEW_CSS = `
   .views { margin-top: 32px; display: grid; gap: 40px; }
@@ -35,6 +35,13 @@ export const VIEW_CSS = `
   .rowlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: baseline; }
   .rowlist small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
   .rowlist small.good { color: var(--good); } .rowlist small.bad { color: var(--bad); }
+  .metrics { display: grid; gap: 18px; }
+  .metric { display: grid; grid-template-columns: minmax(0, 1fr) auto 92px; column-gap: 16px; align-items: center; }
+  .metric .name { color: var(--bright); }
+  .metric .val { color: var(--bright); text-align: right; white-space: nowrap; }
+  .metric .val.good { color: var(--good); } .metric .val.bad { color: var(--bad); }
+  .metric .sub { grid-column: 1 / span 2; margin-top: 2px; }
+  .metric svg { grid-row: 1 / span 2; grid-column: 3; }
 `;
 
 const DAY = 86_400_000;
@@ -60,7 +67,7 @@ function spark(values: number[]): string {
   return `<svg class="spark" viewBox="0 0 92 26" aria-hidden="true"><polyline points="${pts.map((p) => p.map((x) => x.toFixed(1)).join(",")).join(" ")}"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2"/></svg>`;
 }
 
-type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database };
+type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database; recent: () => Promise<db.Row[]> };
 const dateField = (tab: Tab) => (tab.sort !== "id" ? tab.sort : tab.group ?? "created_at");
 const title = (tab: Tab, row: db.Row) => escape(row[tab.title] ?? "untitled");
 // every view is headed by a white pill, the way admin labels its sections
@@ -180,6 +187,95 @@ function list(v: Extract<View, { kind: "list" }>, { tab, rows }: Ctx): string {
   return section(v.label, `<ul class="rowlist">${html.join("")}</ul>`);
 }
 
+// ---- metrics: numbers that come every day (health) ----
+
+const RECENT = 120; // days of rows a metrics view reads: 7 to show, 28 before them as the usual, 90 for the sparkline
+const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
+
+/** A value in its unit: minutes past an hour read "7h 40m". */
+export function amount(f: Field | undefined, v: number): string {
+  if (f?.unit === "min" && v >= 60) return `${Math.floor(v / 60)}h${Math.round(v % 60) ? ` ${Math.round(v % 60)}m` : ""}`;
+  const n = Math.abs(v) >= 100 ? Math.round(v).toLocaleString("en-US") : fmt(Math.round(v * 10) / 10);
+  return f?.unit ? `${n}${f.unit === "%" ? "" : " "}${f.unit}` : n;
+}
+/** "resting_hr" -> "resting hr", "hrv_ms" -> "hrv": the unit is shown with the value. */
+export const metricName = (name: string) => name.replace(/_(ms|min|kg|km|bpm)$/, "").replaceAll("_", " ");
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+/**
+ * Each metric: the average of its last 7 days (ending at the newest day with data), coloured only when that week is unusual
+ * for you: green or red when it sits more than two standard errors from the 28 days before it (better or worse by `better`).
+ * Under it, that usual and the best ever (sqlite finds it over every row). A sparkline of 90 days. A metric that hasn't
+ * moved in a week (weight, vo2max) shows its latest value and when.
+ */
+async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, database, recent }: Ctx): Promise<string> {
+  const rows = await recent(), dateF = dateField(tab);
+  const ranked = v.metrics.filter((m): m is { field: string; better: "higher" | "lower" } => !!m.better);
+  const best = new Map((await db.bests(database, tab, dateF, ranked)).map((b, i) => [ranked[i].field, b]));
+  const items = v.metrics.map((m) => {
+    const f = tab.fields.find((x) => x.name === m.field);
+    const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]), id: r.id })).filter((p): p is { t: number; y: number; id: number } =>
+      p.t !== null && finite(p.y)).sort((a, b) => a.t - b.t);
+    if (!pts.length) return "";
+    const newest = pts.at(-1)!.t;
+    const week = pts.filter((p) => p.t > newest - 7 * DAY).map((p) => p.y);
+    const before = pts.filter((p) => p.t <= newest - 7 * DAY && p.t > newest - 35 * DAY).map((p) => p.y);
+    const name = `<a class="name" href="/${tab.slug}/metrics/${m.field}">${escape(metricName(m.field))}</a>`;
+    const sub: string[] = [];
+    let val: string, tone = "";
+    if (newest < today() - 7 * DAY) { // nothing this week: the latest, and when
+      val = amount(f, pts.at(-1)!.y);
+      sub.push(`<span>${short(newest)}</span>`);
+    } else {
+      const avg = mean(week);
+      val = amount(f, avg);
+      if (before.length) sub.push(`<span>usual ${escape(amount(f, mean(before)))}</span>`);
+      if (m.better && week.length >= 3 && before.length >= 10) {
+        const mb = mean(before), sd = Math.sqrt(mean(before.map((x) => (x - mb) ** 2)));
+        const z = sd > 0 ? (avg - mb) / (sd / Math.sqrt(week.length)) : 0;
+        if (Math.abs(z) >= 2) tone = (z > 0) === (m.better === "higher") ? "good" : "bad";
+      }
+    }
+    const b = best.get(m.field);
+    if (b && Number.isFinite(Number(b.value))) {
+      const bt = dayOf(b.date);
+      sub.push(`<span>best <a href="/${tab.slug}/${b.id}">${escape(amount(f, Number(b.value)))}</a>${bt === null ? "" : ` ${short(bt)}`}</span>`);
+    }
+    const spk = pts.filter((p) => p.t > newest - 90 * DAY).map((p) => p.y);
+    return `<div class="metric">${name}<span class="val${tone ? ` ${tone}` : ""}">${escape(val)}</span><span class="sub">${sub.join("")}</span>${spk.length > 1 ? spark(spk) : "<span></span>"}</div>`;
+  }).filter(Boolean);
+  return items.length ? section(v.label, `<div class="metrics">${items.join("")}</div>`) : "";
+}
+const finite = (y: number) => Number.isFinite(y);
+
+/** One metric's whole history: every day plotted, the best in green, and the last two weeks, each linking to its day. */
+export async function metricPage(tab: Tab, database: D1Database, name: string): Promise<string | null> {
+  const metric = tab.views?.flatMap((v) => (v.kind === "metrics" ? v.metrics : [])).find((m) => m.field === name);
+  const f = tab.fields.find((x) => x.name === name);
+  if (!metric || !f) return null;
+  const pts = (await db.history(database, tab, dateField(tab), name)).map((h) => ({ t: dayOf(h.date), y: Number(h.value), id: h.id }))
+    .filter((p): p is { t: number; y: number; id: number } => p.t !== null && finite(p.y));
+  const head = `<h1>${escape(metricName(name))}</h1>`;
+  if (!pts.length) return `${head}<p class="lift-best">nothing yet</p>`;
+  const best = metric.better ? pts.reduce((a, p) => ((metric.better === "higher" ? p.y > a.y : p.y < a.y) ? p : a)) : null;
+  const W = 600, L = 52, T = 12, H = 220, B = 26;
+  const ys = pts.map((p) => p.y), min = Math.min(...ys), max = Math.max(...ys), range = max - min || 1;
+  const t0 = pts[0].t, span = pts.at(-1)!.t - t0 || 1;
+  const X = (t: number) => (pts.length === 1 ? (L + W) / 2 : L + ((t - t0) / span) * (W - L - 8));
+  const Y = (y: number) => T + (1 - (y - min) / range) * (H - T - B);
+  const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(metricName(name))} every day">
+<text x="${L - 8}" y="${Y(max) + 4}" text-anchor="end">${escape(amount(f, max))}</text><text x="${L - 8}" y="${Y(min) + 4}" text-anchor="end">${escape(amount(f, min))}</text>
+<text x="${L}" y="${H - 6}" text-anchor="start">${short(t0)}</text><text x="${W - 8}" y="${H - 6}" text-anchor="end">${short(pts.at(-1)!.t)}</text>
+<polyline points="${pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ")}"/>
+${best ? `<a href="/${tab.slug}/${best.id}"><circle class="best" cx="${X(best.t).toFixed(1)}" cy="${Y(best.y).toFixed(1)}" r="4"><title>${short(best.t)}: ${escape(amount(f, best.y))}</title></circle></a>` : ""}
+</svg>`;
+  const lastDays = [...pts].reverse().slice(0, 14).map((p) => `<li><a href="/${tab.slug}/${p.id}">${short(p.t)}</a><span class="sets"><span${best && p === best ? ' class="good"' : ""}>${escape(amount(f, p.y))}</span></span></li>`);
+  return `${head}
+${best ? `<p class="lift-best">best <span class="good">${escape(amount(f, best.y))}</span> on ${short(best.t)}</p>` : ""}
+${chart}
+<ul class="sessions">${lastDays.join("")}</ul>`;
+}
+
 /** Plain rows: your average confidence and how many came true; once `min` (default 10) are scored, the same for each confidence level. Nothing until one is scored. */
 function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): string {
   const scored = rows.filter((row) => row[v.verdict] !== undefined && Number.isFinite(Number(row[v.confidence])));
@@ -252,10 +348,13 @@ export const LIFT_CSS = `
   .sets .top { color: var(--bright); }
 `;
 
-/** All of a tab's views that have something to say, in order. */
+/** All of a tab's views that have something to say, in order. Every row is loaded only for views that need them all;
+ * metrics read a window of recent rows and let sqlite find the bests, so a tab with years of days stays cheap. */
 export async function renderViews(tab: Tab, database: D1Database): Promise<string> {
   if (!tab.views?.length) return "";
-  const ctx = { tab, rows: await db.list(database, tab), database };
+  let recent: Promise<db.Row[]> | undefined;
+  const ctx: Ctx = { tab, rows: tab.views.some((v) => v.kind !== "metrics") ? await db.list(database, tab) : [], database,
+    recent: () => (recent ??= db.since(database, tab, dateField(tab), isoDay(today() - (RECENT - 1) * DAY))) };
   const parts = await Promise.all(tab.views.map((v) => {
     switch (v.kind) {
       case "progress": return progress(v, ctx);
@@ -264,6 +363,7 @@ export async function renderViews(tab: Tab, database: D1Database): Promise<strin
       case "upcoming": return upcoming(v, ctx);
       case "calibration": return calibration(v, ctx);
       case "list": return list(v, ctx);
+      case "metrics": return metrics(v, ctx);
     }
   }));
   const html = parts.filter(Boolean).join("\n");

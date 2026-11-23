@@ -1,16 +1,18 @@
 // seniorintern.adhikrish.cloud
-//   /health          liveness for the admin dashboard
+//   /_health         readiness for the uptime page (underscored like every system path, so no tab slug can shadow it)
 //   /api/...         json api (src/api.ts): dots and scripts
-//   /, /<tab>, /<tab>/<id>, /<tab>/lifts/<exercise>  read-only pages (src/page.ts). all writes go through the api.
-// Every request except /health must carry the jwt cloudflare access signs for requests it let in.
+//   /, /<tab>, /<tab>/<id>, /<tab>/lifts/<exercise>, /<tab>/metrics/<field>  read-only pages (src/page.ts). all writes go through the api,
+//   except the hourly garmin sync (src/garmin.ts), which writes the health tab directly.
+// Every request except /_health must carry the jwt cloudflare access signs for requests it let in.
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
-import { exercisePage, homePage, rowPage, tabPage } from "./page.ts";
+import { sync } from "./garmin.ts";
+import { exercisePage, homePage, metricHistoryPage, rowPage, tabPage } from "./page.ts";
 
-type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string };
+type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string; GARMIN_API_KEY?: string; GARMIN_URL?: string };
 
 const design = { base, list };
 const html = (body: string, status = 200) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
@@ -23,7 +25,7 @@ export default {
     // the database is unreachable, not only when the worker is. No jwt needed: from the internet, access still stands in
     // front of it (only you and the agent get through), and all it can do is answer "1".
     // It reports how long its own query took, so uptime shows the database's speed for senior intern.
-    if (url.pathname === "/health") {
+    if (url.pathname === "/_health") {
       const start = Date.now();
       try {
         await env.DB.prepare("SELECT 1").first();
@@ -38,7 +40,7 @@ export default {
     if (!who) return Response.json({ error: "not signed by cloudflare access" }, { status: 401 });
     // People (an email) get everything. A service token gets in only if it is a listed agent.
     if (who.who.startsWith("service:") && !env.AGENT_CLIENT_IDS.split(",").includes(who.who.slice("service:".length))) {
-      return Response.json({ error: "this service token may only call /health" }, { status: 403 });
+      return Response.json({ error: "this service token may only call /_health" }, { status: 403 });
     }
 
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return handleApi(request, env.DB, who.who);
@@ -49,11 +51,20 @@ export default {
     const tab = await db.tab(env.DB, slug);
     if (!tab) return html("not found", 404);
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? "", Math.max(1, Math.floor(Number(url.searchParams.get("page"))) || 1)));
+    if (id === "metrics" && name) {
+      const metric = await metricHistoryPage(design, env.DB, tab, decodeURIComponent(name));
+      return metric ? html(metric) : html("not found", 404);
+    }
     if (id === "lifts" && name) {
       const lift = await exercisePage(design, env.DB, tab, decodeURIComponent(name));
       return lift ? html(lift) : html("not found", 404);
     }
     const row = await db.get(env.DB, tab.slug, Number(id));
-    return row ? html(rowPage(design, tab, row)) : html("not found", 404);
+    return row ? html(rowPage(design, tab, row, await db.getSeries(env.DB, row.id))) : html("not found", 404);
+  },
+
+  // hourly: garmin's recent days, one month further back, and owed intraday detail (src/garmin.ts)
+  async scheduled(controller, env) {
+    await sync(env, controller.scheduledTime);
   },
 } satisfies ExportedHandler<Env>;

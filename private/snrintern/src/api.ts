@@ -7,6 +7,7 @@
 //   POST   /api/<tab>                      GET    /api/_log?limit=       recent schema changes
 //   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (API.md), as markdown
 //   DELETE /api/<tab>/<id>
+//   GET    /api/<tab>/<id>/series          a row's intraday detail (a health day's heart rate, overnight hrv)
 import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
 import * as db from "./db.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
@@ -19,7 +20,7 @@ const API = {
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00)",
     "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
-  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)"],
+  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better }])"],
 };
 
 export async function handleApi(request: Request, database: D1Database, who: string): Promise<Response> {
@@ -63,6 +64,12 @@ export async function handleApi(request: Request, database: D1Database, who: str
   }
 
   const tab = await db.tab(database, first);
+  if (tab && extra === "series" && Number.isInteger(Number(second))) {
+    if (request.method !== "GET") return fail(405, "use GET; the garmin sync writes series");
+    const row = await db.get(database, tab.slug, Number(second));
+    if (!row) return fail(404, "no such row");
+    return json({ series: (await db.getSeries(database, row.id)) ?? {} });
+  }
   if (!tab || extra !== undefined) {
     const known = (await db.tabs(database)).map((t) => t.slug).join(", ");
     return fail(404, `no such tab. tabs: ${known}`);

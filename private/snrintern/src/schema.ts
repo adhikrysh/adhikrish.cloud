@@ -2,7 +2,8 @@
 // Definitions live in d1 (`tabs`) and change through PUT /api/_tabs/<slug>; this file only checks them.
 
 type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
-export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, Tone> };
+export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, Tone>;
+  section?: string }; // section: the heading it sits under on a row's page
 /** How an enum value's pill looks: white (no tone), "outline" (black with a white border), "good" (green border), "bad" (red border). */
 export type Tone = "outline" | "good" | "bad";
 export type TabDefinition = {
@@ -16,8 +17,11 @@ export type TabDefinition = {
   group?: string; // a date/datetime field groups the list by day ("wed, sep 17"); a text or enum field groups it by value
   views?: View[]; // what the tab opens on, above the list (see View)
   hidden?: boolean; // left out of the nav and home (its data still feeds other tabs' views)
+  parts?: Part[]; // on a row's page: one bar per part, each field a share of it (sleep: deep, light, rem, awake)
   fields: Field[];
 };
+
+export type Part = { label: string; fields: string[] };
 
 // A view answers one question at the top of a tab, computed from its rows (or, for "line", another tab's).
 export type View =
@@ -26,7 +30,10 @@ export type View =
   | { kind: "line"; field: string; tab?: string } // a number over time, from this tab or another
   | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number } // the next rows by a date, overdue first
   | { kind: "list"; label: string; where: Record<string, string>; sort?: string; aside?: string } // the rows matching `where`, by `sort` or in the tab's order
-  | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number }; // how often each confidence level came true
+  | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
+  | { kind: "metrics"; label: string; metrics: Metric[] }; // each number's last 7 days against its usual, its best, 90 days of it
+/** better: which way is good (lower resting heart rate, higher hrv). Without it a metric is never coloured and has no best. */
+export type Metric = { field: string; better?: "higher" | "lower" };
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
 export type Data = Record<string, Value>;
@@ -44,7 +51,7 @@ const validDate = (s: string) => !Number.isNaN(Date.parse(s.slice(0, 10)));
 export function checkDefinition(input: unknown): TabDefinition | string {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return "definition must be a json object";
   const d = input as Record<string, unknown>;
-  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "views", "hidden", "fields"]);
+  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "views", "hidden", "parts", "fields"]);
   for (const key of Object.keys(d)) if (!known.has(key)) return `unknown key "${key}". keys: ${[...known].join(", ")}`;
   if (typeof d.label !== "string" || !d.label.trim()) return '"label" must be a non-empty string';
   if (typeof d.about !== "string") return '"about" must be a string';
@@ -58,7 +65,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (RESERVED.includes(f.name)) return `field name "${f.name}" is reserved (every row already has ${RESERVED.join(", ")})`;
     if (names.has(f.name)) return `field "${f.name}" appears twice`;
     if (!TYPES.includes(f.type as FieldType)) return `field "${f.name}": type must be one of ${TYPES.join(", ")}`;
-    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
+    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
     const field: Field = { name: f.name, type: f.type as FieldType };
     if (f.required !== undefined) {
       if (typeof f.required !== "boolean") return `field "${f.name}": required must be true or false`;
@@ -85,6 +92,10 @@ export function checkDefinition(input: unknown): TabDefinition | string {
         field.colors = c as Record<string, Tone>;
       }
     } else if (f.options !== undefined || f.colors !== undefined) return `field "${f.name}": options and colors only apply to enum fields`;
+    if (f.section !== undefined) {
+      if (typeof f.section !== "string" || !f.section.trim()) return `field "${f.name}": section must be a heading like "sleep"`;
+      field.section = f.section;
+    }
     names.add(field.name);
     fields.push(field);
   }
@@ -115,8 +126,18 @@ export function checkDefinition(input: unknown): TabDefinition | string {
   const views = checkViews(d.views, types);
   if (typeof views === "string") return views;
   if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
+  const parts: Part[] = [];
+  if (d.parts !== undefined) {
+    if (!Array.isArray(d.parts)) return '"parts" must be a list';
+    for (const [i, raw] of d.parts.entries()) {
+      const p = raw as Record<string, unknown>;
+      if (typeof p !== "object" || p === null || typeof p.label !== "string" || !p.label.trim() || !Array.isArray(p.fields) || p.fields.length < 2
+        || !p.fields.every((n) => typeof n === "string" && ["int", "number"].includes(types.get(n) ?? ""))) return `parts[${i}]: needs a "label" and two or more number "fields"`;
+      parts.push({ label: p.label, fields: p.fields as string[] });
+    }
+  }
   return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}),
-    ...(group ? { group } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), fields };
+    ...(group ? { group } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), ...(parts.length ? { parts } : {}), fields };
 }
 
 /** Checks one row body against a tab's fields. `partial` is for PATCH: only the given fields are checked. */
@@ -174,7 +195,13 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
         if (v.sort !== undefined && !types.has(v.sort)) return `${where}: "sort" must name a field`;
         if (v.aside !== undefined && !types.has(v.aside)) return `${where}: "aside" must name a field`;
         break;
-      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list`;
+      case "metrics":
+        if (typeof v.label !== "string" || !v.label.trim()) return `${where}: "label" must be a heading like "sleep"`;
+        if (!Array.isArray(v.metrics) || !v.metrics.length || !v.metrics.every((m: any) => typeof m === "object" && m !== null
+          && isField(m.field, ["int", "number"]) && (m.better === undefined || m.better === "higher" || m.better === "lower")))
+          return `${where}: "metrics" must list { "field": <a number field>, "better": "higher" or "lower" (optional) }`;
+        break;
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics`;
     }
     views.push(v as View);
   }

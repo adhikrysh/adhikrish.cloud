@@ -3,7 +3,7 @@
 import { escape, page, type Design } from "../../../design/html.ts";
 import * as db from "./db.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
-import { LIFT_CSS, liftPage, matches, renderViews, VIEW_CSS } from "./views.ts";
+import { amount, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
 
 const CSS = `
   nav { flex-wrap: wrap; row-gap: 6px; }
@@ -53,6 +53,18 @@ const CSS = `
   details.group .project-list { margin: 4px 0 18px 18px; }
   a.schema { display: inline-block; margin-top: 64px; color: var(--ghost); font-size: var(--fs-tiny); }
   a.schema:hover { color: var(--muted); }
+  .section h2 { margin-top: 36px; }
+  .section dl { margin-top: 12px; }
+  .part { margin-top: 14px; }
+  .part .bar { display: flex; height: 10px; border-radius: 2px; overflow: hidden; gap: 1px; margin-top: 6px; }
+  .part .bar i { display: block; background: var(--muted); }
+  .part .bar i:nth-child(2) { background: var(--faint); } .part .bar i:nth-child(3) { background: var(--ghost); } .part .bar i:nth-child(4) { background: var(--line); }
+  .part .keys { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: var(--fs-small); margin-top: 6px; }
+  .timeline { margin-top: 28px; }
+  .timeline svg { width: 100%; height: auto; display: block; margin-top: 8px; overflow: visible; }
+  .timeline polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+  .timeline text { fill: var(--faint); font-size: var(--fs-tiny); }
+  .timeline line { stroke: var(--line); }
   @media (prefers-reduced-motion: reduce) { .search input, details.group summary::before { transition: none; } }
 `;
 
@@ -120,7 +132,7 @@ function show(f: Field, value: Value, where: "aside" | "line" | "detail"): strin
       return escape([day(p, "short"), clock(p)].filter(Boolean).join(", "));
     }
     case "int":
-    case "number": return escape(f.unit ? `${value}${f.unit === "%" ? "" : " "}${f.unit}` : where === "aside" ? String(value) : `${label(f.name)} ${value}`);
+    case "number": return escape(f.unit ? amount(f, Number(value)) : where === "aside" ? amount(f, Number(value)) : `${label(f.name)} ${value}`);
     case "enum": {
       const tone = f.colors?.[String(value)];
       return `<span class="pill${tone ? ` ${tone}` : ""}">${escape(value)}</span>`;
@@ -243,7 +255,68 @@ function pager(tab: Tab, q: string, at: number, older: boolean): string {
   return at > 1 || older ? `      <nav class="pager" aria-label="pages">${newer}${older ? `<a href="${escape(href(at + 1))}">older →</a>` : ""}</nav>` : "";
 }
 
-export function rowPage(design: Design, tab: Tab, row: db.Row): string {
+/** A clock time for minutes from midnight ("-20" is 11:40pm the night before). */
+const hhmm = (m: number) => { const d = ((Math.round(m) % 1440) + 1440) % 1440, h = Math.floor(d / 60); return `${h % 12 || 12}${d % 60 ? `:${String(d % 60).padStart(2, "0")}` : ""}${h < 12 ? "am" : "pm"}`; };
+
+/** One intraday series as a timeline: a whole day on a shared axis when it spans the day, its own span otherwise (overnight hrv).
+ * Plain grey, only the highest and lowest labelled, so the stack reads as one picture. */
+function timeline(name: string, s: db.Series[string]): string {
+  const pts = s.points.filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (pts.length < 2) return "";
+  const W = 600, H = 120, L = 40, T = 10, B = 22;
+  const ms = pts.map((p) => p[0]), vs = pts.map((p) => p[1]);
+  const fullDay = Math.min(...ms) >= 0 && Math.max(...ms) <= 1440 && Math.max(...ms) - Math.min(...ms) > 720;
+  const [m0, m1] = fullDay ? [0, 1440] : [Math.min(...ms), Math.max(...ms)];
+  const lo = Math.min(...vs), hi = Math.max(...vs), range = hi - lo || 1;
+  const X = (m: number) => L + ((m - m0) / (m1 - m0 || 1)) * (W - L - 4), Y = (v: number) => T + (1 - (v - lo) / range) * (H - T - B);
+  const unit = s.unit ? ` ${s.unit}` : "";
+  const ticks = fullDay ? [0, 360, 720, 1080, 1440] : [m0, m1];
+  // a gap (watch off) breaks the line instead of bridging it: three times the stream's usual spacing, never under 20 minutes
+  const steps = pts.slice(1).map((p, i) => p[0] - pts[i][0]).sort((a, b) => a - b);
+  const gap = Math.max(20, 3 * (steps[Math.floor(steps.length / 2)] ?? 0));
+  const runs: [number, number][][] = [];
+  for (const p of pts) { const last = runs.at(-1)?.at(-1); if (!last || p[0] - last[0] > gap) runs.push([p]); else runs.at(-1)!.push(p); }
+  return `<section class="timeline"><h2>${escape(name)}</h2><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(name)} through the day">
+<text x="${L - 8}" y="${Y(hi) + 4}" text-anchor="end">${escape(`${hi}${unit}`)}</text><text x="${L - 8}" y="${Y(lo) + 4}" text-anchor="end">${escape(`${lo}${unit}`)}</text>
+${ticks.map((m, i) => `<text x="${X(m).toFixed(1)}" y="${H - 4}" text-anchor="${i === 0 ? "start" : i === ticks.length - 1 ? "end" : "middle"}">${hhmm(m)}</text>`).join("")}
+${runs.filter((r) => r.length > 1).map((r) => `<polyline points="${r.map((p) => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ")}"/>`).join("")}
+</svg></section>`;
+}
+
+/** A part (sleep: deep, light, rem, awake) as one bar, each field its share, with the amounts under it. */
+function part(tab: Tab, row: db.Row, p: { label: string; fields: string[] }): string {
+  const xs = p.fields.map((n) => ({ f: field(tab, n), v: Number(row[n]) })).filter((x) => Number.isFinite(x.v) && x.v > 0);
+  const total = xs.reduce((a, x) => a + x.v, 0);
+  if (!xs.length || !total) return "";
+  const word = (n: string) => metricName(n).replace(new RegExp(`^${p.label} `), "");
+  return `<div class="part"><span>${escape(p.label)}</span><div class="bar">${xs.map((x) => `<i style="width:${((x.v / total) * 100).toFixed(1)}%" title="${escape(word(x.f.name))}"></i>`).join("")}</div>
+<div class="keys">${xs.map((x) => `<span>${escape(`${word(x.f.name)} ${amount(x.f, x.v)}`)}</span>`).join("")}</div></div>`;
+}
+
+/** A row whose fields have sections (a health day): each section's numbers under its heading, the parts as bars, then the day's timelines. */
+function sectioned(tab: Tab, row: db.Row, series: db.Series | null): string {
+  const inParts = new Set((tab.parts ?? []).flatMap((p) => p.fields));
+  const order = [...new Set(tab.fields.map((f) => f.section ?? ""))];
+  const sections = order.map((name) => {
+    const fs = tab.fields.filter((f) => (f.section ?? "") === name && f.name !== tab.title && present(row[f.name]));
+    const parts = (tab.parts ?? []).filter((p) => p.fields.some((n) => fs.some((f) => f.name === n))).map((p) => part(tab, row, p)).join("");
+    const dl = fs.filter((f) => !inParts.has(f.name)).map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${f.type === "int" || f.type === "number" ? escape(amount(f, Number(row[f.name]))) : show(f, row[f.name] as Value, "aside")}</dd>`);
+    if (!dl.length && !parts) return "";
+    return `<section class="section">${name ? `<h2><span class="pill">${escape(name)}</span></h2>` : ""}${parts}${dl.length ? `<dl>${dl.join("")}</dl>` : ""}</section>`;
+  });
+  const charts = Object.entries(series ?? {}).map(([name, s]) => timeline(name, s));
+  return [...sections, ...charts].filter(Boolean).join("\n");
+}
+
+export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series | null = null): string {
+  if (tab.fields.some((f) => f.section)) {
+    const body = `      <article class="detail">
+      <h1>${titleOf(tab, row, "detail")}</h1>
+      ${sectioned(tab, row, series)}
+      </article>
+      ${schemaLink(tab)}`;
+    return page({ design, title: `${row[tab.title] ?? "untitled"} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });
+  }
   const shown = new Set([tab.title, ...tab.line, ...tab.aside]);
   const long = (f: Field) => f.type === "text" && present(row[f.name]) && (f.name === tab.snippet || /\n| · /.test(String(row[f.name])) || String(row[f.name]).length > 120);
   const sections = tab.fields.filter((f) => present(row[f.name]) && (f.type === "lifts" || (!shown.has(f.name) && long(f)))).map((f) => {
@@ -270,6 +343,13 @@ export function rowPage(design: Design, tab: Tab, row: db.Row): string {
       </article>
       ${schemaLink(tab)}`;
   return page({ design, title: `${row[tab.title] ?? "untitled"} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });
+}
+
+/** One metric's history (from the tab's metrics views). */
+export async function metricHistoryPage(design: Design, database: D1Database, tab: Tab, name: string): Promise<string | null> {
+  const body = await metricPage(tab, database, name);
+  if (!body) return null;
+  return page({ design, title: `${metricName(name)} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS + LIFT_CSS });
 }
 
 /** One exercise's history (from the tab's progress view): a full chart and every session. */

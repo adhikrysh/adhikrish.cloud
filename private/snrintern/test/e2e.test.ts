@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import { HISTORY, NOT_WORN, numbers, startFakeGarmin } from "./fake-garmin.ts";
 
 const root = join(import.meta.dir, "..");
 const artifacts = join(import.meta.dir, "artifacts");
@@ -18,6 +19,7 @@ const report: { scenario: string; status: number; detail?: unknown }[] = [];
 mkdirSync(artifacts, { recursive: true }); // ignored by git, so a fresh checkout does not have it
 
 let jwks: ReturnType<typeof Bun.serve>;
+const garmin = startFakeGarmin();
 let worker: ReturnType<typeof Bun.spawn> | undefined;
 let port = 0;
 let sign: (claims: Record<string, unknown>, opts?: { aud?: string; forged?: boolean }) => Promise<string>;
@@ -29,7 +31,7 @@ async function startWorker() {
   port = 20000 + Math.floor(Math.random() * 20000);
   worker = Bun.spawn(["npx", "vite", "dev", "--mode", "test", "--port", String(port), "--strictPort"], {
     cwd: root,
-    env: { ...process.env, SNRINTERN_STATE: state, ACCESS_CERTS_URL: `http://127.0.0.1:${jwks.port}/cdn-cgi/access/certs` },
+    env: { ...process.env, SNRINTERN_STATE: state, ACCESS_CERTS_URL: `http://127.0.0.1:${jwks.port}/cdn-cgi/access/certs`, GARMIN_URL: garmin.url },
     stdout: "pipe", stderr: "pipe",
   });
   for (let i = 0; i < 100; i++) {
@@ -107,13 +109,14 @@ beforeAll(async () => {
 afterAll(async () => {
   await stopWorker();
   jwks.stop();
+  garmin.server.stop();
   writeFileSync(join(artifacts, "e2e-report.json"), JSON.stringify({ ranAt: new Date().toISOString(), calls: report }, null, 2));
   rmSync(state, { recursive: true, force: true });
 });
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, forecasts: 4, training: 4, body: 2, books: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, forecasts: 4, training: 4, body: 2, books: 0, health: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -121,7 +124,7 @@ test("requests that did not come through access are refused", async () => {
   expect((await call("no jwt", "/api")).status).toBe(401);
   expect((await call("jwt for another app", "/api", { token: await sign({ email: "me@example.com" }, { aud: "other-app" }) })).status).toBe(401);
   expect((await call("jwt signed by the wrong key", "/api", { token: await sign({ email: "me@example.com" }, { forged: true }) })).status).toBe(401);
-  const health = await call("health needs no jwt (access guards it in production)", "/health");
+  const health = await call("health needs no jwt (access guards it in production)", "/_health");
   expect(health.status).toBe(200);
   expect(health.body).toMatchObject({ ok: true }); expect(typeof health.body.ms).toBe("number"); // and it reports its own query time and where it ran
   expect((await call("a service token that is not a listed agent may not read data", "/api", { token: await sign({ common_name: "some-other-token-id" }) })).status).toBe(403);
@@ -353,6 +356,94 @@ test("books open on what is being read and what is next; the agent moves a book 
   expect(row).toContain("priya"); // who recommended it stays on the row
   writeFileSync(join(artifacts, "page-books.html"), done);
 });
+
+test("garmin fills health: full backfill under the request cap, merged days, intraday detail, metrics that judge the week", async () => {
+  const token = await me(), agent = await dots();
+  const HOUR = 3_600_000;
+  const base = Math.floor(Date.now() / HOUR / 3) * 3 * HOUR + 17 * 60_000; // an hour that checks recent days (every 3rd)
+  const runs: { at: string; recent: boolean; calls: number }[] = [];
+  const run = async (at: number) => {
+    const before = garmin.calls.length;
+    // local dev's cron trigger (what the local explorer's "run" button calls), at a chosen time
+    const r = await fetch(`http://localhost:${port}/cdn-cgi/local/scheduled?${new URLSearchParams({ cron: "17 * * * *", time: String(at), format: "json" })}`);
+    if (r.status !== 200) throw new Error(`scheduled: ${r.status} ${await r.text()}`); // a sync that throws fails the run
+    runs.push({ at: new Date(at).toISOString(), recent: Math.floor(at / HOUR) % 3 === 0, calls: garmin.calls.length - before });
+  };
+  // keep running hourly until nothing is owed: a run that checks recent days, then two that only backfill
+  for (let i = 0; i < 30; i++) await run(base + i * HOUR);
+  writeFileSync(join(artifacts, "garmin-runs.json"), JSON.stringify(runs, null, 1));
+  expect(Math.max(...runs.map((r) => r.calls))).toBeLessThanOrEqual(48); // the free plan allows 50 outside requests a run
+  const idle = runs.filter((r) => !r.recent).at(-1)!;
+  expect(idle.calls).toBe(0); // backfill finished: an hour that doesn't check recent days asks garmin nothing
+  expect(runs.filter((r) => r.recent).at(-1)!.calls).toBeLessThanOrEqual(16); // steady state: 1 token + 6 + 2 days of detail (4 each)
+  expect(garmin.calls.filter((c) => c.includes("dailySleepSummariesByDate")).length).toBeGreaterThan(0);
+
+  // every worn day, once: the full history, no duplicates although recent days were stored many times, no row for the unworn day
+  const rows: any[] = [];
+  for (let offset = 0; offset !== null;) { const page = (await call("health rows", `/api/health?limit=1000&offset=${offset}`, { token: agent })).body; rows.push(...page.rows); offset = page.next_offset; }
+  const dates = rows.map((r) => r.date);
+  expect(new Set(dates).size).toBe(dates.length);
+  const iso = (n: number) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) - n * 86_400_000).toISOString().slice(0, 10);
+  expect(dates).not.toContain(iso(NOT_WORN));
+  expect(dates).toContain(iso(HISTORY)); // the oldest day: the backfill walked back three chunks and stopped after three empty ones
+  expect(rows.length).toBe(HISTORY); // HISTORY + 1 days, minus the unworn one
+  const day3 = rows.find((r) => r.date === iso(3));
+  // mapped from five range calls, the day summary and fitness age (newest day only); vo2max failed every time and nothing else did
+  expect(day3).toMatchObject({ hrv_ms: numbers(iso(3)).hrv, resting_hr: 46, steps: numbers(iso(3)).steps, intensity_min: 40, stress_rest_min: 420,
+    sleep_deep_min: 90, sleep_score: 84, bedtime: `${iso(4)}T23:40`, sleep_feedback: "positive optimal structure",
+    sleep_insight: "stress pos excellent or good sleep restful day", hrv_feedback: "hrv balanced", body_battery_feedback: "sleep time passed balanced and inactive",
+    sedentary_min: 690, active_min: 60, body_battery_at_wake: 91, updated_by: "garmin" });
+  expect(day3.vo2max).toBeUndefined();
+  expect(rows.find((r) => r.date === iso(20)).weight_kg).toBe(70.1);
+  // merge: the recent run re-stored day 1 after its summary was fetched, and the summary's fields survived
+  expect(rows.find((r) => r.date === iso(1)).sedentary_min).toBe(690);
+  // old days: numbers and the day summary, no intraday (garmin dropped it), and an empty series so they stop being owed
+  const old = rows.find((r) => r.date === iso(HISTORY));
+  expect(old.sedentary_min).toBe(690);
+  expect((await call("old day series", `/api/health/${old.id}/series`, { token: agent })).body.series).toEqual({});
+
+  // a day's intraday detail, in minutes from local midnight: the null reading and the 40-minute gap are skipped, overnight hrv starts the night before
+  const series = (await call("day series", `/api/health/${day3.id}/series`, { token: agent })).body.series;
+  expect(series["heart rate"].points).toHaveLength(720 - 20 - 1);
+  expect(series["heart rate"].points[0]).toEqual([0, 55]);
+  expect(series["overnight hrv"].points[0]).toEqual([-20, 60]);
+  expect(series["body battery"].points.map((p: number[]) => p[0])).toEqual([0, 468, 573, 954, 1431]);
+
+  // the day page: sections, the sleep and stress bars, timelines with the watch-off gap left open
+  const page = (await call("health day page", `/health/${day3.id}`, { token })).body as string;
+  for (const s of ["recovery", "sleep", "activity"]) expect(page).toContain(`<h2><span class="pill">${s}</span></h2>`);
+  expect(page).not.toContain('<span class="pill">fitness</span>'); // no fitness numbers that day: no empty section
+  expect(page).toContain("<dt>respiration low</dt>");
+  expect(page).toContain('title="deep"');
+  expect(page).toContain("<span>deep 1h 30m</span>");
+  expect(page).toContain("<span>rest 7h</span>");
+  expect(page).toContain("positive optimal structure");
+  const hr = page.split("<h2>heart rate</h2>")[1].split("</section>")[0];
+  expect(hr.match(/<polyline /g)).toHaveLength(2); // before and after the gap
+  expect(hr).toContain(">12am</text>");
+  expect(page.split("<h2>overnight hrv</h2>")[1].split("</section>")[0]).toContain(">11:40pm</text>");
+  expect(page.split("<h2>body battery</h2>")[1].split("</section>")[0].match(/<polyline /g)).toHaveLength(1); // hours apart, still one line
+  writeFileSync(join(artifacts, "page-health-day.html"), page);
+
+  // the tab page: this week judged against the 28 days before it, in the right direction for each metric
+  const tabPage = (await call("health page", "/health", { token })).body as string;
+  const metric = (name: string) => tabPage.split(`/health/metrics/${name}">`)[1].split("</div>")[0];
+  expect(metric("hrv_ms")).toContain('class="val good"'); // up, and higher is better
+  expect(metric("resting_hr")).toContain('class="val good"'); // down, and lower is better
+  expect(metric("stress_avg")).toContain('class="val bad"'); // up, and lower is better
+  expect(metric("steps")).not.toMatch(/class="val (good|bad)"/); // ordinary week: grey
+  expect(metric("hrv_ms")).toContain("best <a href=\"/health/");
+  expect(metric("weight_kg")).not.toContain("best"); // no direction, no best
+  expect(metric("weight_kg")).toContain("70.1 kg");
+  expect(tabPage).not.toContain("vo2max</a>"); // never had a value: no line for it
+  expect(tabPage.indexOf("recovery")).toBeLessThan(tabPage.indexOf('<form class="search"'));
+  writeFileSync(join(artifacts, "page-health.html"), tabPage);
+  const hist = (await call("metric page", "/health/metrics/hrv_ms", { token })).body as string;
+  expect(hist).toContain('<circle class="best"');
+  expect(hist.match(/<li>/g)).toHaveLength(14);
+  writeFileSync(join(artifacts, "page-health-metric.html"), hist);
+  expect((await call("unknown metric", "/health/metrics/nope", { token })).status).toBe(404);
+}, 240_000);
 
 test("people are a search and their groups, nothing above", async () => {
   const token = await me();

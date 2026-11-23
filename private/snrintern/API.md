@@ -39,6 +39,7 @@ cloudflare access checks them before the request reaches the worker. without the
 | GET | `/api` | | tabs, counts, field types, view kinds |
 | GET | `/api/<tab>?q=<text>&limit=<n>&offset=<n>` | | `{ "rows": [...], "next_offset": <n> or null }`, in the tab's sort order. `q` matches any value. `limit` 100 by default, max 1000. to read everything, repeat with `offset=next_offset` until it is `null` |
 | GET | `/api/<tab>/<id>` | | `{ "row": {...} }` |
+| GET | `/api/<tab>/<id>/series` | | `{ "series": { "heart rate": { "unit": "bpm", "points": [[minute, value], ...] }, ... } }`: a row's intraday detail (a health day), minutes from that day's local midnight; `{}` when there is none |
 | POST | `/api/<tab>` | `{ "<field>": value, ... }` | `201 { "row": {...} }` |
 | PATCH | `/api/<tab>/<id>` | only the fields to change | `{ "row": {...} }` |
 | DELETE | `/api/<tab>/<id>` | | `{ "deleted": <id> }` |
@@ -56,6 +57,7 @@ every row also has `id`, `created_at`, `updated_at` and `updated_by` (an email, 
 - **body**: one row per weigh-in. `at`, `bodyweight_kg`, `bodyfat_percentage`, `notes`. a weigh-in is its own row, never part of a training row.
 - **people**: `name`, `company`, `title`, `met_where`, `met_date`, `location`, `linkedin`, `twitter`, `referred_by`, `notes`, `group` (free text: the topic they belong to), `last_contact`. set `group` when adding someone, reusing a topic that's already in use (look at existing rows) when one fits; a new topic just appears on the page. set `last_contact` to today whenever they're mentioned as talked to.
 - **books**: `title`, `author`, `status` (to read, reading, finished, dropped), `recommended_by`, `started`, `finished`, `take`, `quotes`, `link`. one row per book, for its whole life: a recommendation is a new row with `status: to read` and `recommended_by` (a name, a podcast, wherever it came from); starting it, finishing it or giving up is a PATCH to the same row (`status` plus `started` or `finished` as today). search first (`GET /api/books?q=<title>`) so a book is never added twice. `take` is what adhi thinks after a conversation about it: his claims and what he'd argue with, in his words, not a transcript and not a summary of the book. a later conversation adds to `take` instead of replacing it. the page opens on what's being read and what's next.
+- **health**: one row per day, written by the hourly garmin sync, not by agents (read it, don't write it). numbers by section: recovery (`hrv_ms`, `resting_hr`, stress minutes, body battery), sleep (`sleep_min` and stages, `sleep_score`, `bedtime`, `wake_time`, respiration), activity (`steps`, `intensity_min`, `active_min`, `sedentary_min`, calories), fitness (`vo2max`, `fitness_age`, `weight_kg`). text fields ending in `_feedback`, `_insight` or `_qualifier` are garmin's own verdicts as words. heart rate every 2 minutes, overnight hrv and body battery for a day: `GET /api/health/<id>/series` (garmin keeps these about 4 months, so older days have none). `GET /api/_tabs/health` lists every field.
 - **forecasts**: `date`, `decision`, `rationale`, `confidence` (0-100), `expected`, `review_date`, `outcome`, `verdict` (right, wrong), `status` (open, closed). scoring one = PATCH `verdict` and `status: closed`.
 
 ## changing the schema
@@ -80,6 +82,7 @@ a definition, with every key:
 ```
 
 - `title`, `aside`, `line`: how a row reads in the list. `snippet`: a text field previewed under each row. enums show as a white pill; an enum field's `colors` gives a value an outlined pill instead: `"outline"` (white border), `"good"` (green) or `"bad"` (red), e.g. `{ "closed": "outline", "right": "good", "wrong": "bad" }`.
+- `section` on a field puts it under that heading on a row's page; `parts` (`[{ "label": "sleep", "fields": [...] }]`) draws those number fields as shares of one bar there.
 - `hidden: true` keeps a tab out of the nav and off home; its rows still feed other tabs' views (body feeds training's lines).
 - `sort`: `"id"` (newest first) or a field (largest first). `group`: a date field groups the list by day; a text or enum field groups it by value, collapsed.
 - no targets or thresholds go in a definition (no goal weight, no sessions a week, no "after 60 days"): views show what happened and compare it with your own history, so nothing needs updating as plans change.
@@ -96,6 +99,7 @@ what a tab opens on, above its list. green means good and red means bad; everyth
 | `line` | a number over time: the latest, the change since the first, a line; `tab` reads another tab | `field`, `tab` |
 | `upcoming` | the next `limit` (default 3) rows matching `where` by a date, soonest first, overdue in red. a past date on a row under it reads "reviewed …" once the row stops matching `where`, "review overdue by …" while it still does | `field`, `where`, `limit` |
 | `list` | the rows matching `where` under the heading `label`, largest `sort` first (empty last), or in the tab's order without one; `aside` shows one field at the right, a date as "2 weeks ago". nothing is ever red: a row waiting for a year is not late | `label`, `where`, `sort`, `aside` |
+| `metrics` | one line per metric: its average over the last 7 days (ending at the newest day with data), green or red only when that week sits more than two standard errors from the 28 days before it, then that usual, the best ever and a 90-day sparkline; the name opens its whole history. `better` ("higher" or "lower") says which way is good; without it a metric is never coloured and has no best. a metric with nothing in the last week shows its latest value and when | `label`, `metrics: [{ field, better }]` |
 | `calibration` | what you said on average against how many came true, from the first scored row; each confidence level on its own once `min` (default 10) are scored | `confidence`, `verdict`, `right`, `min` |
 
 ## errors

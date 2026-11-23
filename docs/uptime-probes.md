@@ -101,7 +101,7 @@ the request goes to the public url, exactly like a visitor's. the site is static
 
 ```text
 timer
-    -> https://seniorintern.adhikrish.cloud/health, with the prober's service token
+    -> https://seniorintern.adhikrish.cloud/_health, with the prober's service token
     -> nearest cloudflare data center: access checks the token
     -> placement moves the request to senior intern near SJC, next to its database
          -> SELECT 1, timed inside senior intern
@@ -120,9 +120,9 @@ this matters more for the agent than for this page. every agent request runs sev
 
 **how we found the database.** a d1 query's metadata names the data center that served it: `served_by_colo: "SJC"`, `served_by_primary: true`.
 
-**senior intern times itself.** `/health` answers `{ ok, ms }`, where `ms` is how long its own `SELECT 1` took, measured inside senior intern. the page shows that number, so it's the database's speed for senior intern, wherever cloudflare happened to run the timer.
+**senior intern times itself.** `/_health` answers `{ ok, ms }`, where `ms` is how long its own `SELECT 1` took, measured inside senior intern. the page shows that number, so it's the database's speed for senior intern, wherever cloudflare happened to run the timer.
 
-**why `/health` touches the database.** a check that only proves the worker's code runs is a *liveness* check. on cloudflare that's almost always true, so it would show green forever, even on a day when every real request fails because the database is down. a check that proves the service can do its job, by reaching what it depends on, is a *readiness* check. `SELECT 1` is the smallest question a database can answer ("give me the number 1"). it reads no table and only proves the database replied.
+**why `/_health` touches the database.** a check that only proves the worker's code runs is a *liveness* check. on cloudflare that's almost always true, so it would show green forever, even on a day when every real request fails because the database is down. a check that proves the service can do its job, by reaching what it depends on, is a *readiness* check. `SELECT 1` is the smallest question a database can answer ("give me the number 1"). it reads no table and only proves the database replied.
 
 ### 3. self-hosted: everything on the thinkpad
 
@@ -162,7 +162,7 @@ it used to probe every service on every visit. that's fine for a private page, b
 ## who can make it do work
 
 - **the uptime worker's `/_probe`** runs only if the request carries the header `x-probe-key` with the prober's secret. that secret lives in cloudflare's secret storage and never reaches a browser, and only the timer sends it. from outside, `/_probe` returns 404.
-- **senior intern's `/health`** sits behind access like every other path: only your google login, the agent's token and the prober's token get through. it needs no login of its own after that, and all it can do is answer "1". the prober's token can't read data: senior intern only accepts the agent's token for that.
+- **senior intern's `/_health`** sits behind access like every other path: only your google login, the agent's token and the prober's token get through. it needs no login of its own after that, and all it can do is answer "1". the prober's token can't read data: senior intern only accepts the agent's token for that.
 - **the prober's token** goes only to private services, where access checks it. the public site gets no token.
 
 ## the dead ends, and what they taught
@@ -179,7 +179,7 @@ the general lesson: check where each feature applies before building on it, and 
 1. **the thinkpad loses power.** the next run probes every self-hosted app, cloudflare can't reach the tunnel, and each stores a `530`, shown as "tunnel unreachable". the site and senior intern stay green, because they don't depend on the box.
 2. **someone reloads the uptime page 10,000 times.** each load is a few database reads. the box sees nothing, and no probe runs.
 3. **someone requests `uptime.adhikrish.cloud/_probe`.** 404. no key, no run.
-4. **senior intern's database has an outage.** `SELECT 1` fails, `/health` returns 503, and senior intern turns red with "server error 503", even though its worker is fine.
+4. **senior intern's database has an outage.** `SELECT 1` fails, `/_health` returns 503, and senior intern turns red with "server error 503", even though its worker is fine.
 5. **cloudflare runs the timer in europe.** the self-hosted numbers don't change, because they're probed from singapore. senior intern's number doesn't change either, because it times itself.
 6. **you add a new self-hosted app.** add one entry to `services.json` with its url and, if it has one, a health path. it gets probed from singapore along road 3. see [`add-a-service.md`](add-a-service.md).
 7. **you add a new cloudflare worker.** add it to `services.json` with `"cloudflare": true` and a `health` url. give it a `/health` that checks what it depends on and answers `{ ok, ms }`. if it has a database, place it next to that database's primary.

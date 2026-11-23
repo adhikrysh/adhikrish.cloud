@@ -98,3 +98,81 @@ export async function remove(db: D1Database, slug: string, id: number): Promise<
   return (await db.prepare("DELETE FROM rows WHERE tab = ? AND id = ?").bind(slug, id).run()).meta.changes > 0;
 }
 
+
+// ---- series: a row's intraday detail, read only by that row's page ----
+
+export type Series = Record<string, { unit?: string; points: [number, number][] }>;
+
+export async function getSeries(db: D1Database, rowId: number): Promise<Series | null> {
+  const r = await db.prepare("SELECT data FROM series WHERE row_id = ?").bind(rowId).first<{ data: string }>();
+  return r ? JSON.parse(r.data) : null;
+}
+
+export const putSeries = (db: D1Database, rowId: number, series: Series) =>
+  db.prepare("INSERT INTO series (row_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT (row_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at")
+    .bind(rowId, JSON.stringify(series), new Date().toISOString());
+
+// ---- meta: small state kept between cron runs ----
+
+export async function getMeta(db: D1Database, key: string): Promise<string | null> {
+  return (await db.prepare("SELECT value FROM meta WHERE key = ?").bind(key).first<{ value: string }>())?.value ?? null;
+}
+
+export const setMeta = (db: D1Database, key: string, value: string) =>
+  db.prepare("INSERT INTO meta (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
+    .bind(key, value, new Date().toISOString());
+
+// ---- rows keyed by one field (a day): what a sync writes and what the metrics view reads ----
+
+/** Row ids by the value of `field`, for the given values (each day a sync touched). */
+export async function idsBy(db: D1Database, slug: string, field: string, values: string[]): Promise<Map<string, number>> {
+  if (!values.length) return new Map();
+  const marks = values.map(() => "?").join(", ");
+  const r = await db.prepare(`SELECT id, json_extract(data, ?) AS k FROM rows WHERE tab = ? AND json_extract(data, ?) IN (${marks})`)
+    .bind(`$.${field}`, slug, `$.${field}`, ...values).all<{ id: number; k: string }>();
+  return new Map(r.results.map((x) => [x.k, x.id]));
+}
+
+/** Inserts rows keyed by `field`, or merges each into the row that already has its key (json_patch: given fields replace,
+ * others stay), in one batch; returns each key's row id. A sync merges, so what one call knows never wipes what another fetched. */
+export async function mergeBy(db: D1Database, slug: string, field: string, rows: Data[], by: string): Promise<Map<string, number>> {
+  const keys = rows.map((r) => String(r[field]));
+  const existing = await idsBy(db, slug, field, keys);
+  const at = new Date().toISOString();
+  await db.batch(rows.map((data, i) => existing.has(keys[i])
+    ? mergeInto(db, existing.get(keys[i])!, data, by, at)
+    : db.prepare("INSERT INTO rows (tab, data, created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)").bind(slug, JSON.stringify(data), at, at, by)));
+  return idsBy(db, slug, field, keys);
+}
+
+/** Merges fields into one row's data. */
+export const mergeInto = (db: D1Database, id: number, data: Data, by: string, at = new Date().toISOString()) =>
+  db.prepare("UPDATE rows SET data = json_patch(data, ?), updated_at = ?, updated_by = ? WHERE id = ?").bind(JSON.stringify(data), at, by, id);
+
+/** Rows whose date field is on or after `since` (yyyy-mm-dd), oldest first. */
+export async function since(db: D1Database, t: Tab, dateField: string, from: string): Promise<Row[]> {
+  return (await db.prepare("SELECT id, data, created_at, updated_at, updated_by FROM rows WHERE tab = ? AND json_extract(data, ?) >= ? ORDER BY json_extract(data, ?)")
+    .bind(t.slug, `$.${dateField}`, from, `$.${dateField}`).all<RowRecord>()).results.map(toRow);
+}
+
+/** One number's whole history as (date, value) pairs, oldest first: sqlite picks the two values out, so years of rows cost no parsing here. */
+export async function history(db: D1Database, t: Tab, dateField: string, field: string): Promise<{ date: string; value: number; id: number }[]> {
+  return (await db.prepare("SELECT id, json_extract(data, ?) AS date, json_extract(data, ?) AS value FROM rows WHERE tab = ? AND value IS NOT NULL AND date IS NOT NULL ORDER BY date")
+    .bind(`$.${dateField}`, `$.${field}`, t.slug).all<{ date: string; value: number; id: number }>()).results;
+}
+
+/** Each field's best value and its date (largest or smallest), in one round trip. */
+export async function bests(db: D1Database, t: Tab, dateField: string, metrics: { field: string; better: "higher" | "lower" }[]) {
+  if (!metrics.length) return [];
+  const results = await db.batch<{ value: number; date: string; id: number }>(metrics.map((m) =>
+    db.prepare(`SELECT id, json_extract(data, ?) AS value, json_extract(data, ?) AS date FROM rows WHERE tab = ? AND value IS NOT NULL ORDER BY value ${m.better === "higher" ? "DESC" : "ASC"}, date DESC LIMIT 1`)
+      .bind(`$.${m.field}`, `$.${dateField}`, t.slug)));
+  return results.map((r) => r.results[0] ?? null);
+}
+
+/** Rows of a tab that have no series yet, dated on or after `from`, newest first (the days a sync still owes their detail). */
+export async function missingSeries(db: D1Database, slug: string, dateField: string, from: string, limit: number): Promise<{ id: number; date: string }[]> {
+  return (await db.prepare(`SELECT rows.id AS id, json_extract(rows.data, ?) AS date FROM rows LEFT JOIN series ON series.row_id = rows.id
+    WHERE rows.tab = ? AND series.row_id IS NULL AND date >= ? ORDER BY date DESC LIMIT ?`)
+    .bind(`$.${dateField}`, slug, from, limit).all<{ id: number; date: string }>()).results;
+}

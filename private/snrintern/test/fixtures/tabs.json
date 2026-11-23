@@ -372,5 +372,414 @@
     "type": "url"
    }
   ]
+ },
+ "health": {
+  "label": "health",
+  "about": "garmin, every day: recovery, sleep, activity, fitness",
+  "title": "date",
+  "aside": [
+   "sleep_min",
+   "hrv_ms",
+   "steps"
+  ],
+  "line": [],
+  "sort": "date",
+  "parts": [
+   {
+    "label": "sleep",
+    "fields": [
+     "sleep_deep_min",
+     "sleep_light_min",
+     "sleep_rem_min",
+     "sleep_awake_min"
+    ]
+   },
+   {
+    "label": "stress",
+    "fields": [
+     "stress_rest_min",
+     "stress_low_min",
+     "stress_medium_min",
+     "stress_high_min"
+    ]
+   }
+  ],
+  "views": [
+   {
+    "kind": "metrics",
+    "label": "recovery",
+    "metrics": [
+     {
+      "field": "hrv_ms",
+      "better": "higher"
+     },
+     {
+      "field": "resting_hr",
+      "better": "lower"
+     },
+     {
+      "field": "stress_avg",
+      "better": "lower"
+     },
+     {
+      "field": "body_battery_charged",
+      "better": "higher"
+     }
+    ]
+   },
+   {
+    "kind": "metrics",
+    "label": "sleep",
+    "metrics": [
+     {
+      "field": "sleep_min",
+      "better": "higher"
+     },
+     {
+      "field": "sleep_score",
+      "better": "higher"
+     }
+    ]
+   },
+   {
+    "kind": "metrics",
+    "label": "activity",
+    "metrics": [
+     {
+      "field": "steps",
+      "better": "higher"
+     },
+     {
+      "field": "intensity_min",
+      "better": "higher"
+     }
+    ]
+   },
+   {
+    "kind": "metrics",
+    "label": "fitness",
+    "metrics": [
+     {
+      "field": "vo2max",
+      "better": "higher"
+     },
+     {
+      "field": "fitness_age",
+      "better": "lower"
+     },
+     {
+      "field": "weight_kg"
+     }
+    ]
+   }
+  ],
+  "fields": [
+   {
+    "name": "date",
+    "type": "date",
+    "required": true
+   },
+   {
+    "name": "hrv_ms",
+    "type": "int",
+    "unit": "ms",
+    "section": "recovery"
+   },
+   {
+    "name": "hrv_weekly_ms",
+    "type": "int",
+    "unit": "ms",
+    "section": "recovery"
+   },
+   {
+    "name": "hrv_status",
+    "type": "text",
+    "section": "recovery"
+   },
+   {
+    "name": "hrv_baseline_low",
+    "type": "int",
+    "unit": "ms",
+    "section": "recovery"
+   },
+   {
+    "name": "hrv_baseline_high",
+    "type": "int",
+    "unit": "ms",
+    "section": "recovery"
+   },
+   {
+    "name": "hrv_feedback",
+    "type": "text",
+    "section": "recovery"
+   },
+   {
+    "name": "resting_hr",
+    "type": "int",
+    "unit": "bpm",
+    "section": "recovery"
+   },
+   {
+    "name": "min_hr",
+    "type": "int",
+    "unit": "bpm",
+    "section": "recovery"
+   },
+   {
+    "name": "max_hr",
+    "type": "int",
+    "unit": "bpm",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_avg",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_max",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_qualifier",
+    "type": "text",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_rest_min",
+    "type": "int",
+    "unit": "min",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_low_min",
+    "type": "int",
+    "unit": "min",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_medium_min",
+    "type": "int",
+    "unit": "min",
+    "section": "recovery"
+   },
+   {
+    "name": "stress_high_min",
+    "type": "int",
+    "unit": "min",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_high",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_low",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_charged",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_drained",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_at_wake",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_during_sleep",
+    "type": "int",
+    "section": "recovery"
+   },
+   {
+    "name": "body_battery_feedback",
+    "type": "text",
+    "section": "recovery"
+   },
+   {
+    "name": "sleep_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_deep_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_light_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_rem_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_awake_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_score",
+    "type": "int",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_need_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "nap_min",
+    "type": "int",
+    "unit": "min",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_hr",
+    "type": "int",
+    "unit": "bpm",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_stress",
+    "type": "int",
+    "section": "sleep"
+   },
+   {
+    "name": "bedtime",
+    "type": "datetime",
+    "section": "sleep"
+   },
+   {
+    "name": "wake_time",
+    "type": "datetime",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_feedback",
+    "type": "text",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_insight",
+    "type": "text",
+    "section": "sleep"
+   },
+   {
+    "name": "sleep_need_feedback",
+    "type": "text",
+    "section": "sleep"
+   },
+   {
+    "name": "respiration_avg",
+    "type": "number",
+    "unit": "brpm",
+    "section": "sleep"
+   },
+   {
+    "name": "respiration_low",
+    "type": "number",
+    "unit": "brpm",
+    "section": "sleep"
+   },
+   {
+    "name": "respiration_high",
+    "type": "number",
+    "unit": "brpm",
+    "section": "sleep"
+   },
+   {
+    "name": "steps",
+    "type": "int",
+    "section": "activity"
+   },
+   {
+    "name": "distance_km",
+    "type": "number",
+    "unit": "km",
+    "section": "activity"
+   },
+   {
+    "name": "floors",
+    "type": "int",
+    "section": "activity"
+   },
+   {
+    "name": "intensity_min",
+    "type": "int",
+    "unit": "min",
+    "section": "activity"
+   },
+   {
+    "name": "intensity_moderate",
+    "type": "int",
+    "unit": "min",
+    "section": "activity"
+   },
+   {
+    "name": "intensity_vigorous",
+    "type": "int",
+    "unit": "min",
+    "section": "activity"
+   },
+   {
+    "name": "active_min",
+    "type": "int",
+    "unit": "min",
+    "section": "activity"
+   },
+   {
+    "name": "sedentary_min",
+    "type": "int",
+    "unit": "min",
+    "section": "activity"
+   },
+   {
+    "name": "calories_total",
+    "type": "int",
+    "unit": "kcal",
+    "section": "activity"
+   },
+   {
+    "name": "calories_active",
+    "type": "int",
+    "unit": "kcal",
+    "section": "activity"
+   },
+   {
+    "name": "vo2max",
+    "type": "number",
+    "section": "fitness"
+   },
+   {
+    "name": "fitness_age",
+    "type": "number",
+    "section": "fitness"
+   },
+   {
+    "name": "weight_kg",
+    "type": "number",
+    "unit": "kg",
+    "section": "fitness"
+   }
+  ]
  }
 }

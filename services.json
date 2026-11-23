@@ -10,7 +10,7 @@
     {
       "name": "senior intern (src of truth for agents)",
       "url": "https://seniorintern.adhikrish.cloud/",
-      "health": "https://seniorintern.adhikrish.cloud/health",
+      "health": "https://seniorintern.adhikrish.cloud/_health",
       "cloudflare": true,
       "about": "agents"
     },
