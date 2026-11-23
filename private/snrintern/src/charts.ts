@@ -2,9 +2,9 @@
 // The server writes each chart's days into the page as json (date, value, row id); one small script draws them all.
 //   mini   a glance: the newest day's stream where there is one (heart rate every 2 min), else the last 10 days; no zoom;
 //          a click opens the metric's full page
-//   full   like a stock chart: 1d / 3d of the streams, then 10d / 1m / 3m / 1y / all of days (candles for a day's range,
-//          a dashed band for a normal zone, stacked bars for parts); pinch, wheel and drag zoom and pan; the crosshair shows
-//          the time and value; a click opens that day
+//   full   like a stock chart: 1d / 3d of the streams, then 10d / 1m / 3m / 1y / all of days as dots on a scale fitted to
+//          them, your usual band as two dashed lines; pinch, wheel and drag zoom and pan; the crosshair shows the time and
+//          value; a click opens that day
 // Colours come from base.css's variables at runtime, so the charts follow the one design.
 import { escape } from "../../../design/html.ts";
 // the browser build (a global LightweightCharts), read by path: the package's exports field only lists its module builds
@@ -13,13 +13,12 @@ import lib from "../node_modules/lightweight-charts/dist/lightweight-charts.stan
 export const CHARTS_PATH = "/_charts-5.2.1.js"; // the version is in the path, so browsers may cache it forever
 export const chartsAsset = () => new Response(lib, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=31536000, immutable" } });
 
-/** One day: date, value, row id, then by kind: candles add low and high, band adds the zone's low and high, stack adds each part. */
-export type ChartPoint = [date: string, value: number, id: number, ...extra: number[]];
+/** One day: date, value, row id. */
+export type ChartPoint = [date: string, value: number, id: number];
 /** One day's stream: minutes from that day's local midnight (negative = the evening before) and values. */
 export type ChartStream = { date: string; id: number; points: [number, number][] };
 export type Chart = {
   points: ChartPoint[]; // oldest first, one per day
-  kind?: "line" | "bars" | "candles" | "band" | "stack";
   streams?: ChartStream[]; // the newest days' streams, oldest first: the mini shows the newest, the full chart opens on them
   mini?: boolean;
   href?: string; // mini: where a click goes
@@ -27,6 +26,7 @@ export type Chart = {
   unit?: string; // "min" reads 7h 40m
   int?: boolean; // whole numbers
   best?: [from: string, to: string]; // drawn in green over the line
+  usual?: [low: number, high: number]; // your usual band, as two dashed lines
 };
 
 /** One chart's placeholder: its data as json for the script to draw; a full chart gets its range buttons
@@ -57,7 +57,6 @@ const css=getComputedStyle(document.documentElement),v=n=>css.getPropertyValue(n
 const fmt=(c,y)=>{if(c.unit==="min"&&y>=60){const h=Math.floor(y/60),m=Math.round(y%60);return h+"h"+(m?" "+m+"m":"")}
 const n=Math.abs(y)>=100||c.int?Math.round(y).toLocaleString("en-US"):String(Math.round(y*10)/10);return c.unit?n+(c.unit==="%"?"":" "+c.unit):n};
 const day=s=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/1e3,D=86400;
-const shades=["--muted","--faint","--ghost","--line"];
 for(const el of document.querySelectorAll("[data-chart]")){const c=JSON.parse(el.dataset.chart);
 if(!c.points.length&&!(c.streams&&c.streams.length))continue;
 const chart=L.createChart(el,{autoSize:true,
@@ -77,13 +76,9 @@ const drawStreams=n=>{const days=(c.streams||[]).slice(-n),pts=[];
  for(const s of days){for(const[m,y]of s.points)pts.push({time:day(s.date)+m*60,value:y})}
  pts.sort((a,b)=>a.time-b.time);const data=[];for(let i=0;i<pts.length;i++){if(i&&pts[i].time-pts[i-1].time>1200)data.push({time:pts[i-1].time+60});data.push(pts[i])}
  line(data.filter((p,i,a)=>!i||p.time>a[i-1].time),{pointMarkersVisible:false,lineWidth:1.5})};
-const drawDays=()=>{const t=p=>day(p[0]);
- if(c.kind==="bars")add(L.HistogramSeries,{color:v("--muted")},c.points.map(p=>({time:t(p),value:p[1]})));
- else if(c.kind==="stack"){const n=c.points[0].length-3;for(let k=n-1;k>=0;k--)add(L.HistogramSeries,{color:v(shades[k]||"--line")},c.points.map(p=>({time:t(p),value:p.slice(3,4+k).reduce((a,b)=>a+(b||0),0)})))}
- else{if(c.kind==="candles")add(L.CandlestickSeries,{upColor:v("--ghost"),downColor:v("--ghost"),borderVisible:false,wickColor:v("--ghost")},c.points.filter(p=>p[3]!=null&&p[4]!=null).map(p=>({time:t(p),open:p[1],close:p[1],low:p[3],high:p[4]})));
-  if(c.kind==="band")for(const k of[3,4])add(L.LineSeries,{color:v("--ghost"),lineWidth:1,lineStyle:L.LineStyle.Dashed,crosshairMarkerVisible:false},c.points.filter(p=>p[k]!=null).map(p=>({time:t(p),value:p[k]})));
-  line(c.points.map(p=>({time:t(p),value:p[1]})));
-  if(c.best)add(L.LineSeries,{color:v("--good"),lineWidth:3,pointMarkersVisible:true,pointMarkersRadius:3.5,crosshairMarkerVisible:false},c.points.filter(p=>p[0]>=c.best[0]&&p[0]<=c.best[1]).map(p=>({time:t(p),value:p[1]})))}};
+const drawDays=()=>{const t=p=>day(p[0]),s=line(c.points.map(p=>({time:t(p),value:p[1]})));
+ if(c.usual)for(const[y,label]of[[c.usual[1],"usual"],[c.usual[0],""]])s.createPriceLine({price:y,color:v("--muted"),lineWidth:1,lineStyle:L.LineStyle.Dashed,axisLabelVisible:true,title:label});
+ if(c.best)add(L.LineSeries,{color:v("--good"),lineWidth:3,pointMarkersVisible:true,pointMarkersRadius:3.5,crosshairMarkerVisible:false},c.points.filter(p=>p[0]>=c.best[0]&&p[0]<=c.best[1]).map(p=>({time:t(p),value:p[1]})))};
 chart.subscribeClick(p=>{if(c.mini){if(c.href)location.href=c.href;return}if(typeof p.time!=="number")return;const id=ids.get(p.time-((p.time%D)+D)%D);if(id)location.href=c.base+id});
 if(c.mini){c.streams&&c.streams.length?drawStreams(1):drawDays();chart.timeScale().fitContent();continue}
 const buttons=el.parentElement.querySelectorAll("[data-range]");

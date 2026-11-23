@@ -20,7 +20,7 @@ const API = {
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00)",
     "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
-  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better, chart }])"],
+  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better, finished, need, clock, change, stream, good, bad }])"],
 };
 
 export async function handleApi(request: Request, database: D1Database, who: string): Promise<Response> {
@@ -51,10 +51,15 @@ export async function handleApi(request: Request, database: D1Database, who: str
     const current = await db.tab(database, second);
     if (request.method === "GET") return current ? json({ tab: current }) : fail(404, "no such tab");
     if (request.method === "PUT") {
-      const definition = checkDefinition(await body());
+      // "after": a tab slug to sit right after in the home page's order; it isn't part of the definition
+      const raw = await body(), after = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>).after : undefined;
+      if (after !== undefined && (typeof after !== "string" || after === second || !(await db.tab(database, after)))) return fail(400, '"after" must be the slug of another tab');
+      const { after: _a, ...rest } = (raw ?? {}) as Record<string, unknown>;
+      const definition = checkDefinition(after === undefined ? raw : rest);
       if (typeof definition === "string") return fail(400, definition);
-      const { tab, created } = await db.putTab(database, second, definition, who);
-      return json({ tab }, created ? 201 : 200);
+      const { created } = await db.putTab(database, second, definition, who);
+      if (after !== undefined) await db.placeAfter(database, second, after as string);
+      return json({ tab: await db.tab(database, second) }, created ? 201 : 200);
     }
     if (request.method === "DELETE") {
       if (!current) return fail(404, "no such tab");

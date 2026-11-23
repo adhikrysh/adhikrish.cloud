@@ -35,6 +35,13 @@ export async function putTab(db: D1Database, slug: string, definition: TabDefini
   return { tab: (await tab(db, slug))!, created: !before };
 }
 
+/** Moves a tab to sit right after another in the home page's order, renumbering every tab 1, 2, 3... in one batch. */
+export async function placeAfter(db: D1Database, slug: string, after: string): Promise<void> {
+  const order = (await tabs(db)).map((t) => t.slug).filter((s) => s !== slug);
+  order.splice(order.indexOf(after) + 1, 0, slug);
+  await db.batch(order.map((s, i) => db.prepare("UPDATE tabs SET position = ? WHERE slug = ?").bind(i + 1, s)));
+}
+
 /** Deletes a tab that has no rows, and logs it. Returns false if it still has rows. */
 export async function deleteTab(db: D1Database, current: Tab, by: string): Promise<boolean> {
   if ((await count(db, current.slug)) > 0) return false;

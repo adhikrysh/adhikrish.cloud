@@ -30,3 +30,4 @@ Plain words, short sentences, lowercase prose like the rest of the private docs,
 - [`add-a-service.md`](add-a-service.md): runbook for putting a new self-hosted app behind the tunnel.
 - [`uptime-probes.md`](uptime-probes.md): how the uptime page checks every service: the timer, placement near singapore, the three roads, and who can start a probe.
 - [`latency.md`](latency.md): measuring each request phase before tuning anything.
+- [`health.md`](health.md): garmin into senior intern: the hourly cron, its request budget and backfill, rows and streams, and how the health page judges a day.

@@ -19,6 +19,7 @@ The full write-up of how it all fits together, including restart handling and fa
 ## Where to add things
 
 - **A self-hosted service:** follow `docs/add-a-service.md`. Its last step adds one entry to `services.json` (`name`, `url`, optional `health` url, `about`). The uptime page picks it up on the next deploy.
+- **Garmin health data:** how the hourly sync, its budget, the streams and the page's verdicts work: `docs/health.md`. The key expires yearly (see secrets below).
 - **A senior intern tab or column:** no code and no migration. The schema is data in d1: `PUT /api/_tabs/<slug>` with the definition (see `private/snrintern/API.md`). Rows are json documents checked against it (`private/snrintern/src/schema.ts`), and every change lands in `/api/_log`. What a tab opens on (charts, due lists) is the definition's `views` (`src/views.ts`), so a new tab or exercise needs no code. Migrations are only for the storage itself (`tabs`, `rows`, `schema_log`).
 - **A write-up:** see `public/AGENTS.md`.
 

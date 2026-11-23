@@ -210,10 +210,11 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(after).toContain("last session yesterday");
   expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to senior intern">←</a><a class="external"'); // a tab goes back home
   expect(charts(after).some((c) => c.base === "/body/")).toBe(true); // bodyweight: every weigh-in, each dot opening its day
-  // every exercise in progress has the same mini chart, one dot per session day, opening its own page
-  const press = charts(after).find((c) => c.href === "/training/lifts/flat%20db%20press");
-  expect(press).toMatchObject({ mini: true, unit: "lb" });
-  expect(press.points.map((p: unknown[]) => p[1])).toEqual([50, 60]);
+  // each exercise in progress: a box of dots on the right, one per session, the latest white
+  const press = after.split('flat db press</a>')[1].split('</div>')[0];
+  expect(press.match(/<circle /g)).toHaveLength(2);
+  expect(press).toContain('<circle class="today"');
+  expect(press).toContain("<polyline ");
   writeFileSync(join(artifacts, "page-training.html"), standalone(after));
   // every lift opens its own page: each session plotted and listed, the best in green
   expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
@@ -445,58 +446,64 @@ test("garmin fills health: full backfill under the request cap, merged days, int
 
   // the tab page: this week judged against the 28 days before it, in the right direction for each metric
   const tabPage = (await call("health page", "/health", { token })).body as string;
-  const metric = (name: string) => tabPage.split(`/health/metrics/${name}">`)[1].split(/<div class="metric">|<\/section>/)[0];
-  expect(metric("hrv_ms")).toContain('class="val good"'); // up, and higher is better
-  expect(metric("resting_hr")).toContain('class="val good"'); // down, and lower is better
-  expect(metric("stress_avg")).toContain('class="val bad"'); // up, and lower is better
-  expect(metric("steps")).not.toMatch(/class="val (good|bad)"/); // ordinary week: grey
-  // ints are whole numbers; the headline is this week's average, with its usual under it
-  const hrvWeek = Math.round([0, 1, 2, 3, 4, 5, 6].reduce((sum, n) => sum + numbers(iso(n)).hrv, 0) / 7); // the week ends today, the newest day
-  expect(metric("hrv_ms")).toContain(`>${hrvWeek} ms</span>`);
-  expect(metric("hrv_ms")).toContain("<span>usual ");
-  // the finest view first: a metric with a stream shows the newest day of it
-  const mini = (name: string) => charts(metric(name))[0];
-  expect(mini("resting_hr").streams).toHaveLength(1);
-  expect(mini("resting_hr").streams[0]).toMatchObject({ date: iso(0) });
-  expect(mini("resting_hr").streams[0].points).toHaveLength(720 - 20 - 1);
-  expect(metric("resting_hr")).toContain(`<span>heart rate, `);
-  expect(mini("hrv_ms").streams[0].points[0]).toEqual([-20, 60]); // last night, from 11:40pm
-  expect(mini("body_battery_high").streams[0].points).toHaveLength(5);
-  // no stream: the last 10 days, drawn by kind: stacked parts for stress and sleep, bars for tallies
-  expect(mini("stress_avg")).toMatchObject({ kind: "stack", streams: [] });
-  expect(mini("stress_avg").points.at(-1).slice(3)).toEqual([420, 300, 120, 30]); // rest, low, medium, high minutes
-  expect(mini("sleep_min").kind).toBe("stack");
-  expect(mini("steps")).toMatchObject({ kind: "bars", mini: true, href: "/health/metrics/steps" });
-  expect(mini("steps").points).toHaveLength(10 - (NOT_WORN < 10 ? 1 : 0));
-  expect(metric("steps")).toContain("<span>last 10 days</span>");
-  // weight: one weigh-in 20 days ago, so no chart: its value and when; vo2max never had a value: no line
-  expect(metric("weight_kg")).toContain("70.1 kg <small>");
-  expect(metric("weight_kg")).not.toContain("data-chart");
-  expect(tabPage).not.toContain("vo2max</a>");
+  const row = (name: string) => tabPage.split(`href="/health/metrics/${name}">`)[1].split("</a>")[0];
+  // each metric is one line: name, the judged day's value, the words, the 14-day box. the words come from rules, and the
+  // box draws the same thing: the usual band behind the dots, the judged day as the big dot
+  // this week sits outside the usual band on purpose: the words say by how much (or that it's a 3-month extreme), coloured by direction
+  expect(row("resting_hr")).toContain('<span class="val good">46 bpm</span>'); // below usual, and lower is better
+  expect(row("resting_hr")).toMatch(/<span class="good">(\d+ bpm below usual|lowest in 3 months)<\/span><span>today<\/span>/);
+  expect(row("hrv_ms")).toContain(`<span class="val good">${numbers(iso(0)).hrv} ms</span>`);
+  expect(row("hrv_ms")).toMatch(/<span class="good">(\d+ ms above usual|highest in 3 months)<\/span>/);
+  expect(row("stress_avg")).toContain('<span class="val bad">'); // up, and lower is better
+  expect(row("stress_avg")).toMatch(/<span class="bad">(\d+ above usual|highest in 3 months)<\/span>/);
+  expect(row("body_battery_at_wake")).toContain(">about usual<"); // the same 91 every morning
+  expect(row("body_battery_at_wake")).not.toMatch(/class="val (good|bad)"/);
+  // sleep: against that night's need, and bedtime against your usual bedtime
+  const sleepNow = Math.round(numbers(iso(0)).sleepSeconds / 60);
+  expect(row("sleep_min")).toContain(`short of what you needed`);
+  expect(row("sleep_min")).toContain("<span>in bed 11:40pm, about usual</span>");
+  if (540 - sleepNow >= 60) expect(row("sleep_min")).toContain('<span class="val bad">');
+  // activity judges the finished day (yesterday) and shows today as so far, never judged
+  expect(row("steps")).toContain(`>${numbers(iso(1)).steps.toLocaleString("en-US")}</span>`);
+  expect(row("steps")).toContain(`<span>yesterday</span><span>today so far ${numbers(iso(0)).steps.toLocaleString("en-US")}</span>`);
+  // the box: 14 dots, the band, the judged day white or coloured with the words
+  expect(row("hrv_ms").match(/<circle /g)).toHaveLength(14 - (NOT_WORN < 14 ? 1 : 0));
+  expect(row("hrv_ms")).toContain('<rect class="usual"');
+  expect(row("hrv_ms").match(/<polyline /g)).toHaveLength(1); // one line through the dots; a single unworn day is bridged, only gaps over 2 days open it
+  expect(row("hrv_ms")).toContain('<circle class="today good"');
+  expect(row("body_battery_at_wake")).toContain('<circle class="today"');
+  // slow numbers: their move over months, or nothing to compare yet
+  expect(row("weight_kg")).toContain("70.1 kg</span>");
+  expect(row("fitness_age")).toContain("24.6</span>");
+  expect(tabPage).not.toContain('href="/health/metrics/vo2max"'); // never had a value: no row
+  expect(tabPage).not.toContain("data-chart"); // the dashboard is static: the boxes are svg, the charts live a click away
   expect(tabPage.indexOf("recovery")).toBeLessThan(tabPage.indexOf('<form class="search"'));
+  // the log: each day as its big picture, from the same rules, bad first, at most two. the fake sleeps 7-8h against a 9h need,
+  // so every night is short; today adds stress (up) and recovery (good) but only two fit, bad first
+  const logRow = (date: string) => tabPage.split('<div class="rows">')[1].split("</li>").find((li) => li.includes(`href="/health/${rows.find((r) => r.date === date).id}"`))!;
+  expect(logRow(iso(0))).toMatch(/<small class="aside words"><span class="bad">(short night|stressful day)<\/span><span class="bad">(short night|stressful day)<\/span><\/small>/);
+  expect(logRow(iso(20))).toContain('<span class="bad">short night</span>');
+  expect(logRow(iso(0))).not.toContain(" ms<"); // words, not numbers
   writeFileSync(join(artifacts, "page-health.html"), standalone(tabPage));
-  // the full page opens on the streams (1d, 3d), and zooms out to every day since the first, as candles of each day's range
+  // the full page opens on the streams (1d, 3d), then every day since the first as dots, your usual as two dashed lines
   const hrPage = (await call("resting hr page", "/health/metrics/resting_hr", { token })).body as string;
   const heart = charts(hrPage)[0];
-  expect(heart.kind).toBe("candles");
   expect(heart.streams.map((s: any) => s.date)).toEqual([iso(2), iso(1), iso(0)]);
   expect(heart.points).toHaveLength(HISTORY);
-  expect(heart.points.at(-1).slice(1, 5)).toEqual([46, heart.points.at(-1)[2], 42, 151]); // resting, id, min, max
+  expect(heart.usual[0]).toBeLessThan(heart.usual[1]);
+  expect(heart.usual[1]).toBeLessThan(56); // the 28 days before today, all in the low 50s
   for (const r of ["1d", "3d", "10d", "1m", "3m", "1y", "all"]) expect(hrPage).toContain(`>${r}</button>`);
+  expect(hrPage).toMatch(/(bpm below usual|lowest in 3 months); your usual is \d+ bpm to \d+ bpm/);
   writeFileSync(join(artifacts, "page-health-heart.html"), standalone(hrPage));
-  // hrv: its balanced band behind the line, and the best week in green
   const hist = (await call("metric page", "/health/metrics/hrv_ms", { token })).body as string;
   const full = charts(hist)[0];
-  expect(full.kind).toBe("band");
-  expect(full.points.at(-1).slice(3)).toEqual([48, 62]);
   expect(full.points[0][0]).toBe(iso(HISTORY));
   expect(full.base).toBe("/health/");
   expect(full.best).toEqual([iso(6), iso(0)]); // this week: hrv in the 70s
   expect(hist).toMatch(/best week <span class="good">7[23] ms<\/span>/);
   expect(hist.match(/<li>/g)).toHaveLength(14);
-  // a metric without a stream has no 1d / 3d
   const stepsPage = (await call("steps page", "/health/metrics/steps", { token })).body as string;
-  expect(stepsPage).not.toContain(">1d</button>");
+  expect(stepsPage).not.toContain(">1d</button>"); // no stream, no 1d / 3d
   writeFileSync(join(artifacts, "page-health-metric.html"), standalone(hist));
   expect((await call("unknown metric", "/health/metrics/nope", { token })).status).toBe(404);
 }, 240_000);
@@ -544,9 +551,16 @@ test("tabs and columns are added through the api, with no migration, and every c
     [{ ...thoughts, views: [{ kind: "list", label: "now", where: { nope: "x" } }] }, 'views[0] (list): "where" must map fields to values'],
   ];
   for (const [d, message] of bad) expect((await send(token, "/api/_tabs/scratch", d, "PUT")).body.error).toStartWith(message);
+  // order is data too: "after" puts a tab right after another on the home page
+  const health = (await Bun.file(join(import.meta.dir, "fixtures", "tabs.json")).json()).health;
+  expect((await send(token, "/api/_tabs/health", { ...health, after: "training" }, "PUT")).status).toBe(200);
+  const home = (await call("home after reorder", "/", { token: await me() })).body as string;
+  expect(home.indexOf('href="/health"')).toBeGreaterThan(home.indexOf('href="/training"'));
+  expect(home.indexOf('href="/health"')).toBeLessThan(home.indexOf('href="/books"'));
+  expect((await send(token, "/api/_tabs/health", { ...health, after: "nope" }, "PUT")).body.error).toBe('"after" must be the slug of another tab');
   const log = (await call("schema log", "/api/_log", { token })).body.changes;
-  expect(log.slice(0, 2).map((c: any) => [c.tab, c.before === null ? "created" : "changed", c.by])).toEqual([
-    ["thoughts", "created", "service:dots-client-id"], ["body", "changed", "service:dots-client-id"],
+  expect(log.slice(0, 3).map((c: any) => [c.tab, c.before === null ? "created" : "changed", c.by])).toEqual([
+    ["health", "changed", "service:dots-client-id"], ["thoughts", "created", "service:dots-client-id"], ["body", "changed", "service:dots-client-id"],
   ]);
 });
 

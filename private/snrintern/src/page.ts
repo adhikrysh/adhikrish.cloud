@@ -4,7 +4,7 @@ import { escape, page as shell, type Design } from "../../../design/html.ts";
 import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
-import { amount, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
+import { amount, dayWords, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
 
 /** Every page goes through here: a page with a chart gets the chart library and its drawing script. */
 const page = (p: Parameters<typeof shell>[0]) => shell({ ...p, body: withCharts(p.body), css: `${p.css ?? ""}${p.body.includes("data-chart=") ? CHART_CSS : ""}` });
@@ -31,6 +31,7 @@ const CSS = `
   .links { margin-top: 6px; font-size: var(--fs-small); display: flex; gap: 16px; flex-wrap: wrap; }
   .links a { color: var(--muted); }
   .aside { display: inline-flex; gap: 12px; align-items: baseline; font-size: var(--fs-tiny); }
+  .aside.words { font-size: var(--fs-small); }
   .meta { color: var(--muted); font-size: var(--fs-small); margin-top: 10px; }
   .detail h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); margin-top: 32px; }
   .prose { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
@@ -209,13 +210,23 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
     q || at > 1 ? Promise.resolve("") : renderViews(tab, database),
   ]);
   const rows = paged ? fetched.slice(0, PAGE) : fetched, older = paged && fetched.length > PAGE;
+  // a tab whose metrics carry good / bad words (health): each day in the list reads as its big picture instead of numbers
+  let words: Map<number, string> | null = null;
+  if (tab.sort !== "id" && rows.length && tab.views?.some((v) => v.kind === "metrics" && v.metrics.some((m) => m.good || m.bad))) {
+    const dateF = tab.sort, dates = rows.map((r) => String(r[dateF] ?? "").slice(0, 10)).filter(Boolean).sort();
+    const from = new Date(Date.parse(`${dates[0]}T00:00:00Z`) - 28 * 86_400_000).toISOString().slice(0, 10);
+    const [context, newest] = await Promise.all([db.since(database, tab, dateF, from), db.list(database, tab, { limit: 1 })]);
+    const newestDate = newest[0] ? String(newest[0][dateF]).slice(0, 10) : null;
+    words = new Map(rows.map((r) => [r.id, dayWords(tab, context, String(r[dateF]).slice(0, 10), newestDate)
+      .map((w) => `<span${w.tone ? ` class="${w.tone}"` : ""}>${escape(w.text)}</span>`).join("")]));
+  }
   const item = (row: db.Row) => {
     // inside a day group the day is the heading, so the row leaves its date (and time) out
-    const aside = bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside");
+    const aside = words?.get(row.id) ?? bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside");
     const line = bits(tab, row, tab.line, "line");
     const snippet = tab.snippet && present(row[tab.snippet]) ? `\n            <p class="snippet">${escape(row[tab.snippet])}</p>` : "";
     return `          <li>
-            <a class="head" href="/${tab.slug}/${row.id}"><span>${titleOf(tab, row, "aside")}</span><small class="aside">${aside}</small></a>${line ? `\n            <p class="line bits">${line}</p>` : ""}${snippet}
+            <a class="head" href="/${tab.slug}/${row.id}"><span>${titleOf(tab, row, "aside")}</span><small class="aside${words ? " words" : ""}">${aside}</small></a>${line ? `\n            <p class="line bits">${line}</p>` : ""}${snippet}
             ${links(tab, row)}
           </li>`;
   };

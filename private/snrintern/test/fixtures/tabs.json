@@ -412,30 +412,23 @@
      {
       "field": "resting_hr",
       "better": "lower",
-      "low": "min_hr",
-      "high": "max_hr",
-      "stream": "heart rate"
+      "stream": "heart rate",
+      "good": "well recovered",
+      "bad": "under-recovered"
      },
      {
       "field": "hrv_ms",
       "better": "higher",
-      "band": [
-       "hrv_baseline_low",
-       "hrv_baseline_high"
-      ],
-      "stream": "overnight hrv"
+      "stream": "overnight hrv",
+      "good": "well recovered",
+      "bad": "under-recovered"
      },
      {
-      "field": "body_battery_high",
+      "field": "body_battery_at_wake",
       "better": "higher",
-      "low": "body_battery_low",
-      "high": "body_battery_high",
-      "stream": "body battery"
-     },
-     {
-      "field": "stress_avg",
-      "better": "lower",
-      "parts": "stress"
+      "stream": "body battery",
+      "good": "well recovered",
+      "bad": "under-recovered"
      }
     ]
    },
@@ -446,11 +439,16 @@
      {
       "field": "sleep_min",
       "better": "higher",
-      "parts": "sleep"
+      "need": "sleep_need_min",
+      "clock": "bedtime",
+      "bad": "short night",
+      "good": "slept well"
      },
      {
-      "field": "sleep_score",
-      "better": "higher"
+      "field": "stress_avg",
+      "better": "lower",
+      "good": "calm day",
+      "bad": "stressful day"
      }
     ]
    },
@@ -461,12 +459,14 @@
      {
       "field": "steps",
       "better": "higher",
-      "chart": "bars"
+      "finished": true,
+      "good": "active day",
+      "bad": "quiet day"
      },
      {
       "field": "intensity_min",
       "better": "higher",
-      "chart": "bars"
+      "finished": true
      }
     ]
    },
@@ -476,14 +476,17 @@
     "metrics": [
      {
       "field": "vo2max",
-      "better": "higher"
+      "better": "higher",
+      "change": true
      },
      {
       "field": "fitness_age",
-      "better": "lower"
+      "better": "lower",
+      "change": true
      },
      {
-      "field": "weight_kg"
+      "field": "weight_kg",
+      "change": true
      }
     ]
    }
