@@ -237,7 +237,7 @@ export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | 
   if (!pts.length) return null;
   let at = pts.length - 1, soFar: number | undefined;
   if (on !== undefined) { at = pts.findIndex((p) => String(p.row[dateF]).slice(0, 10) === on); if (at < 0) return null; }
-  else if (m.finished && pts.length > 1 && String(pts[at].row[dateF]) === newestDate) { soFar = pts[at].y; at--; } // today isn't done: judge yesterday
+  else if (m.finished && pts.length > 1 && String(pts[at].row[dateF]) === liveDay(newestDate)) { soFar = pts[at].y; at--; } // today isn't done: judge yesterday
   const day = pts[at], words: string[] = [];
   const before = pts.filter((p) => p.t < day.t && p.t >= day.t - 28 * DAY).map((p) => p.y);
   const band = before.length >= 10 ? ([quantile(before, 0.25), quantile(before, 0.75)] as [number, number]) : null;
@@ -278,6 +278,9 @@ export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | 
   return { day: day.row, value: day.y, words, tone, band, box, soFar };
 }
 const r0 = (v: unknown) => v !== undefined && v !== null && v !== "";
+/** The newest date if it is today where you are (garmin's dates are local, so today or yesterday in utc), else null: a tab that
+ * hasn't synced for days has no "today", so nothing reads as today, yesterday or "so far". */
+const liveDay = (d: string | null) => (d !== null && (dayOf(d) ?? 0) >= today() - DAY ? d : null);
 
 /**
  * A day's big picture in a few words: each metric with good / bad words is judged on that day, and the ones outside your usual
@@ -288,7 +291,7 @@ const r0 = (v: unknown) => v !== undefined && v !== null && v !== "";
 export function dayWords(tab: Tab, rows: db.Row[], date: string, newestDate: string | null): { text: string; tone: "" | "good" | "bad" }[] {
   const out: { text: string; tone: "good" | "bad" }[] = [];
   for (const m of tab.views?.flatMap((v) => (v.kind === "metrics" ? v.metrics : [])) ?? []) {
-    if ((!m.good && !m.bad) || m.change || (m.finished && date === newestDate)) continue;
+    if ((!m.good && !m.bad) || m.change || (m.finished && date === liveDay(newestDate))) continue;
     const v = judge(tab, m, rows, newestDate, date);
     const text = v?.tone === "good" ? m.good : v?.tone === "bad" ? m.bad : undefined;
     if (text && v && !out.some((o) => o.text === text)) out.push({ text, tone: v.tone as "good" | "bad" });
@@ -324,7 +327,8 @@ async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, recent }: C
     const f = tab.fields.find((x) => x.name === m.field), verdict = judge(tab, m, rows, newestDate);
     if (!verdict) return "";
     const t = dayOf(verdict.day[dateF])!;
-    const when = newestT === null ? short(t) : t === newestT ? "today" : t === newestT - DAY ? "yesterday" : short(t);
+    const live = liveDay(newestDate) ? newestT : null;
+    const when = live === null ? short(t) : t === live ? "today" : t === live - DAY ? "yesterday" : short(t);
     const words = [...verdict.words.map((w, i) => `<span${i === 0 && verdict.tone ? ` class="${verdict.tone}"` : ""}>${escape(w)}</span>`),
       `<span>${escape(when)}</span>`, ...(verdict.soFar !== undefined ? [`<span>today so far ${escape(amount(f, verdict.soFar))}</span>`] : [])];
     return `<a class="metric" href="/${tab.slug}/metrics/${m.field}"><span class="name">${escape(metricName(m.field))}</span><span class="val${verdict.tone ? ` ${verdict.tone}` : ""}">${escape(amount(f, verdict.value))}</span><span class="why">${words.join("")}</span>${verdict.box.length > 1 ? box(verdict, t) : "<span></span>"}</a>`;

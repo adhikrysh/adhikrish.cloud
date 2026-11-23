@@ -51,6 +51,7 @@ resting hr                         46 bpm   ┌───────────
 - **the usual band** is the middle half (25th to 75th percentile) of the 28 days before the judged day. inside it reads "about usual". outside, how far from the middle, or "highest / lowest in 3 months".
 - **sleep** is judged against that night's sleep need from garmin, and bedtime against your usual bedtime.
 - **steps and intensity** judge yesterday: today isn't finished, so it's shown as "so far" and never judged.
+- **"today" means today where you are** (garmin's dates are local, so today or yesterday in utc). if the newest synced day is older than that, nothing reads as today, yesterday or "so far": days show their dates, so stale data can't pass for current.
 - **green and red** appear only outside the band, by which way is better.
 - **the log** reads each day as its big picture: every metric outside its band gives its words ("short night", "well recovered"), at most two, bad first, else "an ordinary day".
 - **a row opens the metric's page**: the same sentence and your usual, then a zoomable chart (lightweight-charts, served by the worker at `/_charts-<version>.js`). metrics with a stream open on `1d` / `3d` of it; `10d` to `all` show one dot per day. a click on a dot opens that day.

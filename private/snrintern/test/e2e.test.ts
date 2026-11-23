@@ -506,6 +506,17 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   expect(stepsPage).not.toContain(">1d</button>"); // no stream, no 1d / 3d
   writeFileSync(join(artifacts, "page-health-metric.html"), standalone(hist));
   expect((await call("unknown metric", "/health/metrics/nope", { token })).status).toBe(404);
+  // a tab that stopped syncing a month ago has no "today": its newest day reads as its date, and a tally isn't "so far"
+  const stale = { label: "stale", about: "stopped syncing", title: "date", sort: "date", fields: [{ name: "date", type: "date", required: true },
+    { name: "pulse", type: "int", unit: "bpm" }, { name: "walks", type: "int" }],
+    views: [{ kind: "metrics", label: "old", metrics: [{ field: "pulse", better: "lower" }, { field: "walks", better: "higher", finished: true }] }] };
+  expect((await send(agent, "/api/_tabs/stale", stale, "PUT")).status).toBe(201);
+  for (let n = 30; n < 50; n++) await send(agent, "/api/stale", { date: iso(n), pulse: 50 + (n % 3), walks: 1000 + n });
+  const stalePage = (await call("stale tab page", "/stale", { token })).body as string;
+  const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"][new Date(iso(30)).getUTCMonth()];
+  expect(stalePage).not.toContain("<span>today</span>");
+  expect(stalePage).not.toContain("so far");
+  expect(stalePage).toContain(`<span>${month} ${new Date(iso(30)).getUTCDate()}</span>`);
 }, 240_000);
 
 test("people are a search and their groups, nothing above", async () => {
