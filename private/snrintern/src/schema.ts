@@ -3,7 +3,8 @@
 
 type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
 export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, Tone>;
-  section?: string }; // section: the heading it sits under on a row's page
+  section?: string; // section: the heading it sits under on a row's page
+  time?: boolean }; // a datetime that must carry a time of day (a session's start), not just a date
 /** How an enum value's pill looks: white (no tone), "outline" (black with a white border), "good" (green border), "bad" (red border). */
 export type Tone = "outline" | "good" | "bad";
 export type TabDefinition = {
@@ -78,7 +79,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (RESERVED.includes(f.name)) return `field name "${f.name}" is reserved (every row already has ${RESERVED.join(", ")})`;
     if (names.has(f.name)) return `field "${f.name}" appears twice`;
     if (!TYPES.includes(f.type as FieldType)) return `field "${f.name}": type must be one of ${TYPES.join(", ")}`;
-    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
+    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section", "time"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
     const field: Field = { name: f.name, type: f.type as FieldType };
     if (f.required !== undefined) {
       if (typeof f.required !== "boolean") return `field "${f.name}": required must be true or false`;
@@ -105,6 +106,10 @@ export function checkDefinition(input: unknown): TabDefinition | string {
         field.colors = c as Record<string, Tone>;
       }
     } else if (f.options !== undefined || f.colors !== undefined) return `field "${f.name}": options and colors only apply to enum fields`;
+    if (f.time !== undefined) {
+      if (field.type !== "datetime" || typeof f.time !== "boolean") return `field "${f.name}": time is true or false, on datetime fields only`;
+      if (f.time) field.time = true;
+    }
     if (f.section !== undefined) {
       if (typeof f.section !== "string" || !f.section.trim()) return `field "${f.name}": section must be a heading like "sleep"`;
       field.section = f.section;
@@ -283,7 +288,9 @@ function checkValue(field: Field, value: unknown): Value | { error: string } {
   const s = String(value).trim();
   switch (field.type) {
     case "date": return DATE.test(s) && validDate(s) ? s : fail("must be a date like 2026-11-18");
-    case "datetime": return DATETIME.test(s) && validDate(s) ? s : fail("must be a date or iso date-time like 2026-11-18 or 2026-11-18T09:30-08:00");
+    case "datetime":
+      if (field.time) return DATETIME.test(s) && /T.*(Z|[+-]\d{2}:\d{2})$/.test(s) && validDate(s) ? s : fail("needs a date and time with its offset, like 2026-11-18T09:30-08:00");
+      return DATETIME.test(s) && validDate(s) ? s : fail("must be a date or iso date-time like 2026-11-18 or 2026-11-18T09:30-08:00");
     case "url": return /^https?:\/\/\S+$/.test(s) ? s : fail("must be a url starting with http:// or https://");
     case "enum": return field.options!.includes(s) ? s : fail(`must be one of: ${field.options!.join(", ")}`);
     case "lifts": { const lifts = parseLifts(s); return typeof lifts === "string" ? fail(`is not valid: ${lifts}`) : formatLifts(lifts); }

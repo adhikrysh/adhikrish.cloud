@@ -387,9 +387,17 @@ made in garmin connect, so there's no unofficial library and nothing
 runs on the thinkpad. each day lands as its numbers plus its streams
 (heart rate every two minutes, overnight hrv, body battery), and the
 streams get their own table because garmin only keeps them for about
-four months. the page judges each metric's newest day against my own
-last 28 days with fixed rules, "7 bpm below usual" next to a box of the
-last 14 days, so rendering it never calls a model.</p>
+four months. the page judges each metric's newest day with garmin's own
+words and bands where garmin has them, and against my own last 28 days
+only where it doesn't, next to a box of the last 14 days, so rendering
+it never calls a model.</p>
+<p>the same cron brings in every activity on the watch and merges it
+with the sessions the agent logged. a session is the same one when both
+start within two hours on the same day, whatever each side calls it, and
+each side keeps what only it knows: the watch has the heart rate,
+distance and pace, the agent has the lifts and how it felt. either one
+alone is still a session, so a run i never mentioned and a gym day i
+forgot to record both count.</p>
 <h2 id="latency">latency</h2>
 <p>before tuning anything, i timed a request from palo alto (in march,
 over about 13,600 km of fibre):</p>

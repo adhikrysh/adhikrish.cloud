@@ -158,7 +158,7 @@
  },
  "training": {
   "label": "training",
-  "about": "sessions: lifting, runs, hikes",
+  "about": "sessions: lifting, runs, hikes, swims, from the agent and the watch",
   "title": "title",
   "aside": [
    "at",
@@ -193,7 +193,8 @@
    {
     "name": "at",
     "type": "datetime",
-    "required": true
+    "required": true,
+    "time": true
    },
    {
     "name": "type",
@@ -203,6 +204,9 @@
      "run",
      "hike",
      "climb",
+     "swim",
+     "ride",
+     "sport",
      "other"
     ]
    },
@@ -236,6 +240,165 @@
     "type": "int",
     "min": 1,
     "max": 10
+   },
+   {
+    "name": "moving_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "elevation_m",
+    "type": "int",
+    "min": 0,
+    "unit": "m"
+   },
+   {
+    "name": "avg_hr",
+    "type": "int",
+    "min": 0,
+    "unit": "bpm"
+   },
+   {
+    "name": "max_hr",
+    "type": "int",
+    "min": 0,
+    "unit": "bpm"
+   },
+   {
+    "name": "calories",
+    "type": "int",
+    "min": 0
+   },
+   {
+    "name": "training_load",
+    "type": "int",
+    "min": 0
+   },
+   {
+    "name": "aerobic_effect",
+    "type": "number",
+    "min": 0,
+    "max": 5
+   },
+   {
+    "name": "anaerobic_effect",
+    "type": "number",
+    "min": 0,
+    "max": 5
+   },
+   {
+    "name": "training_effect",
+    "type": "text"
+   },
+   {
+    "name": "effect_feedback",
+    "type": "text"
+   },
+   {
+    "name": "intensity_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "body_battery_change",
+    "type": "int",
+    "min": -100,
+    "max": 100
+   },
+   {
+    "name": "avg_power",
+    "type": "int",
+    "min": 0,
+    "unit": "w"
+   },
+   {
+    "name": "avg_cadence",
+    "type": "int",
+    "min": 0,
+    "unit": "spm"
+   },
+   {
+    "name": "fastest_1k_s",
+    "type": "int",
+    "min": 0,
+    "unit": "s"
+   },
+   {
+    "name": "fastest_5k_s",
+    "type": "int",
+    "min": 0,
+    "unit": "s"
+   },
+   {
+    "name": "fastest_10k_s",
+    "type": "int",
+    "min": 0,
+    "unit": "s"
+   },
+   {
+    "name": "hr_zone_1_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "hr_zone_2_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "hr_zone_3_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "hr_zone_4_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "hr_zone_5_min",
+    "type": "int",
+    "min": 0,
+    "unit": "min"
+   },
+   {
+    "name": "watch_rpe",
+    "type": "int",
+    "min": 1,
+    "max": 10
+   },
+   {
+    "name": "watch_feel",
+    "type": "text"
+   },
+   {
+    "name": "stamina_start",
+    "type": "int",
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   },
+   {
+    "name": "stamina_end",
+    "type": "int",
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   },
+   {
+    "name": "garmin_type",
+    "type": "text"
+   },
+   {
+    "name": "garmin_id",
+    "type": "int",
+    "min": 0
    },
    {
     "name": "notes",
@@ -282,6 +445,11 @@
     "min": 1,
     "max": 70,
     "unit": "%"
+   },
+   {
+    "name": "garmin_id",
+    "type": "int",
+    "min": 0
    },
    {
     "name": "notes",
@@ -547,10 +715,6 @@
      {
       "field": "fitness_age",
       "better": "lower",
-      "change": true
-     },
-     {
-      "field": "weight_kg",
       "change": true
      }
     ]
@@ -871,12 +1035,6 @@
    {
     "name": "fitness_age",
     "type": "number",
-    "section": "fitness"
-   },
-   {
-    "name": "weight_kg",
-    "type": "number",
-    "unit": "kg",
     "section": "fitness"
    }
   ]

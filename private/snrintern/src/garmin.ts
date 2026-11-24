@@ -5,12 +5,14 @@
 //   every hour,      history, until it is all in: one 30-day chunk further back (until three empty months in a row), then
 //   while owed       each day's own detail, newest first: heart rate every 2 min, overnight hrv, body battery (for days
 //                    garmin still has them, about 4 months) and the day summary (sedentary time, body battery at wake).
-// Each day is one health row (merged by date) plus its series row. Writes merge, so a field fetched once is never wiped by a
+//   every hour,      activities, until they are all in: a page of them, newest first, each new one with its detail (src/activities.ts).
+//   while owed       the newest activities are checked with the recent days.
+// Each day is one health row (merged by date) plus its series row; activities go to training, weigh-ins to body. Writes merge, so a field fetched once is never wiped by a
 // later call that doesn't carry it. Free plan: at most 50 outside requests a run; a run stops spending at 48.
+import * as activities from "./activities.ts";
 import * as db from "./db.ts";
+import { addDays, DAY, Garmin, type GarminEnv, iso, localMinute, mins, num, round, wall, words } from "./garmin-client.ts";
 import { checkRow, type Data, type Tab } from "./schema.ts";
-
-export type GarminEnv = { DB: D1Database; GARMIN_API_KEY?: string; GARMIN_URL?: string };
 
 const TAB = "health";
 const BY = "garmin";
@@ -18,42 +20,9 @@ const CHUNK = 30; // days per range call: sleep summaries refuse more than 30
 const INTRADAY_DAYS = 120; // garmin keeps 2-minute heart rate for about 4 months; older days come back empty
 const BUDGET = 48; // outside requests per run; the free plan allows 50
 const RECENT_EVERY = 3; // hours between checks of the recent days
-const DAY = 86_400_000;
 
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
-const addDays = (d: string, n: number) => iso(Date.parse(`${d}T00:00:00Z`) + n * DAY);
-const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-const mins = (v: unknown, per = 60) => (num(v) === undefined ? undefined : Math.round((v as number) / per));
-const round = (v: unknown, places = 1) => (num(v) === undefined ? undefined : Math.round((v as number) * 10 ** places) / 10 ** places);
-/** garmin's codes as words: "POSITIVE_OPTIMAL_STRUCTURE" -> "positive optimal structure"; "NONE" and variant numbers dropped */
-const words = (v: unknown) => (typeof v === "string" && v && v !== "NONE" ? v.replace(/_\d+$/, "").toLowerCase().replaceAll("_", " ") : undefined);
-/** a garmin "local" epoch (local wall time written as if utc) as "2026-11-21T23:39" */
-const wall = (v: unknown) => (num(v) === undefined ? undefined : new Date(v as number).toISOString().slice(0, 16));
-/** minutes from local midnight of `date`, for garmin's "local" timestamps ("2026-11-21T23:43:12.0" on the 22nd → -17) */
-const localMinute = (date: string, local: string) => Math.round((Date.parse(`${local.slice(0, 19)}Z`) - Date.parse(`${date}T00:00:00Z`)) / 60_000);
-
-class Garmin {
-  calls = 0;
-  constructor(private base: string, private token: string) {}
-  static async connect(env: GarminEnv): Promise<Garmin> {
-    const base = env.GARMIN_URL || "https://personal.connectapi.garmin.com";
-    const r = await fetch(`${base}/personalapitoken-service/personal-api/personal-api-key/token`, { method: "POST", headers: { Accept: "*/*", Authorization: `ApiKey ${env.GARMIN_API_KEY}` } });
-    if (!r.ok) throw new Error(`garmin token: ${r.status}`);
-    const g = new Garmin(base, (await r.text()).trim());
-    g.calls = 1;
-    return g;
-  }
-  /** GET a path; an error status or a body that isn't json reads as nothing, so one missing endpoint never sinks the run. */
-  async get(path: string): Promise<any> {
-    this.calls++;
-    const r = await fetch(`${this.base}${path}`, { headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" } });
-    if (!r.ok) { console.log(`garmin ${r.status} ${path.split("?")[0]}`); return null; }
-    return r.json().catch(() => null);
-  }
-}
-
-/** Every daily number garmin has for each day in [start, end]: five range calls, keyed by date. */
-async function daily(g: Garmin, start: string, end: string): Promise<Map<string, Data>> {
+/** Every daily number garmin has for each day in [start, end], keyed by date, and the weigh-ins (for the body tab): five range calls. */
+async function daily(g: Garmin, start: string, end: string): Promise<{ days: Map<string, Data>; weights: Data[] }> {
   const [summaries, sleeps, hrv, vo2, weight] = await Promise.all([
     g.get(`/usersummary-service/v2/dailysummaries?startDate=${start}&endDate=${end}`),
     g.get(`/sleep-service/sleep/dailySleepSummariesByDate?startDate=${start}&endDate=${end}`),
@@ -110,10 +79,9 @@ async function daily(g: Garmin, start: string, end: string): Promise<Map<string,
     });
   }
   for (const v of Array.isArray(vo2) ? vo2 : []) put(day(v.calendarDate), { vo2max: round(v.generic?.vo2MaxPreciseValue ?? v.generic?.vo2MaxValue) });
-  for (const w of weight?.dailyWeightSummaries ?? []) put(day(w.summaryDate), { weight_kg: round((w.latestWeight?.weight ?? NaN) / 1000) });
   // a day with only its date is a day the watch wasn't worn
   for (const [date, row] of days) if (Object.keys(row).length === 1) days.delete(date);
-  return days;
+  return { days, weights: activities.weighIns(weight) };
 }
 
 /** The day summary's numbers that no range call carries: time sitting and active, body battery at wake and during sleep. */
@@ -164,7 +132,7 @@ async function store(database: D1Database, tab: Tab, days: Map<string, Data>): P
   return rows.length ? db.mergeBy(database, TAB, "date", rows, BY) : new Map();
 }
 
-export type SyncReport = { calls: number; recent: number; backfilled: number; backfill: string; detailed: number };
+export type SyncReport = { calls: number; recent: number; backfilled: number; backfill: string; detailed: number; activities: number; activityBackfill: string; weighIns: number };
 
 export async function sync(env: GarminEnv, now = Date.now()): Promise<SyncReport | null> {
   const tab = await db.tab(env.DB, TAB);
@@ -175,10 +143,13 @@ export async function sync(env: GarminEnv, now = Date.now()): Promise<SyncReport
   const checkRecent = Math.floor(now / 3_600_000) % RECENT_EVERY === 0;
   let state = (await db.getMeta(env.DB, "garmin_backfill")) ?? `before ${recentStart} empty 0`;
   const owed = await db.missingSeries(env.DB, TAB, "date", "0000-00-00", 40);
-  if (!checkRecent && state.startsWith("before done") && !owed.length) return null; // nothing owed this hour: no calls at all
+  let actState = (await db.tab(env.DB, activities.TRAINING)) ? (await db.getMeta(env.DB, "garmin_activities")) ?? "offset 0" : "done";
+  if (!checkRecent && state.startsWith("before done") && !owed.length && actState === "done") return null; // nothing owed this hour: no calls at all
+  // the training and body rows, read once: every activity and weigh-in this run is matched against them
+  const [training, body] = await Promise.all([activities.Book.load(env.DB, activities.TRAINING), activities.Book.load(env.DB, activities.BODY)]);
 
   const g = await Garmin.connect(env);
-  const report: SyncReport = { calls: 0, recent: 0, backfilled: 0, backfill: "", detailed: 0 };
+  const report: SyncReport = { calls: 0, recent: 0, backfilled: 0, backfill: "", detailed: 0, activities: 0, activityBackfill: "", weighIns: 0 };
   const writes: D1PreparedStatement[] = [];
   const detail = async (id: number, date: string) => { // 4 calls inside garmin's intraday window, 1 outside it
     const [extra, series] = await Promise.all([summary(g, date), date >= window ? intraday(g, date) : Promise.resolve({})]);
@@ -187,10 +158,12 @@ export async function sync(env: GarminEnv, now = Date.now()): Promise<SyncReport
   };
   const cost = (date: string) => (date >= window ? 4 : 1);
   const done = new Set<string>();
+  const weigh = (weights: Data[]) => { if (body) report.weighIns += body.add(weights); };
 
-  // 1. the recent days: numbers for the last few, detail for the two newest
+  // 1. the recent days: numbers for the last few, detail for the two newest; then the newest activities (new ones get their detail)
   if (checkRecent) {
-    const recent = await daily(g, recentStart, today);
+    const { days: recent, weights } = await daily(g, recentStart, today);
+    weigh(weights);
     const latest = [...recent.keys()].sort().at(-1);
     if (latest) { // fitness age moves slowly and has no range call: read it for the newest day only
       const age = round((await g.get(`/fitnessage-service/fitnessage/v2/${latest}`))?.fitnessAge);
@@ -199,13 +172,18 @@ export async function sync(env: GarminEnv, now = Date.now()): Promise<SyncReport
     const ids = await store(env.DB, tab, recent);
     report.recent = ids.size;
     for (const date of [...ids.keys()].sort().slice(-2)) { await detail(ids.get(date)!, date); done.add(date); }
+    if (training) {
+      const listed = await activities.fetchActivities(g, training, 0, Math.min(activities.RECENT, BUDGET - g.calls - 1));
+      if (listed) { report.activities += training.add(listed); training.prune(listed); }
+    }
   }
 
   // 2. one month of history, walking back from the oldest day stored
   const [, before, , emptyRuns] = state.split(" ");
   if (before !== "done" && g.calls + 5 <= BUDGET) {
     const end = addDays(before, -1), start = addDays(end, -(CHUNK - 1));
-    const days = await daily(g, start, end);
+    const { days, weights } = await daily(g, start, end);
+    weigh(weights);
     report.backfilled = (await store(env.DB, tab, days)).size;
     const empty = days.size ? 0 : Number(emptyRuns) + 1;
     state = empty >= 3 ? "before done empty 3" : `before ${start} empty ${empty}`; // three empty months in a row: the watch's history is in
@@ -213,13 +191,26 @@ export async function sync(env: GarminEnv, now = Date.now()): Promise<SyncReport
   }
   report.backfill = state;
 
-  // 3. each owed day's own detail, newest first, while the budget lasts
+  // 3. every activity ever, a page at a time, oldest pages last: one listing call plus each new activity's detail
+  if (training && actState !== "done" && BUDGET - g.calls >= 6) {
+    const offset = Number(actState.split(" ")[1]), limit = Math.min(activities.PAGE, BUDGET - g.calls - 1);
+    const page = await activities.fetchActivities(g, training, offset, limit);
+    if (page) {
+      report.activities += training.add(page);
+      actState = page.length < limit ? "done" : `offset ${offset + page.length}`; // a short page is the first activity ever
+      writes.push(db.setMeta(env.DB, "garmin_activities", actState));
+    }
+  }
+  report.activityBackfill = actState;
+
+  // 4. each owed day's own detail, newest first, while the budget lasts
   for (const { id, date } of owed) {
     if (done.has(date)) continue;
     if (g.calls + cost(date) > BUDGET) break;
     await detail(id, date);
     report.detailed++;
   }
+  writes.push(...(training?.writes ?? []), ...(body?.writes ?? []));
   if (writes.length) await env.DB.batch(writes);
   report.calls = g.calls;
   console.log(`garmin sync ${JSON.stringify(report)}`);

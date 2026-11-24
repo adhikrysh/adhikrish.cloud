@@ -54,8 +54,55 @@ function sleep(date: string) {
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
+/** A day `n` days ago as yyyy-mm-dd, and garmin's local and gmt wall times for a local time on it (pacific, utc-8). */
+const daysAgo = (n: number) => iso(today() - n * DAY);
+const wallTimes = (n: number, time: string) => {
+  const local = Date.parse(`${daysAgo(n)}T${time}:00Z`), text = (t: number) => new Date(t).toISOString().slice(0, 19).replace("T", " ");
+  return { startTimeLocal: text(local), startTimeGMT: text(local + 8 * 3_600_000) };
+};
+
+/** One listed activity, in the list call's shape (taken from a real one), and its detail's extras. */
+function activity(id: number, ago: number, time: string, typeKey: string, name: string,
+  o: { min: number; km?: number; hr?: number; elev?: number; load?: number; rpe?: number; feel?: number }) {
+  const km = o.km ?? 0, hr = o.hr ?? 130, s = o.min * 60;
+  return {
+    list: {
+      activityId: id, activityName: name, ...wallTimes(ago, time), activityType: { typeId: 1, typeKey, parentTypeId: 17 },
+      distance: km * 1000, duration: s + 0.49, movingDuration: s - 120, elevationGain: o.elev ?? 0, averageHR: hr, maxHR: hr + 25,
+      calories: Math.round(o.min * 9.6), activityTrainingLoad: o.load ?? o.min * 1.3 + 0.4, aerobicTrainingEffect: 2.6, anaerobicTrainingEffect: 0.4,
+      trainingEffectLabel: "AEROBIC_BASE", aerobicTrainingEffectMessage: "IMPROVING_AEROBIC_BASE_8", differenceBodyBattery: -9,
+      moderateIntensityMinutes: Math.round(o.min / 2), vigorousIntensityMinutes: 5,
+      hrTimeInZone_1: 300, hrTimeInZone_2: s - 900, hrTimeInZone_3: 600, hrTimeInZone_4: 0, hrTimeInZone_5: 0,
+      ...(km ? { averageRunningCadenceInStepsPerMinute: 162.4, avgPower: 263, fastestSplit_1000: 331.6 } : {}),
+      ...(km >= 5 ? { fastestSplit_5000: 1702.2 } : {}),
+      summarizedExerciseSets: typeKey === "strength_training" ? [{ category: "UNKNOWN", reps: 0, volume: 0, sets: 1, maxWeight: 0 }] : undefined,
+    },
+    detail: { activityId: id, summaryDTO: { directWorkoutRpe: o.rpe, directWorkoutFeel: o.feel, ...(km ? { beginPotentialStamina: 97, endPotentialStamina: 61 } : {}) } },
+  };
+}
+
+/** The watch's activities, newest first. The test leans on each one: see e2e.test.ts. Old runs every 5 days fill the history,
+ * so the backfill has to page. */
+export function activities() {
+  const named = [
+    activity(9001, 5, "18:00", "strength_training", "Strength", { min: 65, hr: 108, rpe: 70, feel: 75 }), // the agent logs it after
+    activity(9002, 2, "07:10", "running", "Menlo Park Running", { min: 31, km: 5.04, hr: 148, rpe: 50, feel: 50 }), // agent logged 07:00
+    activity(9003, 3, "18:00", "running", "Menlo Park Running", { min: 42, km: 7.5, hr: 151 }), // agent logged the date only
+    activity(9004, 4, "07:00", "running", "Menlo Park Running", { min: 25, km: 4.1, hr: 139 }), // garmin only
+    activity(9006, 8, "09:53", "hiking", "Mariposa County Hiking", { min: 201, km: 7.34, hr: 137, elev: 963 }), // the agent's "walk" at 09:30
+    activity(9005, 8, "08:00", "hiking", "Mariposa County Hiking", { min: 112, km: 4.32, hr: 125, elev: 330 }), // same morning, its own row
+    activity(9007, 13, "21:30", "strength_training", "Strength", { min: 45, hr: 104 }), // 3.5 hours after the agent's 18:00: not that one
+    activity(9008, 20, "18:20", "strength_training", "Strength", { min: 58, hr: 110 }), // the agent's 18:00 chest day
+    activity(9009, 30, "06:30", "lap_swimming", "Pool Swim", { min: 40, km: 1.5, hr: 128 }),
+    activity(9010, 40, "17:00", "soccer", "Soccer", { min: 90, km: 8.2, hr: 155 }),
+  ];
+  const old = Array.from({ length: 60 }, (_, i) => activity(8000 + i, 45 + i * 5, "07:00", "running", "Menlo Park Running", { min: 30, km: 5.2, hr: 145 }));
+  return [...named, ...old];
+}
+
 export function startFakeGarmin() {
   const calls: string[] = [];
+  const acts = activities(); // the test deletes from this, the way you would delete one in garmin connect
   const server = Bun.serve({
     port: 0,
     fetch(request) {
@@ -77,8 +124,20 @@ export function startFakeGarmin() {
       }
       if (p.startsWith("/metrics-service/metrics/maxmet/daily/")) return json({ error: "boom" }, 500);
       if (p.startsWith("/weight-service/weight/range/")) {
-        const d = iso(today() - 20 * DAY);
-        return json({ dailyWeightSummaries: range(seg[4], seg[5]).includes(d) ? [{ summaryDate: d, latestWeight: { weight: 70_100 } }] : [] });
+        // weigh-ins 20 days ago (a day the agent logged nothing) and yesterday (the agent logged 69.4 by hand, with no time)
+        const ins = [[20, 70_100, 15.2, 501], [1, 69_800, undefined, 502]] as const;
+        return json({ dailyWeightSummaries: ins.filter(([n]) => range(seg[4], seg[5]).includes(daysAgo(n))).map(([n, g, fat, pk]) => {
+          const local = Date.parse(`${daysAgo(n)}T07:30:00Z`);
+          return { summaryDate: daysAgo(n), numOfWeightEntries: 1, latestWeight: { samplePk: pk, date: local, calendarDate: daysAgo(n), weight: g, bodyFat: fat ?? null, timestampGMT: local + 8 * 3_600_000, sourceType: "MANUAL" } };
+        }) });
+      }
+      if (p === "/activitylist-service/activities/search/activities") {
+        const start = Number(q("start")), limit = Number(q("limit"));
+        return json(acts.slice(start, start + limit).map((a) => a.list));
+      }
+      if (seg[1] === "activity-service" && seg[2] === "activity") {
+        const a = acts.find((x) => String(x.list.activityId) === seg[3]);
+        return a ? json(a.detail) : json({ message: "not found" }, 404);
       }
       if (p.startsWith("/fitnessage-service/fitnessage/v2/")) return json({ fitnessAge: 24.63, chronologicalAge: 25 });
       if (p === "/usersummary-service/usersummary/daily") {
@@ -115,5 +174,5 @@ export function startFakeGarmin() {
       return json({ message: `no fake for ${p}` }, 404);
     },
   });
-  return { server, calls, url: `http://127.0.0.1:${server.port}` };
+  return { server, calls, activities: acts, url: `http://127.0.0.1:${server.port}` };
 }

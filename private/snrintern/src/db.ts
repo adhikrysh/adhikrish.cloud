@@ -193,3 +193,19 @@ export async function missingSeries(db: D1Database, slug: string, dateField: str
     WHERE rows.tab = ? AND series.row_id IS NULL AND date >= ? ORDER BY date DESC LIMIT ?`)
     .bind(`$.${dateField}`, slug, from, limit).all<{ id: number; date: string }>()).results;
 }
+
+// ---- statements a sync batches ----
+
+export const insertStatement = (db: D1Database, slug: string, data: Data, by: string, at = new Date().toISOString()) =>
+  db.prepare("INSERT INTO rows (tab, data, created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)").bind(slug, JSON.stringify(data), at, at, by);
+
+export const unsetStatement = (db: D1Database, id: number, field: string, by: string) =>
+  db.prepare("UPDATE rows SET data = json_remove(data, ?), updated_at = ?, updated_by = ? WHERE id = ?").bind(`$.${field}`, new Date().toISOString(), by, id);
+
+export const deleteStatement = (db: D1Database, id: number) => db.prepare("DELETE FROM rows WHERE id = ?").bind(id);
+
+/** Rows whose date or datetime field falls on `date` (its first ten characters, the local day it was written in). */
+export async function sameDay(db: D1Database, slug: string, field: string, date: string): Promise<Row[]> {
+  return (await db.prepare("SELECT id, data, created_at, updated_at, updated_by FROM rows WHERE tab = ? AND substr(json_extract(data, ?), 1, 10) = ?")
+    .bind(slug, `$.${field}`, date).all<RowRecord>()).results.map(toRow);
+}

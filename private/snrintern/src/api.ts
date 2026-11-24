@@ -9,6 +9,7 @@
 //   DELETE /api/<tab>/<id>
 //   GET    /api/<tab>/<id>/series          a row's intraday detail (a health day's heart rate, overnight hrv)
 import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
+import { claim, TRAINING } from "./activities.ts";
 import * as db from "./db.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 
@@ -18,7 +19,7 @@ const API = {
   docs: "GET /api/_docs (the full contract, as markdown; read it before writing)",
   data: ["GET /api", "GET /api/<tab>?q=&limit=&offset= (pages: next_offset is null on the last)", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
-  field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00)",
+  field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00; time: true requires the time and offset)",
     "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
   views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better, finished, need, clock, change, stream, good, bad }])"],
 };
@@ -90,6 +91,9 @@ export async function handleApi(request: Request, database: D1Database, who: str
     if (request.method === "POST") {
       const change = checkRow(tab, await body(), { partial: false });
       if (typeof change === "string") return fail(400, change);
+      // a session garmin already stored (the watch synced first) becomes one row with it, not two
+      const merged = tab.slug === TRAINING ? await claim(database, tab, change.set, who) : null;
+      if (merged) return json({ row: merged, merged: "garmin" }, 200);
       return json({ row: await db.insert(database, tab.slug, change.set, who) }, 201);
     }
     return fail(405, "use GET or POST");

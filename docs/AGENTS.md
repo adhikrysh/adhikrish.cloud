@@ -31,3 +31,4 @@ Plain words, short sentences, lowercase prose like the rest of the private docs,
 - [`uptime-probes.md`](uptime-probes.md): how the uptime page checks every service: the timer, placement near singapore, the three roads, and who can start a probe.
 - [`latency.md`](latency.md): measuring each request phase before tuning anything.
 - [`health.md`](health.md): garmin into senior intern: the hourly cron, its request budget and backfill, rows and streams, and how the health page judges a day.
+- [`training.md`](training.md): garmin activities and the agent's sessions as one training log: who owns which field, how a session is matched both ways, the one delete.

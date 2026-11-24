@@ -9,7 +9,7 @@ how does a day on the watch end up as a line on `seniorintern.adhikrish.cloud/he
 - **the personal api.** garmin's official api for one person's own data (`personal.connectapi.garmin.com`). you make a **key** in garmin connect web (settings > personal api key), valid for up to a year. the key buys a **bearer token** that lasts 24 hours; there are no refresh tokens, a new token is one call. the key lives in 1password (`Personal` > `garmin personal api key`) and on the worker as the secret `GARMIN_API_KEY`.
 - **a health row.** one row per local calendar day in the `health` tab: about 55 numbers and words (resting hr, hrv, sleep and its stages, steps, body battery, garmin's own verdicts as words...). the tab's definition is data in d1 like every tab; its copy in git is `private/snrintern/test/fixtures/tabs.json`.
 - **a series.** a day's streams, in their own table (`series`, one row per health row), as `[minute from local midnight, value]` pairs. kept out of `rows` so lists and views never parse them; only that day's page and the full metric pages read them.
-- **meta.** one key, `garmin_backfill`, saying how far back the history has reached.
+- **meta.** `garmin_backfill` says how far back the days have reached; `garmin_activities` how far the activities have (see [`training.md`](training.md)).
 - **the cron trigger.** cloudflare calls the worker's `scheduled` handler at minute 17 of every hour (`private/snrintern/cloudflare.config.ts`). code: [`src/garmin.ts`](../private/snrintern/src/garmin.ts).
 
 ## one hour, traced
@@ -24,9 +24,11 @@ how does a day on the watch end up as a line on `seniorintern.adhikrish.cloud/he
         │     5 range calls (daily summaries, sleep, hrv,         5
         │     vo2max, weight), fitness age for the newest day     1
         │     and the two newest days' detail                     8
+        │     the 20 newest activities (training.md)          1 + 1 each new
         ├─► history not all in: the 30 days before the oldest     5
         │   row (sleep refuses longer ranges); three empty
         │   months in a row means the watch's history is in
+        ├─► activities not all in: the next page of them      1 + 1 each new
         └─► owed detail, newest first, while the budget lasts:
               inside garmin's ~4 month window: heart rate,
               hrv readings, body battery, the day summary          4 a day
@@ -35,7 +37,7 @@ how does a day on the watch end up as a line on `seniorintern.adhikrish.cloud/he
   writes merge into each day's row (json_patch), series upsert
 ```
 
-a recent day keeps changing (the phone syncs whenever it syncs), so recent days are fetched again every third hour; an older day is final. steady state is about 15 calls every third hour, about 120 a day. a full backfill of years of daily numbers takes a few days of hourly runs.
+a recent day keeps changing (the phone syncs whenever it syncs), so recent days are fetched again every third hour; an older day is final. steady state is about 16 calls every third hour, about 130 a day. the weight range call's weigh-ins go to the body tab, not health. a full backfill of years of daily numbers takes a few days of hourly runs.
 
 ## the page
 

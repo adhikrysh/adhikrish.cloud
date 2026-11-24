@@ -100,7 +100,7 @@ beforeAll(async () => {
     ["training", { at: `${day(-20)}T18:00-08:00`, type: "strength", title: "chest", focus: "chest, arms", lifts: "flat db press: 45x10, 50x8; tricep pushdown: 50x8x3", duration_min: 60 }],
     ["training", { at: `${day(-13)}T18:00-08:00`, type: "strength", title: "chest", focus: "chest", lifts: "flat db press: 50x8, 60x6; pull up: bwx10" }],
     ["training", { at: `${day(-6)}T07:00-08:00`, type: "strength", title: "legs", focus: "legs", lifts: "leg press: 220x8, 260x10; pull up: +25x6" }],
-    ["training", { at: day(-2), type: "run", title: "easy run", focus: "legs", distance_km: 5.2, duration_min: 30 }],
+    ["training", { at: `${day(-2)}T07:00-08:00`, type: "run", title: "easy run", focus: "legs", distance_km: 5.2, duration_min: 30 }],
     ["body", { at: day(-30), bodyweight_kg: 68, bodyfat_percentage: 15.5 }],
     ["body", { at: day(-1), bodyweight_kg: 69.4 }],
   ];
@@ -137,17 +137,17 @@ test("requests that did not come through access are refused", async () => {
 
 test("lifts are normalized on the way in, and malformed ones are refused with the reason", async () => {
   const token = await dots();
-  const r = await send(token, "/api/training", { at: day(0), type: "strength", title: "back", lifts: "Seated Row: 100x8x2, 115 × 8; Pull Up: BW x 10, +25x6" });
+  const r = await send(token, "/api/training", { at: `${day(0)}T09:00-08:00`, type: "strength", title: "back", lifts: "Seated Row: 100x8x2, 115 × 8; Pull Up: BW x 10, +25x6" });
   expect(r.status).toBe(201);
   expect(r.body.row.lifts).toBe("seated row: 100x8, 100x8, 115x8; pull up: bwx10, +25x6");
   expect(r.body.row.updated_by).toBe("service:dots-client-id");
   expect((await call("delete it", `/api/training/${r.body.row.id}`, { method: "DELETE", token })).status).toBe(200);
   const bad: [unknown, string][] = [
-    [{ at: day(0), lifts: "bench 100x8" }, '"lifts" is not valid: "bench 100x8" needs "exercise: sets"'],
-    [{ at: day(0), lifts: "bench: heavy" }, '"lifts" is not valid: "heavy" in bench must look like 50x8'],
-    [{ at: day(0), distance_km: "far" }, '"distance_km" must be a number'],
-    [{ at: day(0), type: "yoga" }, '"type" must be one of: strength, run, hike, climb, other'],
-    [{ at: day(0), rpe: 11 }, '"rpe" must be at most 10'],
+    [{ at: `${day(0)}T09:00-08:00`, lifts: "bench 100x8" }, '"lifts" is not valid: "bench 100x8" needs "exercise: sets"'],
+    [{ at: `${day(0)}T09:00-08:00`, lifts: "bench: heavy" }, '"lifts" is not valid: "heavy" in bench must look like 50x8'],
+    [{ at: `${day(0)}T09:00-08:00`, distance_km: "far" }, '"distance_km" must be a number'],
+    [{ at: `${day(0)}T09:00-08:00`, type: "yoga" }, '"type" must be one of: strength, run, hike, climb, swim, ride, sport, other'],
+    [{ at: `${day(0)}T09:00-08:00`, rpe: 11 }, '"rpe" must be at most 10'],
     [{ title: "no date" }, '"at" is required'],
   ];
   for (const [body, message] of bad) {
@@ -378,6 +378,14 @@ test("books open on what is being read and what is next; the agent moves a book 
 
 test("garmin fills health: full backfill under the request cap, merged days, intraday detail, metrics that judge the week", async () => {
   const token = await me(), agent = await dots();
+  // before garmin's first run, sessions the agent already logged (more in beforeAll): a walk that garmin calls a hike, and an
+  // old-style row with only a date, written while the tab still allowed that
+  await send(agent, "/api/training", { at: `${day(-8)}T09:30-08:00`, type: "other", title: "walk with friends", notes: "knee felt fine" });
+  const { slug: _s, position: _p, ...training } = (await call("training schema", "/api/_tabs/training", { token })).body.tab;
+  const untimed = { ...training, fields: training.fields.map(({ time: _t, ...f }: any) => f) };
+  expect((await send(token, "/api/_tabs/training", untimed, "PUT")).status).toBe(200);
+  expect((await send(agent, "/api/training", { at: day(-3), type: "run", title: "tempo run", distance_km: 7, rpe: 7 })).status).toBe(201);
+  expect((await send(token, "/api/_tabs/training", training, "PUT")).status).toBe(200);
   const HOUR = 3_600_000;
   const base = Math.floor(Date.now() / HOUR / 3) * 3 * HOUR + 17 * 60_000; // an hour that checks recent days (every 3rd)
   const runs: { at: string; recent: boolean; calls: number }[] = [];
@@ -394,7 +402,7 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   expect(Math.max(...runs.map((r) => r.calls))).toBeLessThanOrEqual(48); // the free plan allows 50 outside requests a run
   const idle = runs.filter((r) => !r.recent).at(-1)!;
   expect(idle.calls).toBe(0); // backfill finished: an hour that doesn't check recent days asks garmin nothing
-  expect(runs.filter((r) => r.recent).at(-1)!.calls).toBeLessThanOrEqual(16); // steady state: 1 token + 6 + 2 days of detail (4 each)
+  expect(runs.filter((r) => r.recent).at(-1)!.calls).toBeLessThanOrEqual(17); // steady state: 1 token + 6 + 2 days of detail (4 each) + the activity list
   expect(garmin.calls.filter((c) => c.includes("dailySleepSummariesByDate")).length).toBeGreaterThan(0);
 
   // every worn day, once: the full history, no duplicates although recent days were stored many times, no row for the unworn day
@@ -413,7 +421,6 @@ test("garmin fills health: full backfill under the request cap, merged days, int
     sleep_insight: "stress pos excellent or good sleep restful day", hrv_feedback: "hrv balanced", body_battery_feedback: "sleep time passed balanced and inactive",
     sedentary_min: 690, active_min: 60, body_battery_at_wake: 91, updated_by: "garmin" });
   expect(day3.vo2max).toBeUndefined();
-  expect(rows.find((r) => r.date === iso(20)).weight_kg).toBe(70.1);
   // merge: the recent run re-stored day 1 after its summary was fetched, and the summary's fields survived
   expect(rows.find((r) => r.date === iso(1)).sedentary_min).toBe(690);
   // old days: numbers and the day summary, no intraday (garmin dropped it), and an empty series so they stop being owed
@@ -470,8 +477,7 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   expect(row("hrv_ms")).not.toContain('<rect class="usual"');
   expect(row("resting_hr")).toContain('<rect class="usual"');
   expect(row("body_battery_at_wake")).toContain('<circle class="today good"');
-  // slow numbers: their move over months, or nothing to compare yet
-  expect(row("weight_kg")).toContain("70.1 kg</span>");
+  expect(tabPage).not.toContain('href="/health/metrics/weight_kg"'); // weigh-ins live in body now
   expect(tabPage).not.toContain('href="/health/metrics/vo2max"'); // never had a value: no row
   expect(tabPage).not.toContain("data-chart"); // the dashboard is static svg; the charts live a click away
   expect(tabPage.indexOf("recovery")).toBeLessThan(tabPage.indexOf('<form class="search"'));
@@ -513,6 +519,76 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   expect(stalePage).not.toContain("so far");
   expect(stalePage).toContain(`<span>${month} ${new Date(iso(30)).getUTCDate()}</span>`);
 }, 240_000);
+
+test("garmin's activities and the agent's sessions are one log: merged both ways, garmin's measurements, the agent's words", async () => {
+  const token = await me(), agent = await dots();
+  const all = async () => {
+    const rows: any[] = [];
+    for (let o = 0; o !== null;) { const p = (await call("training rows", `/api/training?limit=1000&offset=${o}`, { token: agent })).body; rows.push(...p.rows); o = p.next_offset; }
+    return rows;
+  };
+  let rows = await all();
+  const by = (id: number) => rows.find((r) => r.garmin_id === id);
+  // every activity once, although the recent checks and the backfill pages listed many of them more than once
+  const ids = rows.map((r) => r.garmin_id).filter((x) => x !== undefined);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(ids.length).toBe(garmin.activities.length);
+  // the agent first, timed: its 18:00 chest day and garmin's 18:20 strength are one row; garmin's start and heart rate, the agent's words
+  const chest = by(9008);
+  expect(chest).toMatchObject({ at: `${day(-20)}T18:20-08:00`, title: "chest", type: "strength", focus: "chest, arms", duration_min: 58, avg_hr: 110, training_effect: "aerobic base" });
+  expect(chest.lifts).toContain("tricep pushdown");
+  // the agent's own measurement yields to the watch's (5.2 km by hand, 5.04 measured); what you told the watch sits beside the agent's rpe
+  expect(by(9002)).toMatchObject({ title: "easy run", focus: "legs", distance_km: 5.04, duration_min: 31, watch_rpe: 5, watch_feel: "normal",
+    stamina_start: 97, stamina_end: 61, fastest_5k_s: 1702, hr_zone_1_min: 5, hr_zone_2_min: 16, intensity_min: 26 });
+  // an old row with only a date matches on the day, and takes garmin's time
+  expect(by(9003)).toMatchObject({ title: "tempo run", rpe: 7, distance_km: 7.5, at: `${day(-3)}T18:00-08:00` });
+  // the agent's "walk" at 09:30 pairs with the 09:53 hike, the closer start; its type stays the agent's; the 08:00 hike is a row of its own
+  expect(by(9006)).toMatchObject({ title: "walk with friends", type: "other", garmin_type: "hiking", elevation_m: 963, notes: "knee felt fine" });
+  expect(by(9005)).toMatchObject({ title: "mariposa county hiking", type: "hike" });
+  // 3.5 hours apart is two sessions: the 21:30 strength didn't take the agent's 18:00 chest day
+  expect(by(9007).title).toBe("strength");
+  expect(rows.find((r) => r.at === `${day(-13)}T18:00-08:00`).garmin_id).toBeUndefined();
+  // garmin alone: its type mapped to the tab's, its name as the title
+  expect(by(9004)).toMatchObject({ type: "run", title: "menlo park running", updated_by: "garmin" });
+  expect(by(9009).type).toBe("swim");
+  expect(by(9010).type).toBe("sport");
+  // the agent alone: a legs day with no activity that day stays as it was
+  expect(rows.find((r) => r.title === "legs").garmin_id).toBeUndefined();
+
+  // garmin first: the watch synced the strength session, then the agent logs it an hour later; one row, garmin's duration and start
+  const logged = await send(agent, "/api/training", { at: `${day(-5)}T19:05-08:00`, type: "strength", title: "back", focus: "back", lifts: "pull up: bwx10, bwx8", duration_min: 50, rpe: 8 });
+  expect(logged.status).toBe(200);
+  expect(logged.body.merged).toBe("garmin");
+  expect(logged.body.row).toMatchObject({ id: by(9001).id, garmin_id: 9001, title: "back", duration_min: 65, at: `${day(-5)}T18:00-08:00`, rpe: 8, watch_rpe: 7, watch_feel: "strong" });
+  // a second session that evening is its own row: the garmin row already has the agent's words
+  expect((await send(agent, "/api/training", { at: `${day(-5)}T20:30-08:00`, type: "run", title: "shakeout", duration_min: 15 })).status).toBe(201);
+  // a session needs its time now
+  expect((await send(agent, "/api/training", { at: day(-1), type: "run" })).body.error).toBe('"at" needs a date and time with its offset, like 2026-11-18T09:30-08:00');
+
+  // weigh-ins: one on a day the agent logged nothing, and yesterday's hand-logged 69.4 becomes the scale's 69.8 at 07:30
+  const body = (await call("body rows", "/api/body?limit=100", { token: agent })).body.rows;
+  expect(body.find((r: any) => r.garmin_id === 501)).toMatchObject({ at: `${day(-20)}T07:30-08:00`, bodyweight_kg: 70.1, bodyfat_percentage: 15.2 });
+  expect(body.find((r: any) => r.garmin_id === 502)).toMatchObject({ at: `${day(-1)}T07:30-08:00`, bodyweight_kg: 69.8 });
+  expect(body.filter((r: any) => r.at.startsWith(day(-1)))).toHaveLength(1);
+
+  // deleted in garmin: the run only garmin knew goes; the chest day the agent wrote to stays, unlinked, with its numbers
+  const gone = by(9004).id;
+  for (const id of [9004, 9008]) garmin.activities.splice(garmin.activities.findIndex((a) => a.list.activityId === id), 1);
+  const HOUR = 3_600_000, at = Math.floor(Date.now() / HOUR / 3) * 3 * HOUR + 17 * 60_000 + 33 * HOUR; // an hour that checks recent days
+  const r = await fetch(`http://localhost:${port}/cdn-cgi/local/scheduled?${new URLSearchParams({ cron: "17 * * * *", time: String(at), format: "json" })}`);
+  expect(r.status).toBe(200);
+  rows = await all();
+  expect(rows.find((x) => x.id === gone)).toBeUndefined();
+  const kept = rows.find((x) => x.id === chest.id);
+  expect(kept.garmin_id).toBeUndefined();
+  expect(kept).toMatchObject({ title: "chest", avg_hr: 110 });
+  writeFileSync(join(artifacts, "training-merged.json"), JSON.stringify(rows.filter((x) => x.at >= day(-41)).sort((a, b) => (a.at < b.at ? 1 : -1)), null, 1));
+  const runPage = await call("garmin run page", `/training/${by(9002).id}`, { token });
+  expect(runPage.status).toBe(200);
+  expect(runPage.body).toContain("avg hr");
+  writeFileSync(join(artifacts, "page-training-run.html"), runPage.body);
+  writeFileSync(join(artifacts, "page-training-garmin.html"), standalone((await call("training page", "/training", { token })).body));
+}, 60_000);
 
 test("people are a search and their groups, nothing above", async () => {
   const token = await me();
