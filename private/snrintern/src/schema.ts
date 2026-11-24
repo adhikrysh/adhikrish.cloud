@@ -32,15 +32,21 @@ export type View =
   | { kind: "list"; label: string; where: Record<string, string>; sort?: string; aside?: string } // the rows matching `where`, by `sort` or in the tab's order
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
   | { kind: "metrics"; label: string; metrics: Metric[] }; // each number's last 7 days against its usual, its best, 90 days of it
-/** One number on a metrics view: a line of words judging its newest day against your usual, and a box of its last 14 days.
- * better: which way is good (lower resting hr, higher hrv); without it nothing is coloured and no best is named.
- * finished: judge the newest finished day, not today (a tally like steps isn't done until the day is).
- * need: a field holding the day's own target from garmin (sleep need); the words say how far off it the day was.
- * clock: a datetime field whose time of day is compared with your usual (bedtime).
- * change: a slow number (vo2max, weight): the words say how it moved over 3 months instead.
- * stream: a series name (series table) holding the same thing within a day; the full page opens on it (1d, 3d).
- * good / bad: the words a day earns in the log when this metric is outside your usual that way ("well recovered", "short night"). */
-export type Metric = { field: string; better?: "higher" | "lower"; finished?: boolean; need?: string; clock?: string; change?: boolean; stream?: string; good?: string; bad?: string };
+/** One number on a metrics view: a short verdict on its newest day and a box of its last 14 days. How a day is judged, in order
+ * of trust (the closer to garmin, the better):
+ *   label   garmin's own word for the day, from a text field (sleep score's "poor"); `good` / `bad` list which words colour
+ *   scale   garmin's published bands for the number (body battery: 25 / 50 / 75), each with its word and an optional tone
+ *   goal    a field holding garmin's goal for the day (steps), or for the week with `per: "week"` (intensity minutes)
+ *   change  a slow number (vo2max, weight): how it moved over the months
+ *   else    your own history: higher or lower than 80% of the 28 days before (10th / 90th percentile), coloured by `better`;
+ *           `limit`: a clinical bound above which a day is always bad (resting hr over 100)
+ * finished: judge the newest finished day (today's tally isn't done). stream: a series the full page opens on (1d, 3d).
+ * log: the words a day earns in the tab's list when this metric judges it good or bad ("well recovered", "short night"). */
+export type Scale = { upTo: number; word: string; tone?: "good" | "bad" };
+export type Metric = {
+  field: string; better?: "higher" | "lower"; finished?: boolean; change?: boolean; stream?: string; limit?: number; per?: "week"; goal?: string;
+  label?: { field: string; good?: string[]; bad?: string[] }; scale?: Scale[]; log?: { good?: string; bad?: string };
+};
 export type Tab = TabDefinition & { slug: string; position: number };
 export type Value = string | number;
 export type Data = Record<string, Value>;
@@ -207,15 +213,23 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
         if (!Array.isArray(v.metrics) || !v.metrics.length) return `${where}: "metrics" must list { "field": <a number field>, ... }`;
         for (const m of v.metrics as any[]) {
           if (typeof m !== "object" || m === null || !isField(m.field, ["int", "number"])) return `${where}: each metric needs "field", a number field`;
-          const bad = Object.keys(m).find((k) => !["field", "better", "finished", "need", "clock", "change", "stream", "good", "bad"].includes(k));
-          if (bad) return `${where}: unknown metric key "${bad}" (keys: field, better, finished, need, clock, change, stream, good, bad)`;
-          for (const k of ["good", "bad"]) if (m[k] !== undefined && (typeof m[k] !== "string" || !m[k].trim() || m[k].length > 40)) return `${where}: "${k}" must be a few words, like "well recovered"`;
-          if ((m.good !== undefined || m.bad !== undefined) && m.better === undefined) return `${where}: "good" and "bad" need "better", so a day knows which way is which`;
+          const keys = ["field", "better", "finished", "change", "stream", "limit", "per", "goal", "label", "scale", "log"];
+          const bad = Object.keys(m).find((k) => !keys.includes(k));
+          if (bad) return `${where}: unknown metric key "${bad}" (keys: ${keys.join(", ")})`;
           if (m.better !== undefined && m.better !== "higher" && m.better !== "lower") return `${where}: "better" must be "higher" or "lower"`;
           for (const k of ["finished", "change"]) if (m[k] !== undefined && typeof m[k] !== "boolean") return `${where}: "${k}" must be true or false`;
-          if (m.need !== undefined && !isField(m.need, ["int", "number"])) return `${where}: "need" must name a number field`;
-          if (m.clock !== undefined && !isField(m.clock, ["datetime"])) return `${where}: "clock" must name a datetime field`;
+          if (m.limit !== undefined && typeof m.limit !== "number") return `${where}: "limit" must be a number`;
+          if (m.per !== undefined && m.per !== "week") return `${where}: "per" can only be "week"`;
+          if (m.goal !== undefined && !isField(m.goal, ["int", "number"])) return `${where}: "goal" must name a number field`;
           if (m.stream !== undefined && (typeof m.stream !== "string" || !m.stream.trim())) return `${where}: "stream" must name a series, like "heart rate"`;
+          const words = (x: unknown) => x === undefined || (Array.isArray(x) && x.every((w) => typeof w === "string"));
+          if (m.label !== undefined && (typeof m.label !== "object" || !isField(m.label.field, ["text"]) || !words(m.label.good) || !words(m.label.bad)))
+            return `${where}: "label" is { "field": <a text field>, "good": [words], "bad": [words] }`;
+          if (m.scale !== undefined && (!Array.isArray(m.scale) || !m.scale.length || !m.scale.every((b: any, i: number, all: any[]) => typeof b === "object" && b !== null
+            && typeof b.upTo === "number" && (i === 0 || b.upTo > all[i - 1].upTo) && typeof b.word === "string" && b.word.trim() && (b.tone === undefined || b.tone === "good" || b.tone === "bad"))))
+            return `${where}: "scale" is a list of { "upTo": n, "word": "...", "tone": "good" or "bad" (optional) }, upTo rising`;
+          if (m.log !== undefined && (typeof m.log !== "object" || ![m.log.good, m.log.bad].every((w) => w === undefined || (typeof w === "string" && w.trim() && w.length <= 40))))
+            return `${where}: "log" is { "good": "a few words", "bad": "a few words" }`;
         }
         break;
       default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics`;

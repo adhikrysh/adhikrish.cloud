@@ -196,13 +196,10 @@ function list(v: Extract<View, { kind: "list" }>, { tab, rows }: Ctx): string {
 
 // ---- metrics: numbers that come every day (health) ----
 //
-// A metric row is a verdict and its evidence. The words judge one day against your usual, by fixed rules (no model, so no cost
-// and the same numbers always read the same); the box on the right draws the same comparison: 14 days of dots, the usual band
-// behind them, the judged day in white.
-//   usual band   the middle half (25th to 75th percentile) of the 28 days before the judged day; needs 10 of them
-//   about usual  the day sits inside the band; otherwise "3 above usual", "12% below usual" (percent once the usual is in the
-//                thousands), or "highest in 3 months" when it beats the 90 days before it
-//   colour       green or red only outside the band, by `better`; everything else white and grey
+// A metric row is a verdict and its evidence: one short phrase judging one day, and a box of the last 14 days. The phrase
+// comes from the closest thing to a source of truth (see Metric in schema.ts): garmin's own word for the day, garmin's
+// published bands, garmin's goal, and only where garmin has nothing, your own history (higher or lower than 80% of the 28
+// days before). Fixed rules, no model: no cost, and the same numbers always read the same. Green is good, red is bad.
 
 const RECENT = 125; // rows a metrics view reads: 90 days for "highest in 3 months", 28 for the band, 7 to spare
 const BOX = 14; // days in a row's box
@@ -225,12 +222,9 @@ function quantile(xs: number[], q: number): number {
   return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo);
 }
 /** Minutes after 6pm, so bedtimes either side of midnight compare as one line (11pm = 300, 1am = 420). */
-const nightMinute = (v: unknown) => { const m = /T(\d{2}):(\d{2})/.exec(String(v ?? "")); return m ? ((+m[1] * 60 + +m[2] - 18 * 60) % 1440 + 1440) % 1440 : null; };
-const clockOf = (v: unknown) => { const m = /T(\d{2}):(\d{2})/.exec(String(v ?? "")); if (!m) return ""; const h = +m[1]; return `${h % 12 || 12}${m[2] === "00" ? "" : `:${m[2]}`}${h < 12 ? "am" : "pm"}`; };
+export type Verdict = { day: db.Row; value: number; word: string; tone: "" | "good" | "bad"; band: [number, number] | null; box: { t: number; y: number }[]; soFar?: number };
 
-export type Verdict = { day: db.Row; value: number; words: string[]; tone: "" | "good" | "bad"; band: [number, number] | null; box: { t: number; y: number }[]; soFar?: number };
-
-/** Judges one metric's newest day (or newest finished day), or the day `on`, against your usual, by the rules above. rows: oldest first. */
+/** Judges one metric's newest day (or newest finished day), or the day `on`, by the first rule it has. rows: oldest first. */
 export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | null, on?: string): Verdict | null {
   const dateF = dateField(tab), f = tab.fields.find((x) => x.name === m.field);
   const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]), row: r })).filter((p): p is Pt & { row: db.Row } => p.t !== null && r0(p.row[m.field]) && finite(p.y));
@@ -238,44 +232,39 @@ export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | 
   let at = pts.length - 1, soFar: number | undefined;
   if (on !== undefined) { at = pts.findIndex((p) => String(p.row[dateF]).slice(0, 10) === on); if (at < 0) return null; }
   else if (m.finished && pts.length > 1 && String(pts[at].row[dateF]) === liveDay(newestDate)) { soFar = pts[at].y; at--; } // today isn't done: judge yesterday
-  const day = pts[at], words: string[] = [];
-  const before = pts.filter((p) => p.t < day.t && p.t >= day.t - 28 * DAY).map((p) => p.y);
-  const band = before.length >= 10 ? ([quantile(before, 0.25), quantile(before, 0.75)] as [number, number]) : null;
-  let tone: Verdict["tone"] = "";
-  if (m.change) { // a slow number: how it moved over 3 months
+  const day = pts[at];
+  let value = day.y, word = "", tone: Verdict["tone"] = "", band: [number, number] | null = null;
+  const label = m.label ? String(day.row[m.label.field] ?? "") : "";
+  if (m.label && label) { // garmin's own word
+    word = label;
+    tone = m.label.good?.includes(label) ? "good" : m.label.bad?.includes(label) ? "bad" : "";
+  } else if (m.scale) { // garmin's bands
+    const b = m.scale.find((x) => day.y <= x.upTo) ?? m.scale.at(-1)!;
+    word = b.word; tone = b.tone ?? "";
+  } else if (m.goal) { // garmin's goal, for the day or the week ending it
+    const goal = Number(day.row[m.goal]);
+    if (m.per === "week") value = pts.filter((p) => p.t <= day.t && p.t > day.t - 7 * DAY).reduce((sum, p) => sum + p.y, 0);
+    if (finite(goal) && goal > 0) {
+      word = m.per === "week" ? `${Math.round(value)} of ${Math.round(goal)}${f?.unit ? ` ${f.unit}` : ""} this week` : value >= goal ? "goal met" : `${amount(f, goal - value)} short of goal`;
+      if (value >= goal) tone = "good";
+    }
+  } else if (m.change) { // a slow number: how it moved
     const old = pts.filter((p) => p.t <= day.t - 60 * DAY).at(-1);
     if (old) {
-      const d = day.y - old.y, months = Math.max(2, Math.round((day.t - old.t) / (30.44 * DAY)));
-      words.push(Math.abs(d) < (f?.type === "int" ? 1 : 0.1) ? `no change in ${months} months` : `${d > 0 ? "up" : "down"} ${amount(f, Math.abs(d))} in ${months} months`);
-      if (m.better && Math.abs(d) >= (f?.type === "int" ? 1 : 0.1)) tone = (d > 0) === (m.better === "higher") ? "good" : "bad";
+      const d = day.y - old.y, months = Math.max(2, Math.round((day.t - old.t) / (30.44 * DAY))), still = Math.abs(d) < (f?.type === "int" ? 1 : 0.1);
+      word = still ? `no change in ${months} months` : `${d > 0 ? "up" : "down"} ${amount(f, Math.abs(d))} in ${months} months`;
+      if (m.better && !still) tone = (d > 0) === (m.better === "higher") ? "good" : "bad";
     }
-  } else if (m.need && finite(Number(day.row[m.need])) && day.row[m.need] !== undefined) { // against the day's own target (sleep need)
-    const d = day.y - Number(day.row[m.need]);
-    words.push(Math.abs(d) < 15 ? "about what you needed" : d < 0 ? `${amount(f, -d)} short of what you needed` : `${amount(f, d)} more than you needed`);
-    if (d <= -60) tone = "bad";
-    else if (d >= 0) tone = "good";
-  } else if (band) {
-    const median = quantile(before, 0.5), window = pts.filter((p) => p.t < day.t && p.t >= day.t - 90 * DAY).map((p) => p.y);
-    const inside = day.y >= band[0] && day.y <= band[1];
-    if (inside) words.push("about usual");
-    else if (window.length >= 30 && day.y > Math.max(...window)) words.push("highest in 3 months");
-    else if (window.length >= 30 && day.y < Math.min(...window)) words.push("lowest in 3 months");
-    else {
-      const d = day.y - median, above = d > 0;
-      const size = Math.abs(median) >= 1000 ? `${Math.round(Math.abs(d / median) * 100)}%` : amount(f, Math.abs(d));
-      words.push(f?.unit === "min" ? `${size} ${above ? "more" : "less"} than usual` : `${size} ${above ? "above" : "below"} usual`);
-    }
-    if (!inside && m.better) tone = (day.y > band[1]) === (m.better === "higher") ? "good" : "bad";
-  }
-  if (m.clock && day.row[m.clock] !== undefined) { // bedtime against your usual bedtime
-    const now = nightMinute(day.row[m.clock]), usual = pts.filter((p) => p.t < day.t && p.t >= day.t - 28 * DAY).map((p) => nightMinute(p.row[m.clock!])).filter((x): x is number => x !== null);
-    if (now !== null) {
-      const d = usual.length >= 10 ? now - quantile(usual, 0.5) : 0;
-      words.push(`in bed ${clockOf(day.row[m.clock])}${usual.length < 10 ? "" : Math.abs(d) < 20 ? ", about usual" : `, ${amount({ name: "", type: "int", unit: "min" }, Math.abs(d)).replace(" min", "m")} ${d > 0 ? "later" : "earlier"} than usual`}`);
-    }
+  } else { // your own history, and a clinical bound if there is one
+    const before = pts.filter((p) => p.t < day.t && p.t >= day.t - 28 * DAY).map((p) => p.y);
+    if (before.length >= 14) band = [quantile(before, 0.1), quantile(before, 0.9)];
+    if (m.limit !== undefined && day.y > m.limit) { word = `above ${amount(f, m.limit)}`; tone = "bad"; }
+    else if (band && day.y > band[1]) { word = "higher than usual"; tone = m.better ? (m.better === "higher" ? "good" : "bad") : ""; }
+    else if (band && day.y < band[0]) { word = "lower than usual"; tone = m.better ? (m.better === "lower" ? "good" : "bad") : ""; }
+    else if (band) word = "usual";
   }
   const box = pts.filter((p) => p.t <= day.t && p.t > day.t - BOX * DAY).map((p) => ({ t: p.t, y: p.y }));
-  return { day: day.row, value: day.y, words, tone, band, box, soFar };
+  return { day: day.row, value, word, tone, band, box, soFar };
 }
 const r0 = (v: unknown) => v !== undefined && v !== null && v !== "";
 /** The newest date if it is today where you are (garmin's dates are local, so today or yesterday in utc), else null: a tab that
@@ -283,7 +272,7 @@ const r0 = (v: unknown) => v !== undefined && v !== null && v !== "";
 const liveDay = (d: string | null) => (d !== null && (dayOf(d) ?? 0) >= today() - DAY ? d : null);
 
 /**
- * A day's big picture in a few words: each metric with good / bad words is judged on that day, and the ones outside your usual
+ * A day's big picture in a few words: each metric with `log` words is judged on that day, and the ones judged good or bad
  * give their words, bad first, at most two, repeats merged ("well recovered" from both hrv and resting hr counts once).
  * Nothing outside usual: "an ordinary day". Today's tallies aren't finished, so they say nothing yet. rows: oldest first,
  * including the 28 days before `date`.
@@ -291,9 +280,9 @@ const liveDay = (d: string | null) => (d !== null && (dayOf(d) ?? 0) >= today() 
 export function dayWords(tab: Tab, rows: db.Row[], date: string, newestDate: string | null): { text: string; tone: "" | "good" | "bad" }[] {
   const out: { text: string; tone: "good" | "bad" }[] = [];
   for (const m of tab.views?.flatMap((v) => (v.kind === "metrics" ? v.metrics : [])) ?? []) {
-    if ((!m.good && !m.bad) || m.change || (m.finished && date === liveDay(newestDate))) continue;
+    if ((!m.log?.good && !m.log?.bad) || m.change || (m.finished && date === liveDay(newestDate))) continue;
     const v = judge(tab, m, rows, newestDate, date);
-    const text = v?.tone === "good" ? m.good : v?.tone === "bad" ? m.bad : undefined;
+    const text = v?.tone === "good" ? m.log?.good : v?.tone === "bad" ? m.log?.bad : undefined;
     if (text && v && !out.some((o) => o.text === text)) out.push({ text, tone: v.tone as "good" | "bad" });
   }
   out.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "bad" ? -1 : 1));
@@ -329,9 +318,9 @@ async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, recent }: C
     const t = dayOf(verdict.day[dateF])!;
     const live = liveDay(newestDate) ? newestT : null;
     const when = live === null ? short(t) : t === live ? "today" : t === live - DAY ? "yesterday" : short(t);
-    const words = [...verdict.words.map((w, i) => `<span${i === 0 && verdict.tone ? ` class="${verdict.tone}"` : ""}>${escape(w)}</span>`),
+    const words = [...(verdict.word ? [`<span${verdict.tone ? ` class="${verdict.tone}"` : ""}>${escape(verdict.word)}</span>`] : []),
       `<span>${escape(when)}</span>`, ...(verdict.soFar !== undefined ? [`<span>today so far ${escape(amount(f, verdict.soFar))}</span>`] : [])];
-    return `<a class="metric" href="/${tab.slug}/metrics/${m.field}"><span class="name">${escape(metricName(m.field))}</span><span class="val${verdict.tone ? ` ${verdict.tone}` : ""}">${escape(amount(f, verdict.value))}</span><span class="why">${words.join("")}</span>${verdict.box.length > 1 ? box(verdict, t) : "<span></span>"}</a>`;
+    return `<a class="metric" href="/${tab.slug}/metrics/${m.field}"><span class="name">${escape(metricName(m.field))}</span><span class="val${verdict.tone ? ` ${verdict.tone}` : ""}">${escape(m.per === "week" ? `${Math.round(verdict.value)}${f?.unit ? ` ${f.unit}` : ""}` : amount(f, verdict.value))}</span><span class="why">${words.join("")}</span>${verdict.box.length > 1 ? box(verdict, t) : "<span></span>"}</a>`;
   }).filter(Boolean);
   return items.length ? section(v.label, `<div class="metrics">${items.join("")}</div>`) : "";
 }
@@ -367,10 +356,8 @@ export async function metricPage(tab: Tab, database: D1Database, name: string): 
     unit: f.unit, int: f.type === "int", usual: verdict?.band ?? undefined, best: week.length > 1 ? [iso(week[0].t), iso(week.at(-1)!.t)] : undefined });
   const inBest = new Set(week.map((p) => p.id));
   const lastDays = [...pts].reverse().slice(0, 14).map((p) => `<li><a href="/${tab.slug}/${p.id}">${short(p.t)}</a><span class="sets"><span${inBest.has(p.id) ? ' class="good"' : ""}>${escape(amount(f, p.y))}</span></span></li>`);
-  const lines = [
-    verdict ? `<p class="lift-best">${[`<span class="${verdict.tone}">${escape(amount(f, verdict.value))}</span>`, ...verdict.words.map(escape)].join(", ")}${verdict.band ? `; your usual is ${escape(amount(f, verdict.band[0]))} to ${escape(amount(f, verdict.band[1]))}` : ""}</p>` : "",
-    best && week.length ? `<p class="lift-best">best ${week.length === 7 ? "week" : "day"} <span class="good">${escape(amount(f, best.avg))}</span>, ${week.length === 7 ? `<a href="/${tab.slug}/${week[0].id}">${short(week[0].t)}</a> to ` : ""}<a href="/${tab.slug}/${week.at(-1)!.id}">${short(week.at(-1)!.t)}</a></p>` : "",
-  ].join("\n");
+  // just the value and its verdict: the chart says the rest (the best week is drawn in green on it)
+  const lines = verdict ? `<p class="verdict"><span class="${verdict.tone}">${escape(amount(f, verdict.value))}</span>${verdict.word ? ` <span class="${verdict.tone}">${escape(verdict.word)}</span>` : ""}</p>` : "";
   return `${head}
 ${lines}
 ${plot}
@@ -418,6 +405,9 @@ ${plot}
 
 export const LIFT_CSS = `
   .lift-best { color: var(--muted); font-size: var(--fs-small); margin-top: 8px; }
+  .verdict { margin-top: 8px; font-size: var(--fs-heading); color: var(--bright); }
+  .verdict span + span { color: var(--muted); font-size: var(--fs-body); margin-left: 8px; }
+  .verdict span.good { color: var(--good); } .verdict span.bad { color: var(--bad); }
   .sessions { list-style: none; margin-top: 36px; display: grid; gap: 12px; }
   .sessions li { display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: baseline; }
   .sessions li > a { color: var(--muted); font-size: var(--fs-small); }

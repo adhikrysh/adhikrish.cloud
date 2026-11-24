@@ -447,61 +447,56 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   // the tab page: this week judged against the 28 days before it, in the right direction for each metric
   const tabPage = (await call("health page", "/health", { token })).body as string;
   const row = (name: string) => tabPage.split(`href="/health/metrics/${name}">`)[1].split("</a>")[0];
-  // each metric is one line: name, the judged day's value, the words, the 14-day box. the words come from rules, and the
-  // box draws the same thing: the usual band behind the dots, the judged day as the big dot
-  // this week sits outside the usual band on purpose: the words say by how much (or that it's a 3-month extreme), coloured by direction
-  expect(row("resting_hr")).toContain('<span class="val good">46 bpm</span>'); // below usual, and lower is better
-  expect(row("resting_hr")).toMatch(/<span class="good">(\d+ bpm below usual|lowest in 3 months)<\/span><span>today<\/span>/);
-  expect(row("hrv_ms")).toContain(`<span class="val good">${numbers(iso(0)).hrv} ms</span>`);
-  expect(row("hrv_ms")).toMatch(/<span class="good">(\d+ ms above usual|highest in 3 months)<\/span>/);
-  expect(row("stress_avg")).toContain('<span class="val bad">'); // up, and lower is better
-  expect(row("stress_avg")).toMatch(/<span class="bad">(\d+ above usual|highest in 3 months)<\/span>/);
-  expect(row("body_battery_at_wake")).toContain(">about usual<"); // the same 91 every morning
-  expect(row("body_battery_at_wake")).not.toMatch(/class="val (good|bad)"/);
-  // sleep: against that night's need, and bedtime against your usual bedtime
-  const sleepNow = Math.round(numbers(iso(0)).sleepSeconds / 60);
-  expect(row("sleep_min")).toContain(`short of what you needed`);
-  expect(row("sleep_min")).toContain("<span>in bed 11:40pm, about usual</span>");
-  if (540 - sleepNow >= 60) expect(row("sleep_min")).toContain('<span class="val bad">');
-  // activity judges the finished day (yesterday) and shows today as so far, never judged
-  expect(row("steps")).toContain(`>${numbers(iso(1)).steps.toLocaleString("en-US")}</span>`);
+  const word = (name: string) => row(name).split('<span class="why">')[1].split("</span>")[0];
+  // each metric is one line: the judged day's value, one short verdict, the 14-day box; the verdict comes from garmin first
+  expect(word("hrv_ms")).toBe("<span>balanced"); // garmin's hrv status, as garmin says it; balanced isn't coloured
+  expect(word("sleep_score")).toBe("<span>good"); // garmin's sleep score label
+  expect(row("sleep_score")).toContain('<span class="val">84</span>');
+  expect(word("body_battery_at_wake")).toBe('<span class="good">high'); // 91: garmin's high reserve band (76 to 100)
+  expect(row("body_battery_at_wake")).toContain('<span class="val good">91</span>');
+  expect(word("stress_avg")).toBe("<span>low"); // 45: garmin's low stress band (26 to 50)
+  // steps against garmin's goal for the finished day (yesterday), today shown as so far
+  expect(word("steps")).toBe(`<span>${(10000 - numbers(iso(1)).steps).toLocaleString("en-US")} short of goal`);
   expect(row("steps")).toContain(`<span>yesterday</span><span>today so far ${numbers(iso(0)).steps.toLocaleString("en-US")}</span>`);
-  // the box: 14 dots, the band, the judged day white or coloured with the words
+  // intensity: the week ending yesterday against garmin's weekly goal, in plain minutes
+  expect(row("intensity_min")).toContain('<span class="val good">280 min</span>');
+  expect(word("intensity_min")).toBe('<span class="good">280 of 150 min this week');
+  // resting hr: garmin gives no verdict, so your own history: this week's 46 sits inside the low end of the last 28 days
+  expect(row("resting_hr")).toContain('46 bpm</span>');
+  expect(word("resting_hr")).toMatch(/^<span( class="good")?>(usual|lower than usual)$/);
+  // the box: 14 dots and a line; the band only where the verdict is your own history
   expect(row("hrv_ms").match(/<circle /g)).toHaveLength(14 - (NOT_WORN < 14 ? 1 : 0));
-  expect(row("hrv_ms")).toContain('<rect class="usual"');
-  expect(row("hrv_ms").match(/<polyline /g)).toHaveLength(1); // one line through the dots; a single unworn day is bridged, only gaps over 2 days open it
-  expect(row("hrv_ms")).toContain('<circle class="today good"');
-  expect(row("body_battery_at_wake")).toContain('<circle class="today"');
+  expect(row("hrv_ms").match(/<polyline /g)).toHaveLength(1);
+  expect(row("hrv_ms")).not.toContain('<rect class="usual"');
+  expect(row("resting_hr")).toContain('<rect class="usual"');
+  expect(row("body_battery_at_wake")).toContain('<circle class="today good"');
   // slow numbers: their move over months, or nothing to compare yet
   expect(row("weight_kg")).toContain("70.1 kg</span>");
-  expect(row("fitness_age")).toContain("24.6</span>");
   expect(tabPage).not.toContain('href="/health/metrics/vo2max"'); // never had a value: no row
-  expect(tabPage).not.toContain("data-chart"); // the dashboard is static: the boxes are svg, the charts live a click away
+  expect(tabPage).not.toContain("data-chart"); // the dashboard is static svg; the charts live a click away
   expect(tabPage.indexOf("recovery")).toBeLessThan(tabPage.indexOf('<form class="search"'));
-  // the log: each day as its big picture, from the same rules, bad first, at most two. the fake sleeps 7-8h against a 9h need,
-  // so every night is short; today adds stress (up) and recovery (good) but only two fit, bad first
+  // the log: each day as its big picture from the same verdicts (at most two, bad first)
   const logRow = (date: string) => tabPage.split('<div class="rows">')[1].split("</li>").find((li) => li.includes(`href="/health/${rows.find((r) => r.date === date).id}"`))!;
-  expect(logRow(iso(0))).toMatch(/<small class="aside words"><span class="bad">(short night|stressful day)<\/span><span class="bad">(short night|stressful day)<\/span><\/small>/);
-  expect(logRow(iso(20))).toContain('<span class="bad">short night</span>');
-  expect(logRow(iso(0))).not.toContain(" ms<"); // words, not numbers
+  expect(logRow(iso(0))).toContain('<small class="aside words"><span class="good">well recovered</span></small>'); // body battery high; today's steps aren't judged
+  expect(logRow(iso(20))).toContain('<span class="good">well recovered</span><span class="good">active day</span>'); // 11,460 steps, over the goal
   writeFileSync(join(artifacts, "page-health.html"), standalone(tabPage));
-  // the full page opens on the streams (1d, 3d), then every day since the first as dots, your usual as two dashed lines
+  // the full page: the value and its verdict, then the chart (streams at 1d / 3d, then every day, your usual as dashed lines)
   const hrPage = (await call("resting hr page", "/health/metrics/resting_hr", { token })).body as string;
   const heart = charts(hrPage)[0];
   expect(heart.streams.map((s: any) => s.date)).toEqual([iso(2), iso(1), iso(0)]);
   expect(heart.points).toHaveLength(HISTORY);
   expect(heart.usual[0]).toBeLessThan(heart.usual[1]);
-  expect(heart.usual[1]).toBeLessThan(56); // the 28 days before today, all in the low 50s
   for (const r of ["1d", "3d", "10d", "1m", "3m", "1y", "all"]) expect(hrPage).toContain(`>${r}</button>`);
-  expect(hrPage).toMatch(/(bpm below usual|lowest in 3 months); your usual is \d+ bpm to \d+ bpm/);
+  expect(hrPage).toMatch(/<p class="verdict"><span class="(good)?">46 bpm<\/span> <span class="(good)?">(usual|lower than usual)<\/span><\/p>/);
+  expect(hrPage).not.toContain("your usual is"); // no narration
   writeFileSync(join(artifacts, "page-health-heart.html"), standalone(hrPage));
   const hist = (await call("metric page", "/health/metrics/hrv_ms", { token })).body as string;
   const full = charts(hist)[0];
   expect(full.points[0][0]).toBe(iso(HISTORY));
   expect(full.base).toBe("/health/");
-  expect(full.best).toEqual([iso(6), iso(0)]); // this week: hrv in the 70s
-  expect(hist).toMatch(/best week <span class="good">7[23] ms<\/span>/);
-  expect(hist.match(/<li>/g)).toHaveLength(14);
+  expect(full.usual).toBeUndefined(); // judged by garmin's status, so no band of your own
+  expect(hist).toContain('<p class="verdict"><span class="">');
+  expect(hist).not.toContain("best week"); // the chart shows it; no words for it
   const stepsPage = (await call("steps page", "/health/metrics/steps", { token })).body as string;
   expect(stepsPage).not.toContain(">1d</button>"); // no stream, no 1d / 3d
   writeFileSync(join(artifacts, "page-health-metric.html"), standalone(hist));

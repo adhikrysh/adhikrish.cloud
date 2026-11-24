@@ -412,23 +412,56 @@
      {
       "field": "resting_hr",
       "better": "lower",
+      "limit": 100,
       "stream": "heart rate",
-      "good": "well recovered",
-      "bad": "under-recovered"
+      "log": {
+       "good": "well recovered",
+       "bad": "under-recovered"
+      }
      },
      {
       "field": "hrv_ms",
-      "better": "higher",
+      "label": {
+       "field": "hrv_status",
+       "bad": [
+        "low",
+        "poor",
+        "unbalanced"
+       ]
+      },
       "stream": "overnight hrv",
-      "good": "well recovered",
-      "bad": "under-recovered"
+      "log": {
+       "bad": "under-recovered"
+      }
      },
      {
       "field": "body_battery_at_wake",
-      "better": "higher",
+      "scale": [
+       {
+        "upTo": 25,
+        "word": "very low",
+        "tone": "bad"
+       },
+       {
+        "upTo": 50,
+        "word": "low",
+        "tone": "bad"
+       },
+       {
+        "upTo": 75,
+        "word": "medium"
+       },
+       {
+        "upTo": 100,
+        "word": "high",
+        "tone": "good"
+       }
+      ],
       "stream": "body battery",
-      "good": "well recovered",
-      "bad": "under-recovered"
+      "log": {
+       "good": "well recovered",
+       "bad": "under-recovered"
+      }
      }
     ]
    },
@@ -437,18 +470,48 @@
     "label": "sleep",
     "metrics": [
      {
-      "field": "sleep_min",
-      "better": "higher",
-      "need": "sleep_need_min",
-      "clock": "bedtime",
-      "bad": "short night",
-      "good": "slept well"
+      "field": "sleep_score",
+      "label": {
+       "field": "sleep_score_label",
+       "good": [
+        "excellent"
+       ],
+       "bad": [
+        "poor"
+       ]
+      },
+      "log": {
+       "good": "slept well",
+       "bad": "poor sleep"
+      }
      },
      {
       "field": "stress_avg",
-      "better": "lower",
-      "good": "calm day",
-      "bad": "stressful day"
+      "scale": [
+       {
+        "upTo": 25,
+        "word": "rest",
+        "tone": "good"
+       },
+       {
+        "upTo": 50,
+        "word": "low"
+       },
+       {
+        "upTo": 75,
+        "word": "medium",
+        "tone": "bad"
+       },
+       {
+        "upTo": 100,
+        "word": "high",
+        "tone": "bad"
+       }
+      ],
+      "log": {
+       "good": "calm day",
+       "bad": "stressful day"
+      }
      }
     ]
    },
@@ -458,14 +521,16 @@
     "metrics": [
      {
       "field": "steps",
-      "better": "higher",
+      "goal": "step_goal",
       "finished": true,
-      "good": "active day",
-      "bad": "quiet day"
+      "log": {
+       "good": "active day"
+      }
      },
      {
       "field": "intensity_min",
-      "better": "higher",
+      "goal": "intensity_goal",
+      "per": "week",
       "finished": true
      }
     ]
@@ -659,6 +724,11 @@
     "section": "sleep"
    },
    {
+    "name": "sleep_score_label",
+    "type": "text",
+    "section": "sleep"
+   },
+   {
     "name": "sleep_need_min",
     "type": "int",
     "unit": "min",
@@ -730,6 +800,11 @@
     "section": "activity"
    },
    {
+    "name": "step_goal",
+    "type": "int",
+    "section": "activity"
+   },
+   {
     "name": "distance_km",
     "type": "number",
     "unit": "km",
@@ -742,6 +817,12 @@
    },
    {
     "name": "intensity_min",
+    "type": "int",
+    "unit": "min",
+    "section": "activity"
+   },
+   {
+    "name": "intensity_goal",
     "type": "int",
     "unit": "min",
     "section": "activity"

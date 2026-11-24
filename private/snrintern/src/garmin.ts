@@ -74,7 +74,7 @@ async function daily(g: Garmin, start: string, end: string): Promise<Map<string,
     if (s.includesWellnessData === false) continue;
     const mod = num(s.intensityMinutes?.moderate), vig = num(s.intensityMinutes?.vigorous);
     put(day(s.calendarDate), {
-      steps: num(s.movement?.steps?.value), distance_km: round((s.movement?.steps?.distanceInMeters ?? NaN) / 1000),
+      steps: num(s.movement?.steps?.value), step_goal: num(s.movement?.steps?.goal), intensity_goal: num(s.intensityMinutes?.goal), distance_km: round((s.movement?.steps?.distanceInMeters ?? NaN) / 1000),
       floors: round(s.movement?.floorsAscended?.value, 0),
       calories_total: round(s.calories?.burnedTotal, 0), calories_active: round(s.calories?.burnedActive, 0),
       resting_hr: num(s.heartRate?.restingValue), min_hr: num(s.heartRate?.minValue), max_hr: num(s.heartRate?.maxValue),
@@ -96,7 +96,7 @@ async function daily(g: Garmin, start: string, end: string): Promise<Map<string,
     put(day(s.calendarDate), {
       sleep_min: mins(s.sleepTimeSeconds), sleep_deep_min: mins(s.deepSleepSeconds), sleep_light_min: mins(s.lightSleepSeconds),
       sleep_rem_min: mins(s.remSleepSeconds), sleep_awake_min: mins(s.awakeSleepSeconds),
-      sleep_score: num(s.sleepScores?.overall?.value), sleep_need_min: num(s.sleepNeed?.actual), nap_min: mins(s.napTimeSeconds) || undefined,
+      sleep_score: num(s.sleepScores?.overall?.value), sleep_score_label: words(s.sleepScores?.overall?.qualifierKey), sleep_need_min: num(s.sleepNeed?.actual), nap_min: mins(s.napTimeSeconds) || undefined,
       sleep_hr: round(s.avgHeartRate, 0), sleep_stress: round(s.avgSleepStress, 0),
       bedtime: wall(s.sleepStartTimestampLocal), wake_time: wall(s.sleepEndTimestampLocal),
       sleep_feedback: words(s.sleepScoreFeedback), sleep_insight: words(s.sleepScorePersonalizedInsight) ?? words(s.sleepScoreInsight),

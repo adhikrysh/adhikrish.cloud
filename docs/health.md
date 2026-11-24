@@ -42,19 +42,30 @@ a recent day keeps changing (the phone syncs whenever it syncs), so recent days 
 the dashboard is one line per metric, defined by the tab's `metrics` views ([`src/views.ts`](../private/snrintern/src/views.ts), contract in [`API.md`](../private/snrintern/API.md)):
 
 ```text
-resting hr                         46 bpm   ┌──────────────┐
-7 bpm below usual   today                   │ ░░•─•░░•─•░░ │  14 days, a line,
-                                            │          ●   │  the usual band
-                                            └──────────────┘  shaded, today white
+sleep score                          53     ┌──────────────┐
+poor   today                                │ •─•  •─•─•   │  14 days, dots
+                                            │     •      ● │  and a line,
+                                            └──────────────┘  today white
 ```
 
-- **the usual band** is the middle half (25th to 75th percentile) of the 28 days before the judged day. inside it reads "about usual". outside, how far from the middle, or "highest / lowest in 3 months".
-- **sleep** is judged against that night's sleep need from garmin, and bedtime against your usual bedtime.
+**how a day is judged, closest to the source of truth first.** each metric uses the first rule it has:
+
+| rule | metric | what it says | source |
+|---|---|---|---|
+| garmin's word | sleep score | garmin's label for the night: excellent (green), good, fair, poor (red) | the sleep score's own qualifier |
+| garmin's word | hrv | garmin's status: balanced, unbalanced, low or poor (the last three red) | garmin's hrv status |
+| garmin's bands | body battery at wake | 76 to 100 high (green), 51 to 75 medium, 26 to 50 low and 5 to 25 very low (red) | forerunner 955 owner's manual |
+| garmin's bands | stress | 0 to 25 rest (green), 26 to 50 low, 51 to 75 medium and 76 to 100 high (red) | garmin's stress scale |
+| garmin's goal | steps | goal met (green), or how far short | garmin's daily step goal, stored on the row |
+| garmin's goal | intensity | the week's minutes against garmin's weekly goal | garmin's weekly goal, stored on the row |
+| your history | resting hr | higher or lower than 80% of your previous 28 days (red / green), and red above 100 bpm | garmin gives no verdict; 100 is the clinical upper bound (american heart association) |
+
+garmin's labels are taken as garmin returns them for each day, never re-derived from numbers we believe garmin uses.
+
 - **steps and intensity** judge yesterday: today isn't finished, so it's shown as "so far" and never judged.
 - **"today" means today where you are** (garmin's dates are local, so today or yesterday in utc). if the newest synced day is older than that, nothing reads as today, yesterday or "so far": days show their dates, so stale data can't pass for current.
-- **green and red** appear only outside the band, by which way is better.
-- **the log** reads each day as its big picture: every metric outside its band gives its words ("short night", "well recovered"), at most two, bad first, else "an ordinary day".
-- **a row opens the metric's page**: the same sentence and your usual, then a zoomable chart (lightweight-charts, served by the worker at `/_charts-<version>.js`). metrics with a stream open on `1d` / `3d` of it; `10d` to `all` show one dot per day. a click on a dot opens that day.
+- **the log** reads each day as its big picture: every metric judged good or bad that day gives its words ("poor sleep", "well recovered"), at most two, bad first, else "an ordinary day".
+- **a row opens the metric's page**: the value and its verdict, then a zoomable chart (lightweight-charts, served by the worker at `/_charts-<version>.js`). metrics with a stream open on `1d` / `3d` of it; `10d` to `all` show one dot per day; your usual shows as dashed lines only where the verdict is your own history. a click on a dot opens that day.
 
 all of this is arithmetic in the worker at render time: no model, so no cost, and the same numbers always read the same.
 
@@ -67,6 +78,8 @@ all of this is arithmetic in the worker at render time: no model, so no cost, an
 **wrong:** the daily numbers are averages we computed from the streams, so the streams make them redundant (or the other way round). **why it fails:** the daily numbers are garmin's own daily metrics (resting hr is the lowest stretch of the day, steps a total), and for stress, steps and sleep there is no finer data at all from this api. **instead:** daily numbers answer "how am I trending", streams answer "what happened that day". both are kept.
 
 **wrong:** garmin keeps the raw data, so it can always be fetched again. **why it fails:** the personal api returns intraday data for only about the last 4 months. **instead:** the `series` table is the only long-term copy. never delete it; at about 4 MB a year it never needs to be.
+
+**wrong:** the page should judge every number against your own history. **why it fails:** your history can be a bad baseline (six hours of sleep every night reads "usual"), and a middle-half band flags half of all days by construction. garmin already scores most of these days with its own models. **instead:** garmin's own label, bands or goal wherever garmin has one; your history only where it doesn't (resting hr), and then only the outer 20%.
 
 **wrong:** a tab can be called anything. **why it fails:** the worker's readiness check lived at `/health`, so a `health` tab could never show its page. **instead:** system paths are underscored (`/_health`, `/api/_tabs`), and tab slugs must start with a letter, so they can't collide.
 

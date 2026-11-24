@@ -212,7 +212,7 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
   const rows = paged ? fetched.slice(0, PAGE) : fetched, older = paged && fetched.length > PAGE;
   // a tab whose metrics carry good / bad words (health): each day in the list reads as its big picture instead of numbers
   let words: Map<number, string> | null = null;
-  if (tab.sort !== "id" && rows.length && tab.views?.some((v) => v.kind === "metrics" && v.metrics.some((m) => m.good || m.bad))) {
+  if (tab.sort !== "id" && rows.length && tab.views?.some((v) => v.kind === "metrics" && v.metrics.some((m) => m.log?.good || m.log?.bad))) {
     const dateF = tab.sort, dates = rows.map((r) => String(r[dateF] ?? "").slice(0, 10)).filter(Boolean).sort();
     const from = new Date(Date.parse(`${dates[0]}T00:00:00Z`) - 28 * 86_400_000).toISOString().slice(0, 10);
     const [context, newest] = await Promise.all([db.since(database, tab, dateF, from), db.list(database, tab, { limit: 1 })]);
