@@ -4,6 +4,7 @@
 type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
 export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, Tone>;
   section?: string; // section: the heading it sits under on a row's page
+  hidden?: boolean; // left off the pages (garmin_id): still in the api
   time?: boolean }; // a datetime that must carry a time of day (a session's start), not just a date
 /** How an enum value's pill looks: white (no tone), "outline" (black with a white border), "good" (green border), "bad" (red border). */
 export type Tone = "outline" | "good" | "bad";
@@ -32,7 +33,14 @@ export type View =
   | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number } // the next rows by a date, overdue first
   | { kind: "list"; label: string; where: Record<string, string>; sort?: string; aside?: string } // the rows matching `where`, by `sort` or in the tab's order
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
-  | { kind: "metrics"; label: string; metrics: Metric[] }; // each number's last 7 days against its usual, its best, 90 days of it
+  | { kind: "metrics"; label: string; metrics: Metric[] } // each number's last 7 days against its usual, its best, 90 days of it
+  // sessions (training). every window ends today where you are and counts whole local days.
+  | { kind: "load"; field: string; label?: string } // the last 7 days' total next to the 28 days' weekly average; "higher" or "lower than usual" against your own past weeks
+  | { kind: "limit"; field: string; where?: Record<string, string>; days?: number; over?: number; label?: string } // the longest in `days` (30) and the next one's limit, `over` (10) % past it; sessions that went past it
+  | { kind: "weeks"; by: string; fields: string[]; zones?: string[]; weeks?: number; label?: string } // per value of `by` (a sport), `fields` summed over 7-day weeks; `zones` as shares of the last 28 days
+  | { kind: "records"; records: Record_[]; days?: number; label?: string }; // each record's best ever and its best in the last `days` (90)
+/** One record: the largest (or smallest, `best: "min"`, for times) value of `field`, among rows matching `where`. */
+export type Record_ = { label: string; field: string; best: "max" | "min"; where?: Record<string, string> };
 /** One number on a metrics view: a short verdict on its newest day and a box of its last 14 days. How a day is judged, in order
  * of trust (the closer to garmin, the better):
  *   label   garmin's own word for the day, from a text field (sleep score's "poor"); `good` / `bad` list which words colour
@@ -79,7 +87,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (RESERVED.includes(f.name)) return `field name "${f.name}" is reserved (every row already has ${RESERVED.join(", ")})`;
     if (names.has(f.name)) return `field "${f.name}" appears twice`;
     if (!TYPES.includes(f.type as FieldType)) return `field "${f.name}": type must be one of ${TYPES.join(", ")}`;
-    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section", "time"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
+    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section", "time", "hidden"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
     const field: Field = { name: f.name, type: f.type as FieldType };
     if (f.required !== undefined) {
       if (typeof f.required !== "boolean") return `field "${f.name}": required must be true or false`;
@@ -106,6 +114,10 @@ export function checkDefinition(input: unknown): TabDefinition | string {
         field.colors = c as Record<string, Tone>;
       }
     } else if (f.options !== undefined || f.colors !== undefined) return `field "${f.name}": options and colors only apply to enum fields`;
+    if (f.hidden !== undefined) {
+      if (typeof f.hidden !== "boolean") return `field "${f.name}": hidden must be true or false`;
+      if (f.hidden) field.hidden = true;
+    }
     if (f.time !== undefined) {
       if (field.type !== "datetime" || typeof f.time !== "boolean") return `field "${f.name}": time is true or false, on datetime fields only`;
       if (f.time) field.time = true;
@@ -190,6 +202,9 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
     const v = raw as Record<string, any>;
     const where = `views[${i}] (${v.kind})`;
     const isField = (name: unknown, allowed: FieldType[]) => typeof name === "string" && allowed.includes(types.get(name)!);
+    const whereOk = (w: unknown) => typeof w === "object" && w !== null && !Array.isArray(w) && Object.keys(w).length > 0
+      && Object.entries(w).every(([k, val]) => types.has(k) && typeof val === "string");
+    if (["load", "limit", "weeks", "records"].includes(v.kind) && v.label !== undefined && (typeof v.label !== "string" || !v.label.trim())) return `${where}: "label" must be a heading like "load"`;
     switch (v.kind) {
       case "progress": if (!isField(v.field, ["lifts"])) return `${where}: "field" must name a lifts field`; break;
       case "strip":
@@ -237,7 +252,30 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
             return `${where}: "log" is { "good": "a few words", "bad": "a few words" }`;
         }
         break;
-      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics`;
+      case "load":
+        if (!isField(v.field, ["int", "number"])) return `${where}: "field" must name a number field, like "training_load"`;
+        break;
+      case "limit":
+        if (!isField(v.field, ["int", "number"])) return `${where}: "field" must name a number field, like "distance_km"`;
+        if (v.where !== undefined && !whereOk(v.where)) return `${where}: "where" must map fields to values, like { "type": "run" }`;
+        if (v.days !== undefined && (!Number.isInteger(v.days) || v.days < 7 || v.days > 366)) return `${where}: "days" must be a whole number from 7 to 366`;
+        if (v.over !== undefined && (typeof v.over !== "number" || v.over <= 0 || v.over > 100)) return `${where}: "over" must be a percentage above 0, like 10`;
+        break;
+      case "weeks":
+        if (!isField(v.by, ["enum", "text"])) return `${where}: "by" must name an enum or text field, like "type"`;
+        if (!Array.isArray(v.fields) || !v.fields.length || !v.fields.every((n: unknown) => isField(n, ["int", "number"]))) return `${where}: "fields" must list number fields, like ["duration_min", "distance_km"]`;
+        if (v.zones !== undefined && (!Array.isArray(v.zones) || v.zones.length < 2 || !v.zones.every((n: unknown) => isField(n, ["int", "number"])))) return `${where}: "zones" must list two or more number fields`;
+        if (v.weeks !== undefined && (!Number.isInteger(v.weeks) || v.weeks < 2 || v.weeks > 52)) return `${where}: "weeks" must be a whole number from 2 to 52`;
+        break;
+      case "records":
+        if (!Array.isArray(v.records) || !v.records.length) return `${where}: "records" must list { "label", "field", "best": "max" or "min", "where" (optional) }`;
+        for (const r of v.records as any[]) {
+          if (typeof r !== "object" || r === null || typeof r.label !== "string" || !r.label.trim() || !isField(r.field, ["int", "number"]) || (r.best !== "max" && r.best !== "min")
+            || (r.where !== undefined && !whereOk(r.where))) return `${where}: each record is { "label": "longest run", "field": <a number field>, "best": "max" or "min", "where": { "type": "run" } (optional) }`;
+        }
+        if (v.days !== undefined && (!Number.isInteger(v.days) || v.days < 7 || v.days > 366)) return `${where}: "days" must be a whole number from 7 to 366`;
+        break;
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics, load, limit, weeks, records`;
     }
     views.push(v as View);
   }

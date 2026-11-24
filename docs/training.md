@@ -42,6 +42,19 @@ the activity steps share the sync's 48 calls (the free plan allows 50):
 
 a backfill of 188 activities takes a handful of hourly runs; after that it costs 1 call every third hour.
 
+## what the page opens on
+
+the training page's views are computed from these rows whenever the page or `GET /api/training/_views` is asked, by one function that returns both the numbers and the html ([`src/views.ts`](../private/snrintern/src/views.ts)). nothing is stored, so nothing goes stale when the backfill adds an old run, you delete an activity or the agent fixes a row. every window counts whole local days ending today where you are (the newest row's offset says where that is).
+
+- **load.** the last 7 days of garmin's per-session training load, and the 4-week average a week. it says "higher" or "lower than usual" only against your own past weeks (10th and 90th percentile of up to a year), and never colours it.
+- **run limit.** the longest run of the last 30 days, the next run's limit 10% past it, and any run in those 30 days that went more than 10% past the longest of the 30 days before it, in red.
+- **weeks.** for each sport done in the last 4 weeks: this week's time and distance, a box of 12 weeks, and time in each heart-rate zone over the last 28 days.
+- **records.** fastest 1, 5 and 10 km, longest run, ride and swim, most climbing: the best of the last 90 days next to the best ever.
+
+the agent reads `/_views` instead of redoing the sums: the same numbers as the page, a few lines instead of hundreds of rows, and no arithmetic for a model to get wrong. deciding what to do with them (rest, easy run, push) is the agent's reasoning, never the worker's.
+
+**why not the acute:chronic ratio.** dividing the 7-day load by the 28-day average, with 0.8 to 1.3 as a "sweet spot" and over 1.5 as a danger zone (gabbett, 2016), was popular and doesn't hold up: the 7 days sit inside the 28, so the two are coupled and part of the link to injury is arithmetic (lolli et al., 2019); a ratio hides how much work it describes and jumps when the base is small; and the curve came from modelling choices, not a validated test (impellizzeri et al., 2020). a 2025 study of about 5,200 garmin runners (frandsen, skejø, nielsen, bjsm) found weekly ratio spikes went with *fewer* injuries, while a single run more than 10% longer than the longest of the previous 30 days raised overuse injuries (64% at 10 to 30% longer, 52% at 30 to 100%, 128% past double). that study is observational and covers recreational runners and running distance only, so the limit applies to runs and nothing else.
+
 ## misconceptions we hit
 
 **wrong:** garmin is the source of truth for training, so its rows should replace the agent's. **why it fails:** garmin knows the heart rate of a gym session but not one lift in it; the agent's log is the only record of what you lifted and how it felt. **instead:** each side owns what only it can know, and either alone is a real session.

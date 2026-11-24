@@ -308,14 +308,17 @@ function part(tab: Tab, row: db.Row, p: { label: string; fields: string[] }): st
 <div class="keys">${xs.map((x) => `<span>${escape(`${word(x.f.name)} ${amount(x.f, x.v)}`)}</span>`).join("")}</div></div>`;
 }
 
-/** A row whose fields have sections (a health day): each section's numbers under its heading, the parts as bars, then the day's timelines. */
+/** A value in a row page's list: numbers in their unit ("28:22", "148 bpm"), everything else as on the row's aside. */
+const detailValue = (f: Field, v: Value) => (f.type === "int" || f.type === "number" ? escape(amount(f, Number(v))) : show(f, v, "aside"));
+
+/** A day of numbers (a tab with parts: health): each section's numbers under its heading, the parts as bars, then the day's timelines. */
 function sectioned(tab: Tab, row: db.Row, series: db.Series | null): string {
   const inParts = new Set((tab.parts ?? []).flatMap((p) => p.fields));
   const order = [...new Set(tab.fields.map((f) => f.section ?? ""))];
   const sections = order.map((name) => {
-    const fs = tab.fields.filter((f) => (f.section ?? "") === name && f.name !== tab.title && present(row[f.name]));
+    const fs = tab.fields.filter((f) => (f.section ?? "") === name && f.name !== tab.title && !f.hidden && present(row[f.name]));
     const parts = (tab.parts ?? []).filter((p) => p.fields.some((n) => fs.some((f) => f.name === n))).map((p) => part(tab, row, p)).join("");
-    const dl = fs.filter((f) => !inParts.has(f.name)).map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${f.type === "int" || f.type === "number" ? escape(amount(f, Number(row[f.name]))) : show(f, row[f.name] as Value, "aside")}</dd>`);
+    const dl = fs.filter((f) => !inParts.has(f.name)).map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${detailValue(f, row[f.name] as Value)}</dd>`);
     if (!dl.length && !parts) return "";
     return `<section class="section">${name ? `<h2><span class="pill">${escape(name)}</span></h2>` : ""}${parts}${dl.length ? `<dl>${dl.join("")}</dl>` : ""}</section>`;
   });
@@ -324,7 +327,7 @@ function sectioned(tab: Tab, row: db.Row, series: db.Series | null): string {
 }
 
 export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series | null = null): string {
-  if (tab.fields.some((f) => f.section)) {
+  if (tab.parts?.length) {
     const body = `      <article class="detail">
       <h1>${titleOf(tab, row, "detail")}</h1>
       ${sectioned(tab, row, series)}
@@ -346,15 +349,20 @@ export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series
     const content = value.includes(" · ") ? `<ul class="steps">${value.split(" · ").map((s) => `<li>${escape(s)}</li>`).join("")}</ul>` : `<p class="prose">${escape(value)}</p>`;
     return `<h2>${label(f.name)}</h2>${content}`;
   });
-  const rest = tab.fields.filter((f) => !shown.has(f.name) && f.type !== "url" && f.type !== "lifts" && !long(f) && present(row[f.name]))
-    .map((f) => `<dt>${label(f.name)}</dt><dd>${show(f, row[f.name] as Value, "detail")}</dd>`);
+  // the remaining fields: those without a section first, then each section under its heading (a run: effort, pace, zones)
+  const restFields = tab.fields.filter((f) => !shown.has(f.name) && !f.hidden && f.type !== "url" && f.type !== "lifts" && !long(f) && present(row[f.name]));
+  const dlOf = (fs: Field[]) => `<dl>${fs.map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${f.type === "date" || f.type === "datetime" ? show(f, row[f.name] as Value, "detail") : detailValue(f, row[f.name] as Value)}</dd>`).join("")}</dl>`;
+  const rest = [...new Set(restFields.map((f) => f.section ?? ""))].map((name) => {
+    const fs = restFields.filter((f) => (f.section ?? "") === name);
+    return name ? `<section class="section"><h2><span class="pill">${escape(name)}</span></h2>${dlOf(fs)}</section>` : dlOf(fs);
+  });
   const meta = [bits(tab, row, tab.line, "line"), bits(tab, row, tab.aside, "aside")].filter(Boolean).map((m) => `<p class="meta bits">${m}</p>`).join("\n");
   const body = `      <article class="detail">
       <h1>${titleOf(tab, row, "detail")}</h1>
       ${meta}
       ${links(tab, row)}
       ${sections.join("\n")}
-      ${rest.length ? `<dl>${rest.join("")}</dl>` : ""}
+      ${rest.join("\n")}
       </article>
       ${schemaLink(tab)}`;
   return page({ design, title: `${row[tab.title] ?? "untitled"} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });

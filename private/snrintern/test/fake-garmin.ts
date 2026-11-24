@@ -63,7 +63,7 @@ const wallTimes = (n: number, time: string) => {
 
 /** One listed activity, in the list call's shape (taken from a real one), and its detail's extras. */
 function activity(id: number, ago: number, time: string, typeKey: string, name: string,
-  o: { min: number; km?: number; hr?: number; elev?: number; load?: number; rpe?: number; feel?: number }) {
+  o: { min: number; km?: number; hr?: number; elev?: number; load?: number; rpe?: number; feel?: number; fast5k?: number }) {
   const km = o.km ?? 0, hr = o.hr ?? 130, s = o.min * 60;
   return {
     list: {
@@ -74,7 +74,7 @@ function activity(id: number, ago: number, time: string, typeKey: string, name: 
       moderateIntensityMinutes: Math.round(o.min / 2), vigorousIntensityMinutes: 5,
       hrTimeInZone_1: 300, hrTimeInZone_2: s - 900, hrTimeInZone_3: 600, hrTimeInZone_4: 0, hrTimeInZone_5: 0,
       ...(km ? { averageRunningCadenceInStepsPerMinute: 162.4, avgPower: 263, fastestSplit_1000: 331.6 } : {}),
-      ...(km >= 5 ? { fastestSplit_5000: 1702.2 } : {}),
+      ...(km >= 5 ? { fastestSplit_5000: o.fast5k ?? 1702.2 } : {}), ...(km >= 10 ? { fastestSplit_10000: 3500.3 } : {}),
       summarizedExerciseSets: typeKey === "strength_training" ? [{ category: "UNKNOWN", reps: 0, volume: 0, sets: 1, maxWeight: 0 }] : undefined,
     },
     detail: { activityId: id, summaryDTO: { directWorkoutRpe: o.rpe, directWorkoutFeel: o.feel, ...(km ? { beginPotentialStamina: 97, endPotentialStamina: 61 } : {}) } },
@@ -93,11 +93,17 @@ export function activities() {
     activity(9005, 8, "08:00", "hiking", "Mariposa County Hiking", { min: 112, km: 4.32, hr: 125, elev: 330 }), // same morning, its own row
     activity(9007, 13, "21:30", "strength_training", "Strength", { min: 45, hr: 104 }), // 3.5 hours after the agent's 18:00: not that one
     activity(9008, 20, "18:20", "strength_training", "Strength", { min: 58, hr: 110 }), // the agent's 18:00 chest day
+    // the run limit: 5.7 km is 9.6% past the 5.2 before it and 6.2 is 8.8% past that (both just under 10%); 7.5 km three days
+    // ago is 21% past 6.2, so it's flagged
+    activity(9011, 12, "07:00", "running", "Menlo Park Running", { min: 36, km: 6.2, hr: 146 }),
+    activity(9012, 25, "07:00", "running", "Menlo Park Running", { min: 33, km: 5.7, hr: 146 }),
     activity(9009, 30, "06:30", "lap_swimming", "Pool Swim", { min: 40, km: 1.5, hr: 128 }),
     activity(9010, 40, "17:00", "soccer", "Soccer", { min: 90, km: 8.2, hr: 155 }),
   ];
-  const old = Array.from({ length: 60 }, (_, i) => activity(8000 + i, 45 + i * 5, "07:00", "running", "Menlo Park Running", { min: 30, km: 5.2, hr: 145 }));
-  return [...named, ...old];
+  // old runs every 5 days; 95 days ago the fastest 5 km ever, 150 days ago a half marathon (the longest run, the only 10 km split)
+  const old = Array.from({ length: 60 }, (_, i) => activity(8000 + i, 45 + i * 5, "07:00", "running", "Menlo Park Running",
+    i === 21 ? { min: 125, km: 21.1, hr: 152 } : { min: 30, km: 5.2, hr: 145, ...(i === 10 ? { fast5k: 1615.4 } : {}) }));
+  return [...named, ...old].sort((a, b) => (a.list.startTimeGMT < b.list.startTimeGMT ? 1 : -1)); // newest first, like garmin
 }
 
 export function startFakeGarmin() {

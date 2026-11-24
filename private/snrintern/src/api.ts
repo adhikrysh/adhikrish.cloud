@@ -8,20 +8,23 @@
 //   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (API.md), as markdown
 //   DELETE /api/<tab>/<id>
 //   GET    /api/<tab>/<id>/series          a row's intraday detail (a health day's heart rate, overnight hrv)
+//   GET    /api/<tab>/_views               what the tab's page opens on, as numbers (verdicts, load, limits, records)
 import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
 import { claim, TRAINING } from "./activities.ts";
 import * as db from "./db.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
+import { computeViews } from "./views.ts";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 const API = {
   docs: "GET /api/_docs (the full contract, as markdown; read it before writing)",
-  data: ["GET /api", "GET /api/<tab>?q=&limit=&offset= (pages: next_offset is null on the last)", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
+  data: ["GET /api", "GET /api/<tab>?q=&limit=&offset= (pages: next_offset is null on the last)", "GET /api/<tab>/_views (the page's views as numbers: start here)", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00; time: true requires the time and offset)",
     "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
-  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better, finished, need, clock, change, stream, good, bad }])"],
+  views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better, finished, change, stream, limit, per, goal, label, scale, log }])",
+    "load (field)", "limit (field, where, days, over)", "weeks (by, fields, zones, weeks)", "records (records: [{ label, field, best: max|min, where }], days)"],
 };
 
 export async function handleApi(request: Request, database: D1Database, who: string): Promise<Response> {
@@ -70,6 +73,11 @@ export async function handleApi(request: Request, database: D1Database, who: str
   }
 
   const tab = await db.tab(database, first);
+  if (tab && second === "_views" && extra === undefined) {
+    // what the tab's page opens on, as numbers: the same computation as the page, so an agent reads exactly what it shows
+    if (request.method !== "GET") return fail(405, "use GET");
+    return json({ views: (await computeViews(tab, database)).map(({ kind, label, data }) => ({ kind, label, ...data })) });
+  }
   if (tab && extra === "series" && Number.isInteger(Number(second))) {
     if (request.method !== "GET") return fail(405, "use GET; the garmin sync writes series");
     const row = await db.get(database, tab.slug, Number(second));

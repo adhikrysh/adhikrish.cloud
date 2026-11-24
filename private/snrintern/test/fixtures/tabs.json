@@ -175,6 +175,33 @@
     "label": "sessions"
    },
    {
+    "kind": "load",
+    "field": "training_load"
+   },
+   {
+    "kind": "limit",
+    "field": "distance_km",
+    "where": {
+     "type": "run"
+    },
+    "label": "run limit"
+   },
+   {
+    "kind": "weeks",
+    "by": "type",
+    "fields": [
+     "duration_min",
+     "distance_km"
+    ],
+    "zones": [
+     "hr_zone_1_min",
+     "hr_zone_2_min",
+     "hr_zone_3_min",
+     "hr_zone_4_min",
+     "hr_zone_5_min"
+    ]
+   },
+   {
     "kind": "progress",
     "field": "lifts"
    },
@@ -187,6 +214,55 @@
     "kind": "line",
     "tab": "body",
     "field": "bodyfat_percentage"
+   },
+   {
+    "kind": "records",
+    "records": [
+     {
+      "label": "fastest 1 km",
+      "field": "fastest_1k_s",
+      "best": "min"
+     },
+     {
+      "label": "fastest 5 km",
+      "field": "fastest_5k_s",
+      "best": "min"
+     },
+     {
+      "label": "fastest 10 km",
+      "field": "fastest_10k_s",
+      "best": "min"
+     },
+     {
+      "label": "longest run",
+      "field": "distance_km",
+      "best": "max",
+      "where": {
+       "type": "run"
+      }
+     },
+     {
+      "label": "longest ride",
+      "field": "distance_km",
+      "best": "max",
+      "where": {
+       "type": "ride"
+      }
+     },
+     {
+      "label": "longest swim",
+      "field": "distance_km",
+      "best": "max",
+      "where": {
+       "type": "swim"
+      }
+     },
+     {
+      "label": "most climbing",
+      "field": "elevation_m",
+      "best": "max"
+     }
+    ]
    }
   ],
   "fields": [
@@ -245,160 +321,188 @@
     "name": "moving_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "pace"
    },
    {
     "name": "elevation_m",
     "type": "int",
     "min": 0,
-    "unit": "m"
+    "unit": "m",
+    "section": "pace"
    },
    {
     "name": "avg_hr",
     "type": "int",
     "min": 0,
-    "unit": "bpm"
+    "unit": "bpm",
+    "section": "effort"
    },
    {
     "name": "max_hr",
     "type": "int",
     "min": 0,
-    "unit": "bpm"
+    "unit": "bpm",
+    "section": "effort"
    },
    {
     "name": "calories",
     "type": "int",
-    "min": 0
+    "min": 0,
+    "section": "effort"
    },
    {
     "name": "training_load",
     "type": "int",
-    "min": 0
+    "min": 0,
+    "section": "effort"
    },
    {
     "name": "aerobic_effect",
     "type": "number",
     "min": 0,
-    "max": 5
+    "max": 5,
+    "section": "effort"
    },
    {
     "name": "anaerobic_effect",
     "type": "number",
     "min": 0,
-    "max": 5
+    "max": 5,
+    "section": "effort"
    },
    {
     "name": "training_effect",
-    "type": "text"
+    "type": "text",
+    "section": "effort"
    },
    {
     "name": "effect_feedback",
-    "type": "text"
+    "type": "text",
+    "section": "effort"
    },
    {
     "name": "intensity_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "effort"
    },
    {
     "name": "body_battery_change",
     "type": "int",
     "min": -100,
-    "max": 100
+    "max": 100,
+    "section": "effort"
    },
    {
     "name": "avg_power",
     "type": "int",
     "min": 0,
-    "unit": "w"
+    "unit": "w",
+    "section": "pace"
    },
    {
     "name": "avg_cadence",
     "type": "int",
     "min": 0,
-    "unit": "spm"
+    "unit": "spm",
+    "section": "pace"
    },
    {
     "name": "fastest_1k_s",
     "type": "int",
     "min": 0,
-    "unit": "s"
+    "unit": "s",
+    "section": "pace"
    },
    {
     "name": "fastest_5k_s",
     "type": "int",
     "min": 0,
-    "unit": "s"
+    "unit": "s",
+    "section": "pace"
    },
    {
     "name": "fastest_10k_s",
     "type": "int",
     "min": 0,
-    "unit": "s"
+    "unit": "s",
+    "section": "pace"
    },
    {
     "name": "hr_zone_1_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "zones"
    },
    {
     "name": "hr_zone_2_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "zones"
    },
    {
     "name": "hr_zone_3_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "zones"
    },
    {
     "name": "hr_zone_4_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "zones"
    },
    {
     "name": "hr_zone_5_min",
     "type": "int",
     "min": 0,
-    "unit": "min"
+    "unit": "min",
+    "section": "zones"
    },
    {
     "name": "watch_rpe",
     "type": "int",
     "min": 1,
-    "max": 10
+    "max": 10,
+    "section": "effort"
    },
    {
     "name": "watch_feel",
-    "type": "text"
+    "type": "text",
+    "section": "effort"
    },
    {
     "name": "stamina_start",
     "type": "int",
     "min": 0,
     "max": 100,
-    "unit": "%"
+    "unit": "%",
+    "section": "effort"
    },
    {
     "name": "stamina_end",
     "type": "int",
     "min": 0,
     "max": 100,
-    "unit": "%"
+    "unit": "%",
+    "section": "effort"
    },
    {
     "name": "garmin_type",
-    "type": "text"
+    "type": "text",
+    "hidden": true
    },
    {
     "name": "garmin_id",
     "type": "int",
-    "min": 0
+    "min": 0,
+    "hidden": true
    },
    {
     "name": "notes",

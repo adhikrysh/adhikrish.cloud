@@ -590,6 +590,64 @@ test("garmin's activities and the agent's sessions are one log: merged both ways
   writeFileSync(join(artifacts, "page-training-garmin.html"), standalone((await call("training page", "/training", { token })).body));
 }, 60_000);
 
+test("training opens on what an agent needs, and /_views gives it the same numbers: load, the run limit, weeks, records", async () => {
+  const token = await me(), agent = await dots();
+  const views = (await call("training views", "/api/training/_views", { token: agent })).body.views;
+  const view = (kind: string) => views.find((v: any) => v.kind === kind);
+  writeFileSync(join(artifacts, "training-views.json"), JSON.stringify(views, null, 1));
+  // load: the last 7 days (strength 85 + runs 55 and 41) against your own past weeks, mostly one or two easy runs
+  expect(view("load")).toMatchObject({ last_7_days: 181, verdict: "higher than usual" });
+  expect(view("load").weeks).toHaveLength(12);
+  // the run limit: the longest run of the last 30 days and the next one's limit; 7.5 km went 21% past the 6.2 before it,
+  // while 6.2 (8.8% past 5.7) and 5.7 (9.6% past 5.2) stayed just under 10%
+  expect(view("limit")).toMatchObject({ label: "run limit", days: 30, over_percent: 10, longest: { value: 7.5, on: day(-3) }, next_under: 8.25 });
+  expect(view("limit").over_the_limit).toEqual([{ value: 7.5, on: day(-3), id: expect.any(Number), longest_before: 6.2, percent_over: 21 }]);
+  // weeks: per sport, 7-day weeks; this week's running is the two garmin runs plus the agent's shakeout (no watch)
+  const run = view("weeks").sports.run;
+  expect(run.duration_min.at(-1)).toBe(31 + 42 + 15);
+  expect(run.distance_km.at(-1)).toBe(12.54);
+  expect(view("weeks").zones_last_28_days.hr_zone_2_min).toBeGreaterThan(0);
+  // records: best ever next to the best of the last 90 days
+  const record = (label: string) => view("records").records.find((r: any) => r.label === label);
+  expect(record("fastest 5 km")).toMatchObject({ best_ever: { value: 1615, shown: "26:55", on: day(-95) }, best_last_90_days: { value: 1702, shown: "28:22" } });
+  expect(record("longest run")).toMatchObject({ best_ever: { value: 21.1, on: day(-150) }, best_last_90_days: { value: 7.5 } });
+  expect(record("fastest 10 km")).toMatchObject({ best_ever: { shown: "58:20" }, best_last_90_days: null });
+  expect(record("most climbing").best_ever).toEqual(record("most climbing").best_last_90_days);
+  expect(record("longest ride")).toBeUndefined(); // never ridden: no record
+
+  // the page shows exactly those numbers
+  const page = (await call("training page", "/training", { token })).body as string;
+  const block = (label: string) => page.split(`<span class="pill">${label}</span></h2>`)[1].split("</section>")[0];
+  expect(block("load")).toContain('<span class="name">7 days</span><span class="val">181</span><span class="why"><span>higher than usual</span>');
+  expect(block("run limit")).toContain('<span class="name">next under</span><span class="val">8.3 km</span>');
+  expect(block("run limit")).toContain('<span class="val bad">7.5 km</span><span class="why"><span class="bad">21% past the longest before it, 6.2 km</span>');
+  expect(block("weeks")).toContain('<span class="name">run</span><span class="val">1h 28m</span><span class="why"><span>12.5 km</span><span>7 days</span>');
+  expect(block("records")).toContain('<span class="name">fastest 5 km</span><span class="val">28:22</span>');
+  expect(block("records")).toContain("<span>best 26:55");
+  expect(block("records")).toContain('<span class="name">most climbing</span><span class="val good">963 m</span>');
+  expect(page.indexOf('<span class="pill">records</span>')).toBeLessThan(page.indexOf('<form class="search"')); // right above search
+  writeFileSync(join(artifacts, "page-training-views.html"), standalone(page));
+
+  // health: the agent reads the page's verdicts instead of redoing the maths over raw rows
+  const health = (await call("health views", "/api/health/_views", { token: agent })).body.views;
+  const healthPage = (await call("health page again", "/health", { token })).body as string;
+  const all = health.flatMap((v: any) => v.metrics);
+  expect(all.find((m: any) => m.field === "sleep_score")).toMatchObject({ value: 84, shown: "84", verdict: "good" });
+  for (const m of all) expect(healthPage).toContain(`href="/health/metrics/${m.field}"><span class="name">${m.name}</span><span class="val${m.tone ? ` ${m.tone}` : ""}">${m.shown}</span>`);
+  writeFileSync(join(artifacts, "health-views.json"), JSON.stringify(health, null, 1));
+
+  // a run's page: garmin's numbers under headings, seconds as times, the link to garmin kept out of sight
+  const rows = (await call("runs", "/api/training?q=easy%20run", { token: agent })).body.rows;
+  const runPage = (await call("run page", `/training/${rows[0].id}`, { token })).body as string;
+  for (const s of ["effort", "pace", "zones"]) expect(runPage).toContain(`<h2><span class="pill">${s}</span></h2>`);
+  expect(runPage).toContain("<dt>fastest 5k</dt><dd>28:22</dd>");
+  expect(runPage).toContain("<dt>training load</dt><dd>41</dd>");
+  expect(runPage).not.toContain("garmin id");
+  expect(rows[0].garmin_id).toBe(9002); // still in the api
+  writeFileSync(join(artifacts, "page-training-run.html"), runPage);
+  expect((await call("views of an unknown tab", "/api/nope/_views", { token: agent })).status).toBe(404);
+});
+
 test("people are a search and their groups, nothing above", async () => {
   const token = await me();
   const page = (await call("people page", "/people", { token })).body as string;
