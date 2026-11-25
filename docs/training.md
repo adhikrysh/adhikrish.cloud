@@ -48,7 +48,7 @@ the training page's views are computed from these rows whenever the page or `GET
 
 - **load.** the last 7 days of garmin's per-session training load, and the 4-week average a week. it says "higher" or "lower than usual" only against your own past weeks (10th and 90th percentile of up to a year), and never colours it.
 - **run limit.** the longest run of the last 30 days, the next run's limit 10% past it, and any run in those 30 days that went more than 10% past the longest of the 30 days before it, in red.
-- **weeks.** for each sport done in the last 4 weeks: this week's time and distance, a box of 12 weeks, and time in each heart-rate zone over the last 28 days.
+- **weeks.** for each sport done in the last 4 weeks: this week's time and distance ("no time logged" when the sessions carry none, like a gym day the agent wrote without the watch), a box of 12 weeks, and time in each heart-rate zone over the last 28 days.
 - **records.** fastest 1, 5 and 10 km, longest run, ride and swim, most climbing: the best of the last 90 days next to the best ever.
 
 the agent reads `/_views` instead of redoing the sums: the same numbers as the page, a few lines instead of hundreds of rows, and no arithmetic for a model to get wrong. deciding what to do with them (rest, easy run, push) is the agent's reasoning, never the worker's.

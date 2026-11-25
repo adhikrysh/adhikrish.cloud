@@ -592,6 +592,8 @@ test("garmin's activities and the agent's sessions are one log: merged both ways
 
 test("training opens on what an agent needs, and /_views gives it the same numbers: load, the run limit, weeks, records", async () => {
   const token = await me(), agent = await dots();
+  // a session the agent logged with no time and no watch: it still happened
+  expect((await send(agent, "/api/training", { at: `${day(-1)}T19:30-08:00`, type: "climb", title: "bouldering" })).status).toBe(201);
   const views = (await call("training views", "/api/training/_views", { token: agent })).body.views;
   const view = (kind: string) => views.find((v: any) => v.kind === kind);
   writeFileSync(join(artifacts, "training-views.json"), JSON.stringify(views, null, 1));
@@ -607,6 +609,8 @@ test("training opens on what an agent needs, and /_views gives it the same numbe
   expect(run.duration_min.at(-1)).toBe(31 + 42 + 15);
   expect(run.distance_km.at(-1)).toBe(12.54);
   expect(view("weeks").zones_last_28_days.hr_zone_2_min).toBeGreaterThan(0);
+  expect(view("weeks").sports.climb.sessions.at(-1)).toBe(1);
+  expect(view("weeks").sports.climb.duration_min.at(-1)).toBe(0);
   // records: best ever next to the best of the last 90 days
   const record = (label: string) => view("records").records.find((r: any) => r.label === label);
   expect(record("fastest 5 km")).toMatchObject({ best_ever: { value: 1615, shown: "26:55", on: day(-95) }, best_last_90_days: { value: 1702, shown: "28:22" } });
@@ -622,6 +626,7 @@ test("training opens on what an agent needs, and /_views gives it the same numbe
   expect(block("run limit")).toContain('<span class="name">next under</span><span class="val">8.3 km</span>');
   expect(block("run limit")).toContain('<span class="val bad">7.5 km</span><span class="why"><span class="bad">21% past the longest before it, 6.2 km</span>');
   expect(block("weeks")).toContain('<span class="name">run</span><span class="val">1h 28m</span><span class="why"><span>12.5 km</span><span>7 days</span>');
+  expect(block("weeks")).toContain('<span class="name">climb</span><span class="val">no time logged</span>');
   expect(block("records")).toContain('<span class="name">fastest 5 km</span><span class="val">28:22</span>');
   expect(block("records")).toContain("<span>best 26:55");
   expect(block("records")).toContain('<span class="name">most climbing</span><span class="val good">963 m</span>');

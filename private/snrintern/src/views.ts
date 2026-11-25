@@ -521,15 +521,21 @@ function weeks(v: Extract<View, { kind: "weeks" }>, { tab, rows }: Ctx): ViewRes
     return total(sessions(inRange, dateF, field, { [v.by]: kind }), end - 6 * DAY, end);
   });
   // the sports of the last 4 weeks, most time first: one you stopped months ago isn't today's picture (the json keeps every sport)
-  const all = kinds.map((kind) => ({ kind, sums: Object.fromEntries(v.fields.map((field) => [field, per(kind, field)])) }));
+  // sessions per week too: a session logged without a time (a gym day the agent wrote, no watch) still happened
+  const count = (kind: string) => Array.from({ length: n }, (_, i) => {
+    const end = now - (n - 1 - i) * 7 * DAY;
+    return inRange.filter((r) => String(r[v.by]) === kind && (dayOf(r[dateF]) ?? 0) > end - 7 * DAY && (dayOf(r[dateF]) ?? 0) <= end).length;
+  });
+  const all = kinds.map((kind) => ({ kind, sessions: count(kind), sums: Object.fromEntries(v.fields.map((field) => [field, per(kind, field)])) }));
   const lately = (x: (typeof all)[number]) => x.sums[v.fields[0]].slice(-4).reduce((a, y) => a + y, 0);
   const sports = all.filter((x) => inRange.some((r) => String(r[v.by]) === x.kind && (dayOf(r[dateF]) ?? 0) > now - 28 * DAY)).sort((a, b) => lately(b) - lately(a));
   const main = fieldOf(tab, v.fields[0]);
   if (!sports.length) return null;
-  const html = sports.map(({ kind, sums }) => {
+  const html = sports.map(({ kind, sums, sessions: done }) => {
     const last = (field: string) => sums[field][n - 1];
+    const time = last(v.fields[0]) > 0 ? amount(main, last(v.fields[0])) : done[n - 1] > 0 ? "no time logged" : "none";
     const rest = v.fields.slice(1).filter((field) => last(field) > 0).map((field) => why(amount(fieldOf(tab, field), last(field))));
-    return row(kind, last(v.fields[0]) > 0 ? amount(main, last(v.fields[0])) : "none", [...rest, why("7 days")], "", dotBox(sums[v.fields[0]]));
+    return row(kind, time, [...rest, why("7 days")], "", dotBox(sums[v.fields[0]]));
   }).join("");
   let zones = "", zoneData: Record<string, number> | null = null;
   if (v.zones) {
@@ -543,7 +549,7 @@ function weeks(v: Extract<View, { kind: "weeks" }>, { tab, rows }: Ctx): ViewRes
   }
   const label = v.label ?? "weeks";
   return result("weeks", label, { by: v.by, weeks: n, week_ends: Array.from({ length: n }, (_, i) => isoDay(now - (n - 1 - i) * 7 * DAY)),
-    sports: Object.fromEntries(all.map(({ kind, sums }) => [kind, Object.fromEntries(Object.entries(sums).map(([k, xs]) => [k, xs.map((x) => Math.round(x * 100) / 100)]))])),
+    sports: Object.fromEntries(all.map(({ kind, sums, sessions: done }) => [kind, { sessions: done, ...Object.fromEntries(Object.entries(sums).map(([k, xs]) => [k, xs.map((x) => Math.round(x * 100) / 100)])) }])),
     ...(zoneData ? { zones_last_28_days: zoneData } : {}) }, `<div class="metrics">${html}</div>${zones}`);
 }
 
