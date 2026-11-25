@@ -172,11 +172,13 @@
    {
     "kind": "strip",
     "field": "at",
-    "label": "sessions"
+    "label": "sessions",
+    "page": false
    },
    {
     "kind": "load",
-    "field": "training_load"
+    "field": "training_load",
+    "page": false
    },
    {
     "kind": "limit",
@@ -184,7 +186,8 @@
     "where": {
      "type": "run"
     },
-    "label": "run limit"
+    "label": "run limit",
+    "page": false
    },
    {
     "kind": "weeks",
@@ -199,21 +202,25 @@
      "hr_zone_3_min",
      "hr_zone_4_min",
      "hr_zone_5_min"
-    ]
+    ],
+    "page": false
    },
    {
     "kind": "progress",
-    "field": "lifts"
+    "field": "lifts",
+    "page": false
    },
    {
     "kind": "line",
     "tab": "body",
-    "field": "bodyweight_kg"
+    "field": "bodyweight_kg",
+    "page": false
    },
    {
     "kind": "line",
     "tab": "body",
-    "field": "bodyfat_percentage"
+    "field": "bodyfat_percentage",
+    "page": false
    },
    {
     "kind": "records",
@@ -262,7 +269,8 @@
       "field": "elevation_m",
       "best": "max"
      }
-    ]
+    ],
+    "page": false
    }
   ],
   "fields": [
@@ -735,7 +743,8 @@
        "bad": "under-recovered"
       }
      }
-    ]
+    ],
+    "page": false
    },
    {
     "kind": "metrics",
@@ -785,7 +794,8 @@
        "bad": "stressful day"
       }
      }
-    ]
+    ],
+    "page": false
    },
    {
     "kind": "metrics",
@@ -805,7 +815,8 @@
       "per": "week",
       "finished": true
      }
-    ]
+    ],
+    "page": false
    },
    {
     "kind": "metrics",
@@ -821,7 +832,8 @@
       "better": "lower",
       "change": true
      }
-    ]
+    ],
+    "page": false
    }
   ],
   "fields": [

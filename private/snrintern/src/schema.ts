@@ -26,7 +26,9 @@ export type TabDefinition = {
 export type Part = { label: string; fields: string[] };
 
 // A view answers one question at the top of a tab, computed from its rows (or, for "line", another tab's).
-export type View =
+// Every view is served at /api/<tab>/_views; `page: false` keeps it off the tab's page (numbers for the agents only).
+export type View = ViewKind & { page?: boolean };
+type ViewKind =
   | { kind: "progress"; field: string } // lifts field: each exercise's top set over time
   | { kind: "strip"; field: string; label?: string; days?: number } // a tick per day with a row, from the first (at most `days` back) to today
   | { kind: "line"; field: string; tab?: string } // a number over time, from this tab or another
@@ -204,6 +206,7 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
     const isField = (name: unknown, allowed: FieldType[]) => typeof name === "string" && allowed.includes(types.get(name)!);
     const whereOk = (w: unknown) => typeof w === "object" && w !== null && !Array.isArray(w) && Object.keys(w).length > 0
       && Object.entries(w).every(([k, val]) => types.has(k) && typeof val === "string");
+    if (v.page !== undefined && typeof v.page !== "boolean") return `${where}: "page" must be true or false`;
     if (["load", "limit", "weeks", "records"].includes(v.kind) && v.label !== undefined && (typeof v.label !== "string" || !v.label.trim())) return `${where}: "label" must be a heading like "load"`;
     switch (v.kind) {
       case "progress": if (!isField(v.field, ["lifts"])) return `${where}: "field" must name a lifts field`; break;

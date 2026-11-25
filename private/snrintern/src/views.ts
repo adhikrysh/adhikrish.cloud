@@ -72,7 +72,7 @@ const title = (tab: Tab, row: db.Row) => escape(row[tab.title] ?? "untitled");
 const pill = (heading: string) => `<h2><span class="pill">${escape(heading)}</span></h2>`;
 const section = (heading: string, body: string) => `<section class="view">${pill(heading)}${body}</section>`;
 /** A view's answer: its numbers for the api and its html for the page. */
-export type ViewResult = { kind: View["kind"]; label: string; data: Record<string, unknown>; html: string };
+export type ViewResult = { kind: View["kind"]; label: string; data: Record<string, unknown>; html: string; page?: boolean };
 const result = (kind: View["kind"], label: string, data: Record<string, unknown>, body: string): ViewResult => ({ kind, label, data, html: section(label, body) });
 
 type Point = { t: number; top: number; reps: number; label: string; sets: string[]; row: db.Row };
@@ -597,11 +597,13 @@ export async function computeViews(tab: Tab, database: D1Database): Promise<View
       case "records": return records(v, ctx);
     }
   }));
-  return parts.filter((p): p is ViewResult => p !== null);
+  const out: ViewResult[] = [];
+  parts.forEach((p, i) => { if (p) out.push({ ...p, page: tab.views![i].page !== false }); });
+  return out;
 }
 
 /** The views as the page shows them. */
 export async function renderViews(tab: Tab, database: D1Database): Promise<string> {
-  const html = (await computeViews(tab, database)).map((v) => v.html).join("\n");
+  const html = (await computeViews(tab, database)).filter((v) => v.page).map((v) => v.html).join("\n");
   return html ? `<div class="views">\n${html}\n</div>` : "";
 }

@@ -76,7 +76,7 @@ export async function handleApi(request: Request, database: D1Database, who: str
   if (tab && second === "_views" && extra === undefined) {
     // what the tab's page opens on, as numbers: the same computation as the page, so an agent reads exactly what it shows
     if (request.method !== "GET") return fail(405, "use GET");
-    return json({ views: (await computeViews(tab, database)).map(({ kind, label, data }) => ({ kind, label, ...data })) });
+    return json({ views: (await computeViews(tab, database)).map(({ kind, label, data, page }) => ({ kind, label, on_page: page, ...data })) });
   }
   if (tab && extra === "series" && Number.isInteger(Number(second))) {
     if (request.method !== "GET") return fail(405, "use GET; the garmin sync writes series");
