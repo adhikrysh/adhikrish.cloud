@@ -7,6 +7,7 @@
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
+import { todayHere } from "./here.ts";
 import { named } from "./live.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
@@ -55,7 +56,7 @@ export default {
     if (!slug) return html(await homePage(design, env.DB, env.BIRTHDAY));
     const found = await db.tab(env.DB, slug);
     if (!found) return html("not found", 404);
-    const tab = named(found, env.BIRTHDAY); // a live label (weeks left) everywhere the page names the tab
+    const tab = named(found, env.BIRTHDAY, await todayHere(env.DB)); // a live label (weeks left) everywhere the page names the tab
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? "", Math.max(1, Math.floor(Number(url.searchParams.get("page"))) || 1)));
     if (id === "metrics" && name) {
       const metric = await metricHistoryPage(design, env.DB, tab, decodeURIComponent(name));
@@ -66,7 +67,9 @@ export default {
       return lift ? html(lift) : html("not found", 404);
     }
     const row = await db.get(env.DB, tab.slug, Number(id));
-    return row ? html(rowPage(design, tab, row, await db.getSeries(env.DB, row.id))) : html("not found", 404);
+    if (!row) return html("not found", 404);
+    const [series, today] = await Promise.all([db.getSeries(env.DB, row.id), todayHere(env.DB)]);
+    return html(rowPage(design, tab, row, series, today));
   },
 
   // hourly: garmin's recent days, one month further back, and owed intraday detail (src/garmin.ts)

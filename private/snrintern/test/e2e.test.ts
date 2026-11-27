@@ -35,12 +35,19 @@ let sign: (claims: Record<string, unknown>, opts?: { aud?: string; forged?: bool
 // the made-up birthday the worker gets in test mode (cloudflare.config.ts), and the live labels it should give, worked out here
 // on their own from the agreed formulas: 4,000 weeks minus weeks lived; felt time left = 1 - ln(age/7) / ln(end/7)
 const BIRTHDAY = "1990-01-01";
-const lived = () => Math.floor((Math.floor(Date.now() / 86_400_000) * 86_400_000 - Date.UTC(1990, 0, 1)) / 86_400_000);
+// days are counted where you are: the offset on the newest training row (src/here.ts), so ask the api for it the way an agent would
+let here = 0;
+const findHere = async () => {
+  const at = String((await call("where am i", "/api/training?limit=1", { token: await me() })).body.rows[0].at), m = /([+-])(\d{2}):(\d{2})$/.exec(at)!;
+  here = (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
+};
+const todayHere = () => { const d = new Date(Date.now() + here * 60_000); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
+const lived = () => Math.round((todayHere() - Date.UTC(1990, 0, 1)) / 86_400_000);
 const weeksLeft = () => `${((28_000 - lived()) / 7).toFixed(2)} weeks`;
 const feltLeft = () => `${((1 - Math.log(lived() / 365.25 / 7) / Math.log(28_000 / 365.25 / 7)) * 100).toFixed(2)}% of perceptive time`;
 
 /** A date `days` from today (negative = past), as yyyy-mm-dd. */
-const day = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const day = (days: number) => new Date(Date.now() - 8 * 3_600_000 + days * 86_400_000).toISOString().slice(0, 10); // pacific, like every timed seed (-08:00)
 
 async function startWorker() {
   port = 20000 + Math.floor(Math.random() * 20000);
@@ -245,6 +252,7 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
+  await findHere();
   expect(lift).toContain(`<a class="back" href="/training" aria-label="back to ${feltLeft()}">←</a>`); // a lift goes back to its tab
   writeFileSync(join(artifacts, "page-lift.html"), standalone(lift));
   // the library is served by the worker itself, cached forever
@@ -422,7 +430,7 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   for (let offset = 0; offset !== null;) { const page = (await call("health rows", `/api/health?limit=1000&offset=${offset}`, { token: agent })).body; rows.push(...page.rows); offset = page.next_offset; }
   const dates = rows.map((r) => r.date);
   expect(new Set(dates).size).toBe(dates.length);
-  const iso = (n: number) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) - n * 86_400_000).toISOString().slice(0, 10);
+  const iso = (n: number) => day(-n); // n days ago, in pacific time like the fake garmin
   expect(dates).not.toContain(iso(NOT_WORN));
   expect(dates).toContain(iso(HISTORY)); // the oldest day: the backfill walked back three chunks and stopped after three empty ones
   expect(rows.length).toBe(HISTORY); // HISTORY + 1 days, minus the unworn one
@@ -756,6 +764,7 @@ test("people link to companies, events and each other by name, and their page op
 
 test("tabs go by their names, and health and training by live ones worked out from the birthday secret", async () => {
   const token = await me();
+  await findHere();
   const names = { people: "sonder", forecasts: "laplace's demon", books: "conversations with the dead", health: weeksLeft(), training: feltLeft() };
   const home = (await call("home names", "/", { token })).body as string;
   for (const [slug, name] of Object.entries(names)) expect(home).toContain(`<a href="/${slug}"><span>${name.replaceAll("'", "&#39;").replace("&#39;", "'")}</span></a>`);
@@ -834,6 +843,7 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
   const row = (await call("row page", `/training/${chest.id}`, { token })).body as string;
   expect(row).toContain('<span class="ex">tricep pushdown</span>50 × 8   50 × 8   50 × 8');
   expect(row).toContain(`<a class="schema" href="/api/_tabs/training">schema</a>`);
+  await findHere();
   expect(row).toContain(`<a class="back" href="/training" aria-label="back to ${feltLeft()}">←</a>`); // a row goes back to its tab
   expect(row).not.toContain('<a href="/people">'); // no sibling tabs in the nav
   writeFileSync(join(artifacts, "page-training-row.html"), row);
@@ -847,4 +857,25 @@ test("a restart loses nothing", { timeout: 60_000 }, async () => {
   const after = await call("read after restart", "/api/forecasts?q=Restart", { token });
   expect(after.body.rows).toHaveLength(1);
   expect((await call("schema survives too", "/api/_tabs/thoughts", { token })).status).toBe(200);
+});
+
+test("today is where you are, not in utc: a session minutes ago, in a place whose date isn't utc's, reads as today", async () => {
+  // a place whose date differs from utc's right now: a day ahead (+14:00) in utc's afternoon, a day behind (-12:00) in its morning
+  const hour = new Date().getUTCHours(), offset = hour >= 12 ? "+14:00" : "-12:00", minutes = hour >= 12 ? 14 * 60 : -12 * 60;
+  const wall = new Date(Date.now() - 5 * 60_000 + minutes * 60_000).toISOString(), local = wall.slice(0, 10), clock = wall.slice(11, 16); // 5 minutes ago there
+  expect(local).not.toBe(new Date().toISOString().slice(0, 10)); // the premise: utc's date is another day
+  const agent = await instinct();
+  const r = await send(agent, "/api/training", { at: `${local}T${clock}${offset}`, type: "strength", title: "midnight lift", lifts: "pull up: bwx5" });
+  expect(r.status).toBe(201);
+  try {
+    const strip = (await call("strip, where you are", "/api/training/_views", { token: agent })).body.views.find((v: any) => v.kind === "strip");
+    expect(strip).toMatchObject({ last: local, days_since_last: 0 });
+    expect((await call("training page, where you are", "/training", { token: await me() })).body).toContain("last session today");
+    // the list under it says so too: the row's date reads as today, and the live label counts from the same day
+    await findHere();
+    expect(here).toBe(minutes);
+    expect((await call("api names, where you are", "/api", { token: agent })).body.tabs.find((t: any) => t.slug === "health").label).toBe(weeksLeft());
+  } finally {
+    await call("remove the midnight lift", `/api/training/${r.body.row.id}`, { method: "DELETE", token: agent });
+  }
 });

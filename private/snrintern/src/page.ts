@@ -3,6 +3,7 @@
 import { escape, page as shell, type Design } from "../../../design/html.ts";
 import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
+import { todayHere } from "./here.ts";
 import { named } from "./live.ts";
 import { GRAPH_CSS, withGraph } from "./graph.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
@@ -109,9 +110,9 @@ function day(p: Parts, style: "short" | "long"): string {
 }
 
 /** "today", "yesterday", "3 weeks ago", "in 2 years", in whole calendar days from today (utc). */
-function relative(p: Parts): string {
-  const now = new Date();
-  const days = Math.round((Date.UTC(p.y, p.mo - 1, p.d) - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) / 86_400_000);
+/** "yesterday", "2 weeks ago", "in 3 days", counted from `today`: the date where you are (src/here.ts), never the utc clock. */
+function relative(p: Parts, today: number): string {
+  const days = Math.round((Date.UTC(p.y, p.mo - 1, p.d) - today) / 86_400_000);
   if (days === 0) return "today";
   if (days === -1) return "yesterday";
   if (days === 1) return "tomorrow";
@@ -135,14 +136,14 @@ const field = (tab: Tab, name: string) => tab.fields.find((f) => f.name === name
  * line (under a row): dates as "review in 3 years" / "met 5 months ago" (the field name minus "date").
  * detail (a row's page): the full date and how long ago.
  */
-function show(f: Field, value: Value, where: "aside" | "line" | "detail"): string {
+function show(f: Field, value: Value, where: "aside" | "line" | "detail", today: number): string {
   switch (f.type) {
     case "date":
     case "datetime": {
       const p = parse(String(value));
       if (!p) return escape(value);
-      if (where === "line") return escape([label(f.name).replace(/ ?date$/, ""), relative(p)].filter(Boolean).join(" "));
-      if (where === "detail") return escape(`${[day(p, "long"), clock(p)].filter(Boolean).join(", ")}, ${relative(p)}`);
+      if (where === "line") return escape([label(f.name).replace(/ ?date$/, ""), relative(p, today)].filter(Boolean).join(" "));
+      if (where === "detail") return escape(`${[day(p, "long"), clock(p)].filter(Boolean).join(", ")}, ${relative(p, today)}`);
       return escape([day(p, "short"), clock(p)].filter(Boolean).join(", "));
     }
     case "int":
@@ -166,23 +167,23 @@ function show(f: Field, value: Value, where: "aside" | "line" | "detail"): strin
 }
 
 /** Under a row, a past date that an upcoming view watches reads as done ("reviewed 7 weeks ago"), or overdue in red while the row still matches it. */
-function lineDate(tab: Tab, row: db.Row, f: Field): string | null {
+function lineDate(tab: Tab, row: db.Row, f: Field, today: number): string | null {
   const view = tab.views?.find((v) => v.kind === "upcoming" && v.field === f.name);
   const p = parse(String(row[f.name]));
-  if (!view || view.kind !== "upcoming" || !p || !relative(p).endsWith(" ago")) return null;
+  if (!view || view.kind !== "upcoming" || !p || !relative(p, today).endsWith(" ago")) return null;
   const name = label(f.name).replace(/ ?date$/, "");
-  if (matches(view.where, row)) return `<span class="bad">${escape(`${name} overdue by ${relative(p).replace(" ago", "")}`)}</span>`;
-  return escape(`${name.endsWith("e") ? `${name}d` : `${name}ed`} ${relative(p)}`);
+  if (matches(view.where, row)) return `<span class="bad">${escape(`${name} overdue by ${relative(p, today).replace(" ago", "")}`)}</span>`;
+  return escape(`${name.endsWith("e") ? `${name}d` : `${name}ed`} ${relative(p, today)}`);
 }
 // onPage: on the row's own page, where its refs are links (nothing around them is one)
-const bits = (tab: Tab, row: db.Row, names: string[], where: "aside" | "line", onPage = false) =>
+const bits = (tab: Tab, row: db.Row, names: string[], where: "aside" | "line", today: number, onPage = false) =>
   names.filter((n) => present(row[n])).map((n) => {
     const f = field(tab, n);
-    return `<span>${(where === "line" && (f.type === "date" || f.type === "datetime") && lineDate(tab, row, f)) || show(f, row[n] as Value, onPage && f.type === "ref" ? "detail" : where)}</span>`;
+    return `<span>${(where === "line" && (f.type === "date" || f.type === "datetime") && lineDate(tab, row, f, today)) || show(f, row[n] as Value, onPage && f.type === "ref" ? "detail" : where, today)}</span>`;
   }).join("");
-const links = (tab: Tab, row: db.Row) => {
+const links = (tab: Tab, row: db.Row, today: number) => {
   const urls = tab.fields.filter((f) => f.type === "url" && present(row[f.name]) && !tab.aside.includes(f.name) && !tab.line.includes(f.name));
-  return urls.length ? `<p class="links">${urls.map((f) => show(f, row[f.name] as Value, "detail")).join("")}</p>` : "";
+  return urls.length ? `<p class="links">${urls.map((f) => show(f, row[f.name] as Value, "detail", today)).join("")}</p>` : "";
 };
 /** A row's title; a date title reads "sep 17" in lists and the full date on its own page. */
 const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
@@ -201,7 +202,8 @@ function nav(parent?: { href: string; label: string }): string {
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
 export async function homePage(design: Design, database: D1Database, birthday?: string): Promise<string> {
-  const tabs = (await db.tabs(database)).filter((t) => !t.hidden).map((t) => named(t, birthday));
+  const [all, today] = await Promise.all([db.tabs(database), todayHere(database)]);
+  const tabs = all.filter((t) => !t.hidden).map((t) => named(t, birthday, today));
   const items = tabs.map((tab) => `          <li>
             <a href="/${tab.slug}"><span>${escape(tab.label)}</span></a>
             <p>${escape(tab.about)}</p>
@@ -220,10 +222,11 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
   const groupBy = tab.group ? field(tab, tab.group) : undefined;
   const byDay = groupBy && (groupBy.type === "date" || groupBy.type === "datetime") ? groupBy : undefined;
   const paged = !groupBy || !!byDay;
-  const [rows, views, total] = await Promise.all([
+  const [rows, views, total, today] = await Promise.all([
     db.list(database, tab, { q: q || undefined, ...(paged ? { limit: PAGE, offset: (at - 1) * PAGE } : {}) }),
     q || at > 1 ? Promise.resolve("") : renderViews(tab, database),
     paged ? db.countMatching(database, tab, q || undefined) : Promise.resolve(0),
+    todayHere(database),
   ]);
   // a tab whose metrics carry good / bad words (health): each day in the list reads as its big picture instead of numbers
   let words: Map<number, string> | null = null;
@@ -232,17 +235,17 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
     const from = new Date(Date.parse(`${dates[0]}T00:00:00Z`) - 28 * 86_400_000).toISOString().slice(0, 10);
     const [context, newest] = await Promise.all([db.since(database, tab, dateF, from), db.list(database, tab, { limit: 1 })]);
     const newestDate = newest[0] ? String(newest[0][dateF]).slice(0, 10) : null;
-    words = new Map(rows.map((r) => [r.id, dayWords(tab, context, String(r[dateF]).slice(0, 10), newestDate)
+    words = new Map(rows.map((r) => [r.id, dayWords(tab, context, String(r[dateF]).slice(0, 10), newestDate, today)
       .map((w) => `<span${w.tone ? ` class="${w.tone}"` : ""}>${escape(w.text)}</span>`).join("")]));
   }
   const item = (row: db.Row) => {
     // inside a day group the day is the heading, so the row leaves its date (and time) out
-    const aside = words?.get(row.id) ?? bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside");
-    const line = bits(tab, row, tab.line, "line");
+    const aside = words?.get(row.id) ?? bits(tab, row, tab.aside.filter((n) => n !== byDay?.name), "aside", today);
+    const line = bits(tab, row, tab.line, "line", today);
     const snippet = tab.snippet && present(row[tab.snippet]) ? `\n            <p class="snippet">${escape(row[tab.snippet])}</p>` : "";
     return `          <li>
             <a class="head" href="/${tab.slug}/${row.id}"><span>${titleOf(tab, row, "aside")}</span><small class="aside${words ? " words" : ""}">${aside}</small></a>${line ? `\n            <p class="line bits">${line}</p>` : ""}${snippet}
-            ${links(tab, row)}
+            ${links(tab, row, today)}
           </li>`;
   };
   const ul = (r: db.Row[]) => `<ul class="project-list">\n${r.map(item).join("\n")}\n</ul>`;
@@ -331,16 +334,16 @@ function part(tab: Tab, row: db.Row, p: { label: string; fields: string[] }): st
 }
 
 /** A value in a row page's list: numbers in their unit ("28:22", "148 bpm"), everything else as on the row's aside. */
-const detailValue = (f: Field, v: Value) => (f.type === "int" || f.type === "number" ? escape(amount(f, Number(v))) : show(f, v, f.type === "ref" ? "detail" : "aside"));
+const detailValue = (f: Field, v: Value, today: number) => (f.type === "int" || f.type === "number" ? escape(amount(f, Number(v))) : show(f, v, f.type === "ref" ? "detail" : "aside", today));
 
 /** A day of numbers (a tab with parts: health): each section's numbers under its heading, the parts as bars, then the day's timelines. */
-function sectioned(tab: Tab, row: db.Row, series: db.Series | null): string {
+function sectioned(tab: Tab, row: db.Row, series: db.Series | null, today: number): string {
   const inParts = new Set((tab.parts ?? []).flatMap((p) => p.fields));
   const order = [...new Set(tab.fields.map((f) => f.section ?? ""))];
   const sections = order.map((name) => {
     const fs = tab.fields.filter((f) => (f.section ?? "") === name && f.name !== tab.title && !f.hidden && present(row[f.name]));
     const parts = (tab.parts ?? []).filter((p) => p.fields.some((n) => fs.some((f) => f.name === n))).map((p) => part(tab, row, p)).join("");
-    const dl = fs.filter((f) => !inParts.has(f.name)).map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${detailValue(f, row[f.name] as Value)}</dd>`);
+    const dl = fs.filter((f) => !inParts.has(f.name)).map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${detailValue(f, row[f.name] as Value, today)}</dd>`);
     if (!dl.length && !parts) return "";
     return `<section class="section">${name ? `<h2><span class="pill">${escape(name)}</span></h2>` : ""}${parts}${dl.length ? `<dl>${dl.join("")}</dl>` : ""}</section>`;
   });
@@ -348,11 +351,11 @@ function sectioned(tab: Tab, row: db.Row, series: db.Series | null): string {
   return [...sections, ...charts].filter(Boolean).join("\n");
 }
 
-export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series | null = null): string {
+export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series | null, today: number): string {
   if (tab.parts?.length) {
     const body = `      <article class="detail">
       <h1>${titleOf(tab, row, "detail")}</h1>
-      ${sectioned(tab, row, series)}
+      ${sectioned(tab, row, series, today)}
       </article>
       ${schemaLink(tab)}`;
     return page({ design, title: `${row[tab.title] ?? "untitled"} | senior intern`, nav: nav({ href: `/${tab.slug}`, label: tab.label }), body, css: CSS });
@@ -373,16 +376,16 @@ export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series
   });
   // the remaining fields: those without a section first, then each section under its heading (a run: effort, pace, zones)
   const restFields = tab.fields.filter((f) => !shown.has(f.name) && !f.hidden && f.type !== "url" && f.type !== "lifts" && !long(f) && present(row[f.name]));
-  const dlOf = (fs: Field[]) => `<dl>${fs.map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${f.type === "date" || f.type === "datetime" ? show(f, row[f.name] as Value, "detail") : detailValue(f, row[f.name] as Value)}</dd>`).join("")}</dl>`;
+  const dlOf = (fs: Field[]) => `<dl>${fs.map((f) => `<dt>${escape(metricName(f.name))}</dt><dd>${f.type === "date" || f.type === "datetime" ? show(f, row[f.name] as Value, "detail", today) : detailValue(f, row[f.name] as Value, today)}</dd>`).join("")}</dl>`;
   const rest = [...new Set(restFields.map((f) => f.section ?? ""))].map((name) => {
     const fs = restFields.filter((f) => (f.section ?? "") === name);
     return name ? `<section class="section"><h2><span class="pill">${escape(name)}</span></h2>${dlOf(fs)}</section>` : dlOf(fs);
   });
-  const meta = [bits(tab, row, tab.line, "line", true), bits(tab, row, tab.aside, "aside", true)].filter(Boolean).map((m) => `<p class="meta bits">${m}</p>`).join("\n");
+  const meta = [bits(tab, row, tab.line, "line", today, true), bits(tab, row, tab.aside, "aside", today, true)].filter(Boolean).map((m) => `<p class="meta bits">${m}</p>`).join("\n");
   const body = `      <article class="detail">
       <h1>${titleOf(tab, row, "detail")}</h1>
       ${meta}
-      ${links(tab, row)}
+      ${links(tab, row, today)}
       ${sections.join("\n")}
       ${rest.join("\n")}
       </article>

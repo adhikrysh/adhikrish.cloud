@@ -7,6 +7,7 @@ import { escape } from "../../../design/html.ts";
 import { chart, type ChartPoint, type ChartStream } from "./charts.ts";
 import * as db from "./db.ts";
 import { graphBox } from "./graph.ts";
+import { todayHere } from "./here.ts";
 import { graph } from "./refs.ts";
 import { parseLifts, type Field, type Metric, type Tab, type View } from "./schema.ts";
 
@@ -51,13 +52,13 @@ export const VIEW_CSS = `
 `;
 
 const DAY = 86_400_000;
-const today = () => { const n = new Date(); return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); };
+// `today` everywhere below is the date where you are (src/here.ts), as a utc midnight, never the utc clock
 const dayOf = (v: unknown) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v ?? "")); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; };
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const short = (t: number) => { const d = new Date(t); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
-function ago(t: number): string {
-  const days = Math.round((t - today()) / DAY);
+function ago(t: number, today: number): string {
+  const days = Math.round((t - today) / DAY);
   if (days === 0) return "today";
   if (days === -1) return "yesterday";
   const n = Math.abs(days);
@@ -67,7 +68,7 @@ function ago(t: number): string {
 }
 
 
-type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database; recent: () => Promise<db.Row[]> };
+type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database; recent: () => Promise<db.Row[]>; today: number };
 const dateField = (tab: Tab) => (tab.sort !== "id" ? tab.sort : tab.group ?? "created_at");
 const title = (tab: Tab, row: db.Row) => escape(row[tab.title] ?? "untitled");
 // every view is headed by a white pill, the way admin labels its sections
@@ -134,8 +135,7 @@ function progress(v: Extract<View, { kind: "progress" }>, { tab, rows }: Ctx): V
 /** One tick per day from the first row (at most `days` back, default 182) to today, green on days that have a row; how many a week,
  * and how long since the last, red once this gap is longer than any gap between earlier rows (your own history, no fixed number).
  * `label` is the heading ("sessions"); the last line uses it without the s. */
-function strip(v: Extract<View, { kind: "strip" }>, { rows }: Ctx): ViewResult | null {
-  const now = today();
+function strip(v: Extract<View, { kind: "strip" }>, { rows, today: now }: Ctx): ViewResult | null {
   const dated = rows.map((r) => dayOf(r[v.field])).filter((d): d is number => d !== null && d <= now);
   if (!dated.length) return null;
   const days = new Set(dated), sorted = [...days].sort((a, b) => a - b), last = sorted.at(-1)!;
@@ -147,7 +147,7 @@ function strip(v: Extract<View, { kind: "strip" }>, { rows }: Ctx): ViewResult |
   const heading = v.label ?? "entries", late = sorted.length > 1 && now - last > longest;
   const html = `<section class="view"><div class="strip-head">${pill(heading)}<span>${fmt(Math.round(perWeek * 10) / 10)} a week</span></div>
 <div class="strip">${ticks.join("")}</div><div class="strip-ends"><span>${short(start)}</span><span>today</span></div>
-<p class="sub"><span class="${late ? "bad" : ""}">last ${escape(heading.replace(/s$/, ""))} ${ago(last)}</span></p></section>`;
+<p class="sub"><span class="${late ? "bad" : ""}">last ${escape(heading.replace(/s$/, ""))} ${ago(last, now)}</span></p></section>`;
   return { kind: "strip", label: heading, html, data: { per_week: Math.round(perWeek * 10) / 10, since: isoDay(start), last: isoDay(last),
     days_since_last: Math.round((now - last) / DAY), longest_gap_days: Math.round(longest / DAY), longer_gap_than_ever: late } };
 }
@@ -182,19 +182,18 @@ async function line(v: Extract<View, { kind: "line" }>, { tab, rows, database }:
 export const matches = (where: Record<string, string> | undefined, row: db.Row) => Object.entries(where ?? {}).every(([k, val]) => row[k] === val);
 
 /** The next `limit` (default 3) rows matching `where`, soonest first; a date already past is overdue, in red. */
-function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows }: Ctx): ViewResult | null {
-  const now = today();
+function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows, today: now }: Ctx): ViewResult | null {
   const next = rows.filter((row) => matches(v.where, row)).map((row) => ({ row, t: dayOf(row[v.field]) }))
     .filter((x): x is { row: db.Row; t: number } => x.t !== null).sort((a, b) => a.t - b.t).slice(0, v.limit ?? 3);
   if (!next.length) return null;
-  const html = next.map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${t < now ? "bad" : ""}">${t < now ? `overdue ${ago(t).replace(" ago", "")}` : ago(t)}</small></li>`);
+  const html = next.map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${t < now ? "bad" : ""}">${t < now ? `overdue ${ago(t, now).replace(" ago", "")}` : ago(t, now)}</small></li>`);
   return result("upcoming", "upcoming", { rows: next.map(({ row, t }) => ({ id: row.id, title: row[tab.title] ?? null, date: isoDay(t), overdue: t < now })) },
     `<ul class="rowlist">${html.join("")}</ul>`);
 }
 
 /** The rows matching `where`, headed by `label`: largest `sort` first (empty last, then the tab's order), or the tab's order; `aside` shows one field at the right (a date as "2 weeks ago").
  * No dates are judged here: a book on the reading list for a year is not overdue. */
-function list(v: Extract<View, { kind: "list" }>, { tab, rows }: Ctx): ViewResult | null {
+function list(v: Extract<View, { kind: "list" }>, { tab, rows, today }: Ctx): ViewResult | null {
   const key = (row: db.Row) => (v.sort && row[v.sort] !== undefined && row[v.sort] !== "" ? String(row[v.sort]) : null);
   const matching = rows.filter((row) => matches(v.where, row));
   if (v.sort) matching.sort((a, b) => { const x = key(a), y = key(b); return x === y ? 0 : x === null ? 1 : y === null ? -1 : y.localeCompare(x, undefined, { numeric: true }); });
@@ -203,7 +202,7 @@ function list(v: Extract<View, { kind: "list" }>, { tab, rows }: Ctx): ViewResul
   const aside = (row: db.Row) => {
     if (!v.aside || row[v.aside] === undefined || row[v.aside] === "") return "";
     const t = type === "date" || type === "datetime" ? dayOf(row[v.aside]) : null;
-    return `<small>${t !== null ? ago(t) : escape(row[v.aside])}</small>`;
+    return `<small>${t !== null ? ago(t, today) : escape(row[v.aside])}</small>`;
   };
   const html = matching.map((row) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a>${aside(row)}</li>`);
   return result("list", v.label, { rows: matching.map((row) => ({ id: row.id, title: row[tab.title] ?? null, ...(v.aside ? { [v.aside]: row[v.aside] ?? null } : {}) })) },
@@ -245,13 +244,13 @@ function quantile(xs: number[], q: number): number {
 export type Verdict = { day: db.Row; value: number; word: string; tone: "" | "good" | "bad"; band: [number, number] | null; box: { t: number; y: number }[]; soFar?: number };
 
 /** Judges one metric's newest day (or newest finished day), or the day `on`, by the first rule it has. rows: oldest first. */
-export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | null, on?: string): Verdict | null {
+export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | null, today: number, on?: string): Verdict | null {
   const dateF = dateField(tab), f = tab.fields.find((x) => x.name === m.field);
   const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]), row: r })).filter((p): p is Pt & { row: db.Row } => p.t !== null && r0(p.row[m.field]) && finite(p.y));
   if (!pts.length) return null;
   let at = pts.length - 1, soFar: number | undefined;
   if (on !== undefined) { at = pts.findIndex((p) => String(p.row[dateF]).slice(0, 10) === on); if (at < 0) return null; }
-  else if (m.finished && pts.length > 1 && String(pts[at].row[dateF]) === liveDay(newestDate)) { soFar = pts[at].y; at--; } // today isn't done: judge yesterday
+  else if (m.finished && pts.length > 1 && String(pts[at].row[dateF]) === liveDay(newestDate, today)) { soFar = pts[at].y; at--; } // today isn't done: judge yesterday
   const day = pts[at];
   let value = day.y, word = "", tone: Verdict["tone"] = "", band: [number, number] | null = null;
   const label = m.label ? String(day.row[m.label.field] ?? "") : "";
@@ -289,7 +288,7 @@ export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | 
 const r0 = (v: unknown) => v !== undefined && v !== null && v !== "";
 /** The newest date if it is today where you are (garmin's dates are local, so today or yesterday in utc), else null: a tab that
  * hasn't synced for days has no "today", so nothing reads as today, yesterday or "so far". */
-const liveDay = (d: string | null) => (d !== null && (dayOf(d) ?? 0) >= today() - DAY ? d : null);
+const liveDay = (d: string | null, today: number) => (d !== null && (dayOf(d) ?? 0) >= today - DAY ? d : null);
 
 /**
  * A day's big picture in a few words: each metric with `log` words is judged on that day, and the ones judged good or bad
@@ -297,11 +296,11 @@ const liveDay = (d: string | null) => (d !== null && (dayOf(d) ?? 0) >= today() 
  * Nothing outside usual: "an ordinary day". Today's tallies aren't finished, so they say nothing yet. rows: oldest first,
  * including the 28 days before `date`.
  */
-export function dayWords(tab: Tab, rows: db.Row[], date: string, newestDate: string | null): { text: string; tone: "" | "good" | "bad" }[] {
+export function dayWords(tab: Tab, rows: db.Row[], date: string, newestDate: string | null, today: number): { text: string; tone: "" | "good" | "bad" }[] {
   const out: { text: string; tone: "good" | "bad" }[] = [];
   for (const m of tab.views?.flatMap((v) => (v.kind === "metrics" ? v.metrics : [])) ?? []) {
-    if ((!m.log?.good && !m.log?.bad) || m.change || (m.finished && date === liveDay(newestDate))) continue;
-    const v = judge(tab, m, rows, newestDate, date);
+    if ((!m.log?.good && !m.log?.bad) || m.change || (m.finished && date === liveDay(newestDate, today))) continue;
+    const v = judge(tab, m, rows, newestDate, today, date);
     const text = v?.tone === "good" ? m.log?.good : v?.tone === "bad" ? m.log?.bad : undefined;
     if (text && v && !out.some((o) => o.text === text)) out.push({ text, tone: v.tone as "good" | "bad" });
   }
@@ -329,15 +328,15 @@ function box(v: Verdict, end: number): string {
 
 /** Each metric as one line: its name and the judged day's value, the words under them, the 14-day box on the right.
  * The whole row opens the metric's full page. */
-async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, recent }: Ctx): Promise<ViewResult | null> {
+async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, recent, today }: Ctx): Promise<ViewResult | null> {
   const rows = await recent(), dateF = dateField(tab);
   const newestDate = rows.length ? String(rows.at(-1)![dateF]) : null, newestT = newestDate ? dayOf(newestDate) : null;
   const data: Record<string, unknown>[] = [];
   const items = v.metrics.map((m) => {
-    const f = tab.fields.find((x) => x.name === m.field), verdict = judge(tab, m, rows, newestDate);
+    const f = tab.fields.find((x) => x.name === m.field), verdict = judge(tab, m, rows, newestDate, today);
     if (!verdict) return "";
     const t = dayOf(verdict.day[dateF])!;
-    const live = liveDay(newestDate) ? newestT : null;
+    const live = liveDay(newestDate, today) ? newestT : null;
     const when = live === null ? short(t) : t === live ? "today" : t === live - DAY ? "yesterday" : short(t);
     const words = [...(verdict.word ? [`<span${verdict.tone ? ` class="${verdict.tone}"` : ""}>${escape(verdict.word)}</span>`] : []),
       `<span>${escape(when)}</span>`, ...(verdict.soFar !== undefined ? [`<span>today so far ${escape(amount(f, verdict.soFar))}</span>`] : [])];
@@ -358,13 +357,14 @@ export async function metricPage(tab: Tab, database: D1Database, name: string): 
   const metric = tab.views?.flatMap((v) => (v.kind === "metrics" ? v.metrics : [])).find((m) => m.field === name);
   const f = tab.fields.find((x) => x.name === name);
   if (!metric || !f) return null;
+  const today = await todayHere(database);
   const [entries, recentStreams, recentRows] = await Promise.all([db.history(database, tab, dateField(tab), [name]),
     metric.stream ? db.recentSeries(database, tab.slug, dateField(tab), STREAM_DAYS) : Promise.resolve([]),
-    db.since(database, tab, dateField(tab), isoDay(today() - (RECENT - 1) * DAY))]);
+    db.since(database, tab, dateField(tab), isoDay(today - (RECENT - 1) * DAY))]);
   const pts = entries.map((h) => ({ t: dayOf(h.date), y: Number(h.values[0]), id: h.id })).filter((p): p is { t: number; y: number; id: number } => p.t !== null && finite(p.y));
   const head = `<h1>${escape(metricName(name))}</h1>`;
   if (!pts.length) return `${head}<p class="lift-best">nothing yet</p>`;
-  const verdict = judge(tab, metric, recentRows, recentRows.length ? String(recentRows.at(-1)![dateField(tab)]) : null);
+  const verdict = judge(tab, metric, recentRows, recentRows.length ? String(recentRows.at(-1)![dateField(tab)]) : null, today);
   let best: { from: number; to: number; avg: number } | null = null;
   if (metric.better) { // the seven days with a value whose average is best; fewer than seven, the best day
     const n = Math.min(7, pts.length), better = (a: number, b: number) => (metric.better === "higher" ? a > b : a < b);
@@ -448,16 +448,6 @@ export const LIFT_CSS = `
 // before it raised overuse injuries, Frandsen et al., BJSM; docs/training.md).
 
 const OFFSET = /([+-])(\d{2}):(\d{2})$/;
-/** Today where you are, as a utc midnight: now shifted by the newest timed row's offset (else utc). */
-function localToday(rows: db.Row[], field: string): number {
-  let newest: { t: number; off: number } | null = null;
-  for (const r of rows) {
-    const at = String(r[field] ?? ""), m = OFFSET.exec(at), t = Date.parse(at);
-    if (m && at.length > 10 && Number.isFinite(t) && (!newest || t > newest.t)) newest = { t, off: (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) };
-  }
-  const local = new Date(Date.now() + (newest?.off ?? 0) * 60_000);
-  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
-}
 type Session = { t: number; at: number; y: number; row: db.Row };
 /** Rows matching `where` with a number in `field`, by local day (and instant, for order within a day), oldest first. */
 function sessions(rows: db.Row[], dateF: string, field: string, where?: Record<string, string>): Session[] {
@@ -474,10 +464,10 @@ const why = (text: string, tone = "") => `<span${tone ? ` class="${tone}"` : ""}
 /** The last 7 days' load next to the 28 days' weekly average. "higher" or "lower than usual" when the 7 days sit outside the
  * 10th to 90th percentile of your own past weeks (8 or more of them, up to a year), else "usual". No colour: more load is
  * neither good nor bad by itself. The box: the last 12 weeks, this one white. */
-function load(v: Extract<View, { kind: "load" }>, { tab, rows }: Ctx): ViewResult | null {
+function load(v: Extract<View, { kind: "load" }>, { tab, rows, today }: Ctx): ViewResult | null {
   const dateF = dateField(tab), ss = sessions(rows, dateF, v.field);
   if (!ss.length) return null;
-  const now = localToday(rows, dateF), acute = total(ss, now - 6 * DAY, now), chronic = total(ss, now - 27 * DAY, now) / 4;
+  const now = today, acute = total(ss, now - 6 * DAY, now), chronic = total(ss, now - 27 * DAY, now) / 4;
   const past: number[] = []; // the 7 days ending 1, 2, ... weeks ago, while they're after the first session
   for (let k = 1; k <= 52 && now - 7 * k * DAY - 6 * DAY >= ss[0].t; k++) past.push(total(ss, now - 7 * k * DAY - 6 * DAY, now - 7 * k * DAY));
   const band = past.length >= 8 ? [quantile(past, 0.1), quantile(past, 0.9)] : null;
@@ -491,10 +481,10 @@ function load(v: Extract<View, { kind: "load" }>, { tab, rows }: Ctx): ViewResul
 
 /** The longest session in the last `days` (30) and the next one's limit, `over` (10) % past it; every session in that window
  * that went past the longest of the `days` before it, in red. */
-function limit(v: Extract<View, { kind: "limit" }>, { tab, rows }: Ctx): ViewResult | null {
+function limit(v: Extract<View, { kind: "limit" }>, { tab, rows, today }: Ctx): ViewResult | null {
   const dateF = dateField(tab), ss = sessions(rows, dateF, v.field, v.where).filter((s) => s.y > 0);
   if (!ss.length) return null;
-  const days = v.days ?? 30, over = v.over ?? 10, f = fieldOf(tab, v.field), now = localToday(rows, dateF), from = now - (days - 1) * DAY;
+  const days = v.days ?? 30, over = v.over ?? 10, f = fieldOf(tab, v.field), now = today, from = now - (days - 1) * DAY;
   const recent = ss.filter((s) => s.t >= from && s.t <= now);
   const longest = recent.length ? recent.reduce((a, s) => (s.y >= a.y ? s : a)) : null;
   const spikes = recent.map((s) => {
@@ -513,8 +503,8 @@ function limit(v: Extract<View, { kind: "limit" }>, { tab, rows }: Ctx): ViewRes
 
 /** Each value of `by` (a sport) over the last `weeks` (12) 7-day weeks: `fields` summed, the newest week shown with a box of all
  * of them; `zones` as each field's share of the last 28 days. */
-function weeks(v: Extract<View, { kind: "weeks" }>, { tab, rows }: Ctx): ViewResult | null {
-  const dateF = dateField(tab), n = v.weeks ?? 12, now = localToday(rows, dateF), from = now - (7 * n - 1) * DAY;
+function weeks(v: Extract<View, { kind: "weeks" }>, { tab, rows, today }: Ctx): ViewResult | null {
+  const dateF = dateField(tab), n = v.weeks ?? 12, now = today, from = now - (7 * n - 1) * DAY;
   const inRange = rows.filter((r) => { const t = dayOf(r[dateF]); return t !== null && t >= from && t <= now; });
   if (!inRange.length) return null;
   const kinds = [...new Set(inRange.map((r) => String(r[v.by] ?? "")).filter(Boolean))];
@@ -557,8 +547,8 @@ function weeks(v: Extract<View, { kind: "weeks" }>, { tab, rows }: Ctx): ViewRes
 
 /** Each record's best ever next to its best in the last `days` (90), each opening its session. The recent one is green when it
  * is the best ever. */
-function records(v: Extract<View, { kind: "records" }>, { tab, rows }: Ctx): ViewResult | null {
-  const dateF = dateField(tab), days = v.days ?? 90, now = localToday(rows, dateF), from = now - (days - 1) * DAY;
+function records(v: Extract<View, { kind: "records" }>, { tab, rows, today }: Ctx): ViewResult | null {
+  const dateF = dateField(tab), days = v.days ?? 90, now = today, from = now - (days - 1) * DAY;
   const out: Record<string, unknown>[] = [];
   const html = v.records.map((r) => {
     const ss = sessions(rows, dateF, r.field, r.where).filter((s) => s.y > 0);
@@ -589,8 +579,8 @@ async function graphView(v: Extract<View, { kind: "graph" }>, { tab, database }:
 export async function computeViews(tab: Tab, database: D1Database): Promise<ViewResult[]> {
   if (!tab.views?.length) return [];
   let recent: Promise<db.Row[]> | undefined;
-  const ctx: Ctx = { tab, rows: tab.views.some((v) => v.kind !== "metrics") ? await db.list(database, tab) : [], database,
-    recent: () => (recent ??= db.since(database, tab, dateField(tab), isoDay(today() - (RECENT - 1) * DAY))) };
+  const [rows, today] = await Promise.all([tab.views.some((v) => v.kind !== "metrics") ? db.list(database, tab) : [], todayHere(database)]);
+  const ctx: Ctx = { tab, rows, database, today, recent: () => (recent ??= db.since(database, tab, dateField(tab), isoDay(today - (RECENT - 1) * DAY))) };
   const parts = await Promise.all(tab.views.map((v) => {
     switch (v.kind) {
       case "progress": return progress(v, ctx);

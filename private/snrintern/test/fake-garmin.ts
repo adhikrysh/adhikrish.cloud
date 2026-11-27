@@ -8,7 +8,8 @@ export const NOT_WORN = 10; // days ago
 const KEY = "test-garmin-key", TOKEN = "fake-bearer-token";
 
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
-const today = () => { const n = new Date(); return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); };
+// today in pacific time, where every made-up day and activity is (utc-8): the worker counts days where you are, not in utc
+const today = () => { const n = new Date(Date.now() - 8 * 3_600_000); return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); };
 const ago = (date: string) => Math.round((today() - Date.parse(`${date}T00:00:00Z`)) / DAY);
 const worn = (date: string) => { const a = ago(date); return a >= 0 && a <= HISTORY && a !== NOT_WORN; };
 const range = (a: string, b: string) => { const out: string[] = []; for (let t = Date.parse(`${a}T00:00:00Z`); t <= Date.parse(`${b}T00:00:00Z`); t += DAY) out.push(iso(t)); return out; };

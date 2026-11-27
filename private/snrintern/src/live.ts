@@ -13,11 +13,11 @@ export type Live = (typeof LIVE)[number];
 
 const DAY = 86_400_000, LIFE = 28_000, YEAR = 365.25, FROM = 7;
 
-/** Whole days from the birthday to today (both as utc dates). */
-const daysLived = (birthday: string, now: number) => Math.floor((Math.floor(now / DAY) * DAY - Date.parse(`${birthday}T00:00:00Z`)) / DAY);
+/** Whole days from the birthday to today, where you are (src/here.ts: a utc midnight of your date). */
+const daysLived = (birthday: string, today: number) => Math.round((today - Date.parse(`${birthday}T00:00:00Z`)) / DAY);
 
-export function liveLabel(live: Live, birthday: string, now = Date.now()): string {
-  const days = daysLived(birthday, now);
+export function liveLabel(live: Live, birthday: string, today: number): string {
+  const days = daysLived(birthday, today);
   if (live === "weeks_left") return `${(Math.max(0, LIFE - days) / 7).toFixed(2)} weeks`;
   const age = days / YEAR, end = LIFE / YEAR;
   const left = age <= FROM ? 1 : Math.max(0, 1 - Math.log(age / FROM) / Math.log(end / FROM));
@@ -25,5 +25,5 @@ export function liveLabel(live: Live, birthday: string, now = Date.now()): strin
 }
 
 /** The tab as people and agents see it: its live label in place of its plain one, when it has one and the birthday is set. */
-export const named = (tab: Tab, birthday: string | undefined): Tab =>
-  tab.live && birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? { ...tab, label: liveLabel(tab.live, birthday) } : tab;
+export const named = (tab: Tab, birthday: string | undefined, today: number): Tab =>
+  tab.live && birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? { ...tab, label: liveLabel(tab.live, birthday, today) } : tab;
