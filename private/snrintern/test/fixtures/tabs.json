@@ -62,8 +62,8 @@
   ]
  },
  "people": {
-  "label": "sonder",
-  "about": "people i've met, and where",
+  "label": "people",
+  "about": "sonder",
   "title": "name",
   "aside": [],
   "line": [
@@ -145,9 +145,9 @@
    }
   ]
  },
- "forecasts": {
-  "label": "laplace's demon",
-  "about": "predictions to be scored later",
+ "predictions": {
+  "label": "predictions",
+  "about": "laplace's demon",
   "title": "decision",
   "aside": [
    "verdict",
@@ -644,8 +644,8 @@
   "hidden": true
  },
  "books": {
-  "label": "conversations with the dead",
-  "about": "what i have read, what i think of it, and what is next",
+  "label": "books",
+  "about": "conversations with the dead",
   "title": "title",
   "aside": [
    "status"

@@ -103,17 +103,17 @@ beforeAll(async () => {
     const r = await send(token, `/api/_tabs/${slug}`, definition, "PUT");
     if (r.status >= 300) throw new Error(`${slug}: ${JSON.stringify(r.body)}`);
   }
-  for (const old of ["outbound", "gym"]) await call(`drop seed tab ${old}`, `/api/_tabs/${old}`, { method: "DELETE", token });
+  for (const old of ["outbound", "gym", "forecasts"]) await call(`drop seed tab ${old}`, `/api/_tabs/${old}`, { method: "DELETE", token });
 
   // rows, written the way the agent writes them
   const rows: [string, Record<string, unknown>][] = [
     ["people", { name: "Ada Example", company: "Example Labs", title: "founder", met_where: "space week", group: "space & deep tech", last_contact: day(-120), linkedin: "https://www.linkedin.com/in/ada-example/", notes: "building small satellites" }],
     ["people", { name: "Ben Sample", company: "Sample VC", title: "partner", group: "investors & mentors", last_contact: day(-5), notes: "likes robots" }],
     ["people", { name: "Cy Placeholder", notes: "no group yet" }],
-    ["forecasts", { date: day(-200), decision: "Due soon bet", confidence: 80, expected: "it happens", review_date: day(5), status: "open" }],
-    ["forecasts", { date: day(-300), decision: "Overdue bet", confidence: 60, review_date: day(-10), status: "open" }],
-    ["forecasts", { date: day(-100), decision: "Far away bet", confidence: 95, review_date: day(900), status: "open" }],
-    ["forecasts", { date: day(-400), decision: "Scored bet", confidence: 80, review_date: day(-60), verdict: "right", status: "closed" }],
+    ["predictions", { date: day(-200), decision: "Due soon bet", confidence: 80, expected: "it happens", review_date: day(5), status: "open" }],
+    ["predictions", { date: day(-300), decision: "Overdue bet", confidence: 60, review_date: day(-10), status: "open" }],
+    ["predictions", { date: day(-100), decision: "Far away bet", confidence: 95, review_date: day(900), status: "open" }],
+    ["predictions", { date: day(-400), decision: "Scored bet", confidence: 80, review_date: day(-60), verdict: "right", status: "closed" }],
     ["training", { at: `${day(-20)}T18:00-08:00`, type: "strength", title: "chest", focus: "chest, arms", lifts: "flat db press: 45x10, 50x8; tricep pushdown: 50x8x3", duration_min: 60 }],
     ["training", { at: `${day(-13)}T18:00-08:00`, type: "strength", title: "chest", focus: "chest", lifts: "flat db press: 50x8, 60x6; pull up: bwx10" }],
     ["training", { at: `${day(-6)}T07:00-08:00`, type: "strength", title: "legs", focus: "legs", lifts: "leg press: 220x8, 260x10; pull up: +25x6" }],
@@ -138,7 +138,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, forecasts: 4, training: 4, body: 2, books: 0, health: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, books: 0, health: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -319,9 +319,9 @@ test("ten years of rows: pages of 50, search over all of them, the api and the c
   expect((await call("drop notes", "/api/_tabs/notes", { method: "DELETE", token: agent })).status).toBe(200);
 }, 120_000);
 
-test("forecasts open on what is upcoming and how calibrated; scoring one (by the agent) moves it", async () => {
+test("predictions open on what is upcoming and how calibrated; scoring one (by the agent) moves it", async () => {
   const token = await me();
-  const page = (await call("forecasts page", "/forecasts", { token })).body as string;
+  const page = (await call("predictions page", "/predictions", { token })).body as string;
   // upcoming: the next 3 open ones, overdue first, however far away the rest are
   const upcoming = page.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0];
   expect(upcoming.indexOf("Overdue bet")).toBeLessThan(upcoming.indexOf("Due soon bet"));
@@ -337,14 +337,14 @@ test("forecasts open on what is upcoming and how calibrated; scoring one (by the
   expect(page).toContain('<span><span class="bad">review overdue by 10 days</span></span>'); // past and still open
   expect(page).toContain("<span>reviewed 2 months ago</span>"); // past and scored
   expect(page).not.toContain('class="snippet"'); // no description under rows; "expected" stays searchable and on the row page
-  const overdue = (await call("forecast rows", "/api/forecasts?q=Overdue", { token })).body.rows[0];
-  await send(await dots(), `/api/forecasts/${overdue.id}`, { verdict: "wrong", status: "closed" }, "PATCH");
-  const after = (await call("forecasts page after scoring", "/forecasts", { token })).body as string;
+  const overdue = (await call("forecast rows", "/api/predictions?q=Overdue", { token })).body.rows[0];
+  await send(await dots(), `/api/predictions/${overdue.id}`, { verdict: "wrong", status: "closed" }, "PATCH");
+  const after = (await call("predictions page after scoring", "/predictions", { token })).body as string;
   expect(after.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0]).not.toContain("Overdue bet");
   expect(after).toContain("<span>reviewed 10 days ago</span>");
   expect(after).toContain("<dt>avg confidence</dt><dd>70%</dd><dt>came true</dt><dd>1 of 2</dd>");
   expect(after).toContain('<span class="pill bad">wrong</span>');
-  writeFileSync(join(artifacts, "page-forecasts.html"), after);
+  writeFileSync(join(artifacts, "page-predictions.html"), after);
 });
 
 test("books open on what is being read and what is next; the agent moves a book through its life", async () => {
@@ -742,7 +742,7 @@ test("people link to companies, events and each other by name, and their page op
   expect(page).toContain('<section class="view"><div class="graph" data-graph="'); // no heading pill over it
   expect(page).not.toContain('<span class="pill">connections</span>');
   expect(page).toContain('<script src="/_graph-3.35.0-fcose-2.2.0.js"></script>');
-  expect(page).toContain("● sonder</span><span>■ companies</span><span>◆ events");
+  expect(page).toContain("● people</span><span>■ companies</span><span>◆ events");
   const lib = await fetch(`http://localhost:${port}/_graph-3.35.0-fcose-2.2.0.js`, { headers: { "cf-access-jwt-assertion": token } });
   expect(lib.headers.get("cache-control")).toContain("immutable");
   const text = await lib.text();
@@ -764,17 +764,20 @@ test("people link to companies, events and each other by name, and their page op
 test("tabs keep fixed titles; health's and training's descriptions are live, worked out from the birthday secret", async () => {
   const token = await me();
   await findHere();
-  const titles = { people: "sonder", forecasts: "laplace's demon", books: "conversations with the dead", health: "health", training: "training" };
+  const titles = { people: "people", predictions: "predictions", books: "books", health: "health", training: "training" };
   const home = (await call("home names", "/", { token })).body as string;
   for (const [slug, title] of Object.entries(titles)) expect(home).toContain(`<a href="/${slug}"><span>${title}</span></a>`);
   expect(home).toContain(`<a href="/health"><span>health</span></a>\n            <p>${weeksLeft()}</p>`);
   expect(home).toContain(`<a href="/training"><span>training</span></a>\n            <p>${feltLeft()}</p>`);
-  expect(home).toContain("<p>people i've met, and where</p>"); // the rest keep their written descriptions
+  // the rest have written descriptions: the names live there, the titles stay plain
+  for (const [slug, about] of [["people", "sonder"], ["predictions", "laplace's demon"], ["books", "conversations with the dead"]])
+    expect(home).toContain(`<a href="/${slug}"><span>${slug}</span></a>\n            <p>${about}</p>`);
+  expect((await call("old path", "/forecasts", { token })).status).toBe(404); // renamed, no alias
   // the agents see the same in GET /api; the definition keeps what was written and says it's live
   const tabs = Object.fromEntries((await call("api names", "/api", { token: await instinct() })).body.tabs.map((t: any) => [t.slug, t]));
   expect(tabs.health).toMatchObject({ label: "health", about: weeksLeft() });
   expect(tabs.training).toMatchObject({ label: "training", about: feltLeft() });
-  expect(tabs.people.label).toBe("sonder");
+  expect(tabs.people).toMatchObject({ label: "people", about: "sonder" });
   expect((await call("health definition", "/api/_tabs/health", { token })).body.tab).toMatchObject({ label: "health", live: "weeks_left" });
   expect((await call("health page", "/health", { token })).body).toContain("<h1>health</h1>");
   expect((await send(token, "/api/_tabs/scratch2", { label: "x", about: "", live: "years_left", fields: [{ name: "a", type: "text" }] }, "PUT")).body.error).toContain('"live" must be one of weeks_left, felt_time_left');
@@ -782,7 +785,7 @@ test("tabs keep fixed titles; health's and training's descriptions are live, wor
 
 test("home is just the visible tabs, no numbers", async () => {
   const page = (await call("home", "/", { token: await me() })).body as string;
-  for (const tab of ["people", "forecasts", "training"]) expect(page).toContain(`href="/${tab}"`);
+  for (const tab of ["people", "predictions", "training"]) expect(page).toContain(`href="/${tab}"`);
   for (const hidden of ["body", "companies", "events"]) expect(page).not.toContain(`href="/${hidden}"`);
   expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
@@ -824,7 +827,7 @@ test("tabs and columns are added through the api, with no migration, and every c
 
 test("the pages are read-only: no forms, no write routes", async () => {
   const token = await me();
-  for (const path of ["/", "/training", "/people", "/forecasts"]) {
+  for (const path of ["/", "/training", "/people", "/predictions"]) {
     const page = (await call(`page ${path}`, path, { token })).body as string;
     expect(page).not.toContain("<form method=\"post\"");
     expect(page).not.toContain("_edit");
@@ -837,7 +840,7 @@ test("the pages are read-only: no forms, no write routes", async () => {
 
 test("every page and a row render; a row shows its lifts per exercise", async () => {
   const token = await me();
-  for (const tab of ["people", "forecasts", "training", "body"]) {
+  for (const tab of ["people", "predictions", "training", "body"]) {
     const { status, body } = await call(`page ${tab}`, `/${tab}`, { token });
     expect(status).toBe(200);
     expect(body).not.toContain("#d9a441"); // greys, green and red only
@@ -854,10 +857,10 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
 
 test("a restart loses nothing", { timeout: 60_000 }, async () => {
   const token = await me();
-  await send(token, "/api/forecasts", { decision: "Restart keeps data", confidence: 99 });
+  await send(token, "/api/predictions", { decision: "Restart keeps data", confidence: 99 });
   await stopWorker();
   await startWorker();
-  const after = await call("read after restart", "/api/forecasts?q=Restart", { token });
+  const after = await call("read after restart", "/api/predictions?q=Restart", { token });
   expect(after.body.rows).toHaveLength(1);
   expect((await call("schema survives too", "/api/_tabs/thoughts", { token })).status).toBe(200);
 });
