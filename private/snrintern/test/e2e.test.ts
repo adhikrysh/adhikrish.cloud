@@ -252,8 +252,7 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
-  await findHere();
-  expect(lift).toContain(`<a class="back" href="/training" aria-label="back to ${feltLeft()}">←</a>`); // a lift goes back to its tab
+  expect(lift).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // titles never change // a lift goes back to its tab
   writeFileSync(join(artifacts, "page-lift.html"), standalone(lift));
   // the library is served by the worker itself, cached forever
   const lib = await fetch(`http://localhost:${port}/_charts-5.2.1.js`, { headers: { "cf-access-jwt-assertion": token } });
@@ -762,17 +761,22 @@ test("people link to companies, events and each other by name, and their page op
   writeFileSync(join(artifacts, "page-people.html"), standalone(page));
 });
 
-test("tabs go by their names, and health and training by live ones worked out from the birthday secret", async () => {
+test("tabs keep fixed titles; health's and training's descriptions are live, worked out from the birthday secret", async () => {
   const token = await me();
   await findHere();
-  const names = { people: "sonder", forecasts: "laplace's demon", books: "conversations with the dead", health: weeksLeft(), training: feltLeft() };
+  const titles = { people: "sonder", forecasts: "laplace's demon", books: "conversations with the dead", health: "health", training: "training" };
   const home = (await call("home names", "/", { token })).body as string;
-  for (const [slug, name] of Object.entries(names)) expect(home).toContain(`<a href="/${slug}"><span>${name.replaceAll("'", "&#39;").replace("&#39;", "'")}</span></a>`);
-  // the agents see the same names in GET /api; the definition keeps its plain label and says it's live
-  const tabs = Object.fromEntries((await call("api names", "/api", { token: await instinct() })).body.tabs.map((t: any) => [t.slug, t.label]));
-  for (const [slug, name] of Object.entries(names)) expect(tabs[slug]).toBe(name);
+  for (const [slug, title] of Object.entries(titles)) expect(home).toContain(`<a href="/${slug}"><span>${title}</span></a>`);
+  expect(home).toContain(`<a href="/health"><span>health</span></a>\n            <p>${weeksLeft()}</p>`);
+  expect(home).toContain(`<a href="/training"><span>training</span></a>\n            <p>${feltLeft()}</p>`);
+  expect(home).toContain("<p>people i've met, and where</p>"); // the rest keep their written descriptions
+  // the agents see the same in GET /api; the definition keeps what was written and says it's live
+  const tabs = Object.fromEntries((await call("api names", "/api", { token: await instinct() })).body.tabs.map((t: any) => [t.slug, t]));
+  expect(tabs.health).toMatchObject({ label: "health", about: weeksLeft() });
+  expect(tabs.training).toMatchObject({ label: "training", about: feltLeft() });
+  expect(tabs.people.label).toBe("sonder");
   expect((await call("health definition", "/api/_tabs/health", { token })).body.tab).toMatchObject({ label: "health", live: "weeks_left" });
-  expect((await call("health page", "/health", { token })).body).toContain(`<h1>${weeksLeft()}</h1>`);
+  expect((await call("health page", "/health", { token })).body).toContain("<h1>health</h1>");
   expect((await send(token, "/api/_tabs/scratch2", { label: "x", about: "", live: "years_left", fields: [{ name: "a", type: "text" }] }, "PUT")).body.error).toContain('"live" must be one of weeks_left, felt_time_left');
 });
 
@@ -843,8 +847,7 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
   const row = (await call("row page", `/training/${chest.id}`, { token })).body as string;
   expect(row).toContain('<span class="ex">tricep pushdown</span>50 × 8   50 × 8   50 × 8');
   expect(row).toContain(`<a class="schema" href="/api/_tabs/training">schema</a>`);
-  await findHere();
-  expect(row).toContain(`<a class="back" href="/training" aria-label="back to ${feltLeft()}">←</a>`); // a row goes back to its tab
+  expect(row).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a row goes back to its tab
   expect(row).not.toContain('<a href="/people">'); // no sibling tabs in the nav
   writeFileSync(join(artifacts, "page-training-row.html"), row);
 });
@@ -874,7 +877,7 @@ test("today is where you are, not in utc: a session minutes ago, in a place whos
     // the list under it says so too: the row's date reads as today, and the live label counts from the same day
     await findHere();
     expect(here).toBe(minutes);
-    expect((await call("api names, where you are", "/api", { token: agent })).body.tabs.find((t: any) => t.slug === "health").label).toBe(weeksLeft());
+    expect((await call("api names, where you are", "/api", { token: agent })).body.tabs.find((t: any) => t.slug === "health").about).toBe(weeksLeft());
   } finally {
     await call("remove the midnight lift", `/api/training/${r.body.row.id}`, { method: "DELETE", token: agent });
   }

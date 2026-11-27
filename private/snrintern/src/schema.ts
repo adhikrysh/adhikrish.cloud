@@ -24,7 +24,7 @@ export type TabDefinition = {
   views?: View[]; // what the tab opens on, above the list (see View)
   hidden?: boolean; // left out of the nav and home (its data still feeds other tabs' views)
   parts?: Part[]; // on a row's page: one bar per part, each field a share of it (sleep: deep, light, rem, awake)
-  live?: Live; // the label becomes a number about your life, from the BIRTHDAY secret (src/live.ts); `label` stays the fallback
+  live?: Live; // the description (about) becomes a number about your life, from the BIRTHDAY secret (src/live.ts); the label never changes
   fields: Field[];
 };
 

@@ -4,7 +4,7 @@ import { escape, page as shell, type Design } from "../../../design/html.ts";
 import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
 import { todayHere } from "./here.ts";
-import { named } from "./live.ts";
+import { described } from "./live.ts";
 import { GRAPH_CSS, withGraph } from "./graph.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
 import { amount, dayWords, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
@@ -203,7 +203,7 @@ const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}
 
 export async function homePage(design: Design, database: D1Database, birthday?: string): Promise<string> {
   const [all, today] = await Promise.all([db.tabs(database), todayHere(database)]);
-  const tabs = all.filter((t) => !t.hidden).map((t) => named(t, birthday, today));
+  const tabs = all.filter((t) => !t.hidden).map((t) => described(t, birthday, today)); // live descriptions (weeks left) under fixed titles
   const items = tabs.map((tab) => `          <li>
             <a href="/${tab.slug}"><span>${escape(tab.label)}</span></a>
             <p>${escape(tab.about)}</p>

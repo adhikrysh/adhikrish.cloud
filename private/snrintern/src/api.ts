@@ -13,7 +13,7 @@ import docs from "../API.md?raw"; // bundled at deploy, so the contract always m
 import { claim, TRAINING } from "./activities.ts";
 import * as db from "./db.ts";
 import { todayHere } from "./here.ts";
-import { named } from "./live.ts";
+import { described } from "./live.ts";
 import { linksTo, renamed, resolve } from "./refs.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 import { computeViews } from "./views.ts";
@@ -40,8 +40,8 @@ export async function handleApi(request: Request, database: D1Database, who: str
   if (!first) {
     if (request.method !== "GET") return fail(405, "use GET");
     const [tabs, counts, today] = await Promise.all([db.tabs(database), db.counts(database), todayHere(database)]);
-    // each tab under the name the pages show (a live label is worked out now); GET /api/_tabs/<slug> keeps the definition as written
-    return json({ tabs: tabs.map((t) => ({ ...named(t, birthday, today), rows: counts.get(t.slug) ?? 0 })), api: API });
+    // each tab as home shows it (a live description is worked out now); GET /api/_tabs/<slug> keeps the definition as written
+    return json({ tabs: tabs.map((t) => ({ ...described(t, birthday, today), rows: counts.get(t.slug) ?? 0 })), api: API });
   }
 
   if (first === "_docs") {

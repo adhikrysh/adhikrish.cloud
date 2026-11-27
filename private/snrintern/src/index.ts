@@ -8,7 +8,6 @@ import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
 import { todayHere } from "./here.ts";
-import { named } from "./live.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
 import { CHARTS_PATH, chartsAsset } from "./charts.ts";
@@ -54,9 +53,8 @@ export default {
 
     const [, slug, id, name] = url.pathname.split("/");
     if (!slug) return html(await homePage(design, env.DB, env.BIRTHDAY));
-    const found = await db.tab(env.DB, slug);
-    if (!found) return html("not found", 404);
-    const tab = named(found, env.BIRTHDAY, await todayHere(env.DB)); // a live label (weeks left) everywhere the page names the tab
+    const tab = await db.tab(env.DB, slug);
+    if (!tab) return html("not found", 404);
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? "", Math.max(1, Math.floor(Number(url.searchParams.get("page"))) || 1)));
     if (id === "metrics" && name) {
       const metric = await metricHistoryPage(design, env.DB, tab, decodeURIComponent(name));

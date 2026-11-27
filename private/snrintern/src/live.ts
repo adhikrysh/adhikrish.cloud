@@ -1,6 +1,7 @@
-// Live labels: a tab whose name is a number about your life, worked out from your birthday on every request.
+// Live descriptions: a tab whose one-line description is a number about your life, worked out from your birthday on every
+// request. The title never changes; only the line under it does.
 // The birthday is the worker secret BIRTHDAY (yyyy-mm-dd), never in git or d1: it never changes, and the repo is public.
-// A tab opts in with `"live": "<kind>"` in its definition; without the secret it keeps its plain label.
+// A tab opts in with `"live": "<kind>"` in its definition; without the secret it keeps its written `about`.
 //   weeks_left       4,000 weeks (28,000 days) minus the weeks you've lived: "2780.29 weeks"
 //   felt_time_left   how much of your life is left as it feels. by the proportional theory of felt time, a year at age t feels
 //                    like 1/t of one, so felt time from age a to b is ln(b/a). counting from age 7 (before it, childhood amnesia
@@ -24,6 +25,6 @@ export function liveLabel(live: Live, birthday: string, today: number): string {
   return `${(left * 100).toFixed(2)}% of perceptive time`;
 }
 
-/** The tab as people and agents see it: its live label in place of its plain one, when it has one and the birthday is set. */
-export const named = (tab: Tab, birthday: string | undefined, today: number): Tab =>
-  tab.live && birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? { ...tab, label: liveLabel(tab.live, birthday, today) } : tab;
+/** The tab as people and agents see it: its live description in place of its written one, when it has one and the birthday is set. */
+export const described = (tab: Tab, birthday: string | undefined, today: number): Tab =>
+  tab.live && birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? { ...tab, about: liveLabel(tab.live, birthday, today) } : tab;
