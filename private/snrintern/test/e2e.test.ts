@@ -20,9 +20,10 @@ const report: { scenario: string; status: number; detail?: unknown }[] = [];
 const charts = (html: string) => [...html.matchAll(/data-chart="([^"]*)"/g)].map((m) => JSON.parse(m[1].replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&#39;", "'")));
 /** A page that opens from disk: the chart and graph libraries inlined instead of fetched from the worker, so the artifact draws. */
 const CHART_LIB = readFileSync(join(import.meta.dir, "../node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"), "utf8");
-const GRAPH_LIB = readFileSync(join(import.meta.dir, "../node_modules/cytoscape/dist/cytoscape.min.js"), "utf8");
+const GRAPH_LIB = ["cytoscape/dist/cytoscape.min.js", "layout-base/layout-base.js", "cose-base/cose-base.js", "cytoscape-fcose/cytoscape-fcose.js"]
+  .map((p) => readFileSync(join(import.meta.dir, "../node_modules", p), "utf8")).join(";\n");
 const standalone = (html: string) => html.replace(/<script src="\/_charts-[\d.]+\.js"><\/script>/, () => `<script>${CHART_LIB}</script>`)
-  .replace(/<script src="\/_graph-[\d.]+\.js"><\/script>/, () => `<script>${GRAPH_LIB}</script>`);
+  .replace(/<script src="\/_graph-[\w.-]+\.js"><\/script>/, () => `<script>${GRAPH_LIB}</script>`);
 mkdirSync(artifacts, { recursive: true }); // ignored by git, so a fresh checkout does not have it
 
 let jwks: ReturnType<typeof Bun.serve>;
@@ -723,11 +724,12 @@ test("people link to companies, events and each other by name, and their page op
   // the page: the graph on top, drawn by the library the worker serves, and the groups under it
   const page = (await call("people page", "/people", { token })).body as string;
   expect(page).toContain('class="graph" data-graph="');
-  expect(page).toContain('<script src="/_graph-3.35.0.js"></script>');
+  expect(page).toContain('<script src="/_graph-3.35.0-fcose-2.2.0.js"></script>');
   expect(page).toContain("● people</span><span>■ companies</span><span>◆ events");
-  const lib = await fetch(`http://localhost:${port}/_graph-3.35.0.js`, { headers: { "cf-access-jwt-assertion": token } });
+  const lib = await fetch(`http://localhost:${port}/_graph-3.35.0-fcose-2.2.0.js`, { headers: { "cf-access-jwt-assertion": token } });
   expect(lib.headers.get("cache-control")).toContain("immutable");
-  expect(await lib.text()).toContain("cytoscape");
+  const text = await lib.text();
+  for (const part of ["cytoscape", "layoutBase", "coseBase", "cytoscapeFcose"]) expect(text).toContain(part);
   const list = page.split('<div class="rows">')[1];
   expect(list).toContain("<summary>space &amp; deep tech</summary>");
   expect(list).toContain("<summary>no group</summary>");

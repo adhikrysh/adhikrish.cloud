@@ -47,7 +47,9 @@ every check runs before anything is created, so a refused write (a name matching
 
 ## the page
 
-the graph sits above the list, which stays as it was (groups, search). cytoscape.js lays it out by force and is served by the worker at `/_graph-<version>.js`, like the chart library. each tab gets a shape (people circles, companies squares, events diamonds), nodes grow with their links, and labels keep their size at any zoom. you drag nodes, drag the background to pan, and zoom with the wheel or a pinch once you've clicked into the graph, so scrolling past it still scrolls the page. a click on a node shows its fields, a link to its row and what it links to, and fades the rest. where you dragged things isn't saved: every load lays the graph out again.
+the graph sits above the list, which stays as it was (groups, search), on the page's own black. it's cytoscape.js with the fcose layout, served by the worker at `/_graph-<versions>.js` like the chart library. fcose packs many small parts (most people are a person and their company) into one round cluster, and spaces nodes by the size of their labels, so no two names overlap. each tab gets a shape (people bright circles, companies grey squares, events grey diamonds). labels have a fixed size in the graph, so they grow and shrink with the zoom and hide when they'd be too small to read.
+
+hovering a node lights up what it links to and fades the rest (the way obsidian's graph does). a click holds that and shows, under the graph, the node's fields, a link to its row and what it links to; clicking a linked name jumps there. drag a node to move it, drag the background to pan, and zoom with the wheel or a pinch once you've clicked into the graph, so scrolling past it still scrolls the page. where you dragged things isn't saved: every load lays the graph out again.
 
 ## misconceptions we hit
 
@@ -80,4 +82,4 @@ the graph sits above the list, which stays as it was (groups, search). cytoscape
 ## open questions
 
 - the page's phone layout is untested on a real phone; dragging on a touch screen may also scroll the page.
-- a large graph (hundreds of nodes) hasn't been tried; cose lays it out in the browser on every load.
+- a large graph (hundreds of nodes) hasn't been tried; fcose lays it out in the browser on every load.

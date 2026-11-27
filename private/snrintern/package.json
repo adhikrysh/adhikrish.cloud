@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "cytoscape": "3.35.0",
+    "cytoscape-fcose": "2.2.0",
     "jose": "6.2.17",
     "lightweight-charts": "5.2.1"
   }
