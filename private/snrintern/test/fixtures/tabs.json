@@ -172,8 +172,7 @@
    {
     "kind": "strip",
     "field": "at",
-    "label": "sessions",
-    "page": false
+    "label": "sessions"
    },
    {
     "kind": "load",
@@ -207,20 +206,17 @@
    },
    {
     "kind": "progress",
-    "field": "lifts",
-    "page": false
+    "field": "lifts"
    },
    {
     "kind": "line",
     "tab": "body",
-    "field": "bodyweight_kg",
-    "page": false
+    "field": "bodyweight_kg"
    },
    {
     "kind": "line",
     "tab": "body",
-    "field": "bodyfat_percentage",
-    "page": false
+    "field": "bodyfat_percentage"
    },
    {
     "kind": "records",
@@ -269,8 +265,7 @@
       "field": "elevation_m",
       "best": "max"
      }
-    ],
-    "page": false
+    ]
    }
   ],
   "fields": [
@@ -743,8 +738,7 @@
        "bad": "under-recovered"
       }
      }
-    ],
-    "page": false
+    ]
    },
    {
     "kind": "metrics",
@@ -794,8 +788,7 @@
        "bad": "stressful day"
       }
      }
-    ],
-    "page": false
+    ]
    },
    {
     "kind": "metrics",
@@ -815,8 +808,7 @@
       "per": "week",
       "finished": true
      }
-    ],
-    "page": false
+    ]
    },
    {
     "kind": "metrics",
@@ -832,8 +824,7 @@
       "better": "lower",
       "change": true
      }
-    ],
-    "page": false
+    ]
    }
   ],
   "fields": [

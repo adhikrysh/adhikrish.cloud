@@ -176,35 +176,48 @@ test("the agent adds, edits, finds and deletes rows", async () => {
   expect((await call("second agent deletes", `/api/people/${other.body.row.id}`, { method: "DELETE", token: await instinct() })).status).toBe(200);
 });
 
-test("training's views are numbers for the agent, off the page: a strip of sessions, progress, bodyweight", async () => {
-  const token = await me(), agent = await dots();
-  const views = async () => Object.fromEntries((await call("training views", "/api/training/_views", { token: agent })).body.views.map((v: any) => [v.label, v]));
-  let v = await views();
-  // sessions: 4 in 21 days, the gap since the last (2 days) shorter than the longest before it (7); no goals anywhere
-  expect(v.sessions).toMatchObject({ per_week: 1.3, days_since_last: 2, longest_gap_days: 7, longer_gap_than_ever: false, on_page: false });
-  // flat db press: 50 -> 60 over two sessions, the latest is the best; pull up tracked by added weight
-  const exercise = (name: string) => v.progress.exercises.find((e: any) => e.exercise === name);
-  expect(exercise("flat db press")).toMatchObject({ best: "60 lb × 6", trend: "new best", sessions: 2 });
-  expect(exercise("pull up")).toMatchObject({ best: "+25 × 6", trend: "new best" });
-  // bodyweight from the body tab (hidden): what happened, no target
-  expect(v.bodyweight).toMatchObject({ latest: 69.4, change: 1.4, tab: "body" });
-  expect(v.bodyfat).toMatchObject({ latest: 15.5 });
-  // the page itself: the log, nothing computed above it
+test("the training page is built from the data: a strip of sessions, progress, bodyweight", async () => {
+  const token = await me();
   const page = (await call("training page", "/training", { token })).body as string;
-  expect(page).not.toContain('<div class="views">');
-  expect(page).not.toContain("data-chart");
-  expect(page).not.toContain("6:00 pm"); // grouped by day: the heading is the date, rows carry no time
+  // a tick per day from the first session (20 days ago) to today, green on the 4 days trained; no goals anywhere
+  const strip = page.split('<div class="strip">')[1].split("</div>")[0];
+  expect(strip.match(/<i /g)).toHaveLength(21);
+  expect(strip.match(/class="up"/g)).toHaveLength(4);
+  expect(page).toContain('<h2><span class="pill">sessions</span></h2><span>1.3 a week</span>');
+  // the gap since the last session (2 days) is shorter than the longest before it (7): not red
+  expect(page).toContain('<span class="">last session 2 days ago</span>');
+  expect(page).not.toContain("this week");
+  expect(page).not.toContain("last trained");
+  // grouped by day: the heading is the date alone, and rows carry no time
+  expect(page).not.toContain("6:00 pm");
   expect(page).not.toMatch(/<h2>[^<]*<small>/);
-  expect(page).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to senior intern">←</a><a class="external"'); // a tab goes back home
-  writeFileSync(join(artifacts, "page-training.html"), page);
+  // flat db press: 50 -> 60 over two sessions, latest is the best: green
+  expect(page).toContain('flat db press</a><span class="sub"><span class="good">best 60 lb × 6</span>');
+  // pull up tracked by added weight: bw x10 then +25x6
+  expect(page).toContain('pull up</a><span class="sub"><span class="good">best +25 × 6</span>');
+  // bodyweight line from the body tab: what happened, no target to compare against
+  expect(page).toContain("69.4 kg");
+  expect(page).toContain("<span>+1.4 kg since");
+  expect(page).not.toContain(" to 75");
+  expect(page).toContain('<h2><span class="pill">bodyfat</span></h2>'); // body is hidden, its trends live on training
   // a brand-new exercise shows up in progress after a second session, with no code change
-  const dotsToken = agent;
+  const dotsToken = await dots();
   await send(dotsToken, "/api/training", { at: `${day(-9)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 30x10" });
   await send(dotsToken, "/api/training", { at: `${day(-1)}T18:00-08:00`, type: "strength", title: "arms", lifts: "hammer curl: 25x12" });
-  v = await views();
-  expect(exercise("hammer curl")).toMatchObject({ best: "30 lb × 10", latest: "25 lb × 12", trend: "below best" });
-  expect(v.sessions.days_since_last).toBe(1);
-  // every lift still has its own page, by url: each session plotted and listed, the best in green
+  const after = (await call("training page after new exercise", "/training", { token })).body as string;
+  expect(after).toContain('hammer curl</a><span class="sub"><span class="bad">best 30 lb × 10</span><span>latest 25 lb × 12</span>');
+  expect(after.split('<div class="strip">')[1].split("</div>")[0].match(/class="up"/g)).toHaveLength(6);
+  expect(after).toContain("last session yesterday");
+  expect(after).toContain('<nav aria-label="site"><a class="back" href="/" aria-label="back to senior intern">←</a><a class="external"'); // a tab goes back home
+  expect(charts(after).some((c) => c.base === "/body/")).toBe(true); // bodyweight: every weigh-in, each dot opening its day
+  // each exercise in progress: a box of dots on the right, one per session, the latest white
+  const press = after.split('flat db press</a>')[1].split('</div>')[0];
+  expect(press.match(/<circle /g)).toHaveLength(2);
+  expect(press).toContain('<circle class="today"');
+  expect(press).toContain("<polyline ");
+  writeFileSync(join(artifacts, "page-training.html"), standalone(after));
+  // every lift opens its own page: each session plotted and listed, the best in green
+  expect(after).toContain('<a class="name" href="/training/lifts/flat%20db%20press">flat db press</a>');
   const lift = (await call("lift page", "/training/lifts/flat%20db%20press", { token })).body as string;
   // a zoomable chart: one dot per session day, each opening its session; the best one marked
   const liftChart = charts(lift)[0];
@@ -438,27 +451,36 @@ test("garmin fills health: full backfill under the request cap, merged days, int
   expect(page.split("<h2>body battery</h2>")[1].split("</section>")[0].match(/<polyline /g)).toHaveLength(1); // hours apart, still one line
   writeFileSync(join(artifacts, "page-health-day.html"), page);
 
-  // the verdicts are numbers for the agent (/_views), judged garmin first; the page itself is just the log
+  // the tab page: this week judged against the 28 days before it, in the right direction for each metric
   const tabPage = (await call("health page", "/health", { token })).body as string;
-  expect(tabPage).not.toContain('<div class="views">');
-  expect(tabPage).not.toContain('href="/health/metrics/');
-  const verdicts = (await call("health views", "/api/health/_views", { token: agent })).body.views;
-  const m = (field: string) => verdicts.flatMap((v: any) => v.metrics).find((x: any) => x.field === field);
-  expect(m("hrv_ms")).toMatchObject({ verdict: "balanced", tone: null }); // garmin's hrv status, as garmin says it
-  expect(m("sleep_score")).toMatchObject({ value: 84, verdict: "good" }); // garmin's sleep score label
-  expect(m("body_battery_at_wake")).toMatchObject({ value: 91, verdict: "high", tone: "good" }); // garmin's high reserve band (76 to 100)
-  expect(m("stress_avg").verdict).toBe("low"); // 45: garmin's low stress band (26 to 50)
-  // steps against garmin's goal for the finished day (yesterday), today as so far
-  expect(m("steps")).toMatchObject({ verdict: `${(10000 - numbers(iso(1)).steps).toLocaleString("en-US")} short of goal`, when: "yesterday", today_so_far: numbers(iso(0)).steps });
-  // intensity: the week ending yesterday against garmin's weekly goal
-  expect(m("intensity_min")).toMatchObject({ value: 280, shown: "280 min", verdict: "280 of 150 min this week", tone: "good", per: "week" });
-  // resting hr: garmin gives no verdict, so your own history, with the band it used
-  expect(m("resting_hr")).toMatchObject({ value: 46, shown: "46 bpm" });
-  expect(m("resting_hr").verdict).toMatch(/^(usual|lower than usual)$/);
-  expect(m("resting_hr").usual).toHaveLength(2);
-  expect(m("hrv_ms").usual).toBeUndefined(); // judged by garmin, so no band of your own
-  expect(m("weight_kg")).toBeUndefined(); // weigh-ins live in body now
-  expect(m("vo2max")).toBeUndefined(); // never had a value
+  const row = (name: string) => tabPage.split(`href="/health/metrics/${name}">`)[1].split("</a>")[0];
+  const word = (name: string) => row(name).split('<span class="why">')[1].split("</span>")[0];
+  // each metric is one line: the judged day's value, one short verdict, the 14-day box; the verdict comes from garmin first
+  expect(word("hrv_ms")).toBe("<span>balanced"); // garmin's hrv status, as garmin says it; balanced isn't coloured
+  expect(word("sleep_score")).toBe("<span>good"); // garmin's sleep score label
+  expect(row("sleep_score")).toContain('<span class="val">84</span>');
+  expect(word("body_battery_at_wake")).toBe('<span class="good">high'); // 91: garmin's high reserve band (76 to 100)
+  expect(row("body_battery_at_wake")).toContain('<span class="val good">91</span>');
+  expect(word("stress_avg")).toBe("<span>low"); // 45: garmin's low stress band (26 to 50)
+  // steps against garmin's goal for the finished day (yesterday), today shown as so far
+  expect(word("steps")).toBe(`<span>${(10000 - numbers(iso(1)).steps).toLocaleString("en-US")} short of goal`);
+  expect(row("steps")).toContain(`<span>yesterday</span><span>today so far ${numbers(iso(0)).steps.toLocaleString("en-US")}</span>`);
+  // intensity: the week ending yesterday against garmin's weekly goal, in plain minutes
+  expect(row("intensity_min")).toContain('<span class="val good">280 min</span>');
+  expect(word("intensity_min")).toBe('<span class="good">280 of 150 min this week');
+  // resting hr: garmin gives no verdict, so your own history: this week's 46 sits inside the low end of the last 28 days
+  expect(row("resting_hr")).toContain('46 bpm</span>');
+  expect(word("resting_hr")).toMatch(/^<span( class="good")?>(usual|lower than usual)$/);
+  // the box: 14 dots and a line; the band only where the verdict is your own history
+  expect(row("hrv_ms").match(/<circle /g)).toHaveLength(14 - (NOT_WORN < 14 ? 1 : 0));
+  expect(row("hrv_ms").match(/<polyline /g)).toHaveLength(1);
+  expect(row("hrv_ms")).not.toContain('<rect class="usual"');
+  expect(row("resting_hr")).toContain('<rect class="usual"');
+  expect(row("body_battery_at_wake")).toContain('<circle class="today good"');
+  expect(tabPage).not.toContain('href="/health/metrics/weight_kg"'); // weigh-ins live in body now
+  expect(tabPage).not.toContain('href="/health/metrics/vo2max"'); // never had a value: no row
+  expect(tabPage).not.toContain("data-chart"); // the dashboard is static svg; the charts live a click away
+  expect(tabPage.indexOf("recovery")).toBeLessThan(tabPage.indexOf('<form class="search"'));
   // the log: each day as its big picture from the same verdicts (at most two, bad first)
   const logRow = (date: string) => tabPage.split('<div class="rows">')[1].split("</li>").find((li) => li.includes(`href="/health/${rows.find((r) => r.date === date).id}"`))!;
   expect(logRow(iso(0))).toContain('<small class="aside words"><span class="good">well recovered</span></small>'); // body battery high; today's steps aren't judged
@@ -597,17 +619,17 @@ test("training opens on what an agent needs, and /_views gives it the same numbe
   expect(record("most climbing").best_ever).toEqual(record("most climbing").best_last_90_days);
   expect(record("longest ride")).toBeUndefined(); // never ridden: no record
 
-  // off the page by default; a view with "page" left on draws exactly those numbers (the same computation)
+  // load, the run limit and weeks are the agent's (page: false): off the page, which still opens on sessions, progress,
+  // bodyweight and records; drawn, they'd show exactly those numbers (the same computation)
   const shown = (await call("training page", "/training", { token })).body as string;
-  expect(shown).not.toContain('<span class="pill">load</span>');
-  const drawn = async (slug: string) => {
-    const { slug: _s, position: _p, ...d } = (await call(`${slug} schema`, `/api/_tabs/${slug}`, { token })).body.tab;
-    expect((await send(token, `/api/_tabs/${slug}`, { ...d, views: d.views.map(({ page: _x, ...v }: any) => v) }, "PUT")).status).toBe(200);
-    const html = (await call(`${slug} page, views drawn`, `/${slug}`, { token })).body as string;
-    expect((await send(token, `/api/_tabs/${slug}`, d, "PUT")).status).toBe(200);
-    return html;
-  };
-  const page = await drawn("training");
+  for (const label of ["load", "run limit", "weeks"]) expect(shown).not.toContain(`<span class="pill">${label}</span>`);
+  for (const label of ["sessions", "progress", "records"]) expect(shown).toContain(`<span class="pill">${label}</span>`);
+  expect(view("load").on_page).toBe(false);
+  expect(view("records").on_page).toBe(true);
+  const { slug: _s, position: _p, ...def } = (await call("training schema", "/api/_tabs/training", { token })).body.tab;
+  expect((await send(token, "/api/_tabs/training", { ...def, views: def.views.map(({ page: _x, ...v }: any) => v) }, "PUT")).status).toBe(200);
+  const page = (await call("training page, every view drawn", "/training", { token })).body as string;
+  expect((await send(token, "/api/_tabs/training", def, "PUT")).status).toBe(200);
   const block = (label: string) => page.split(`<span class="pill">${label}</span></h2>`)[1].split("</section>")[0];
   expect(block("load")).toContain('<span class="name">7 days</span><span class="val">181</span><span class="why"><span>higher than usual</span>');
   expect(block("run limit")).toContain('<span class="name">next under</span><span class="val">8.3 km</span>');
@@ -622,7 +644,7 @@ test("training opens on what an agent needs, and /_views gives it the same numbe
 
   // health: the agent reads the page's verdicts instead of redoing the maths over raw rows
   const health = (await call("health views", "/api/health/_views", { token: agent })).body.views;
-  const healthPage = await drawn("health");
+  const healthPage = (await call("health page again", "/health", { token })).body as string;
   const all = health.flatMap((v: any) => v.metrics);
   expect(all.find((m: any) => m.field === "sleep_score")).toMatchObject({ value: 84, shown: "84", verdict: "good" });
   for (const m of all) expect(healthPage).toContain(`href="/health/metrics/${m.field}"><span class="name">${m.name}</span><span class="val${m.tone ? ` ${m.tone}` : ""}">${m.shown}</span>`);

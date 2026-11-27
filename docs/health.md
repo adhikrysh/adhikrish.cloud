@@ -2,7 +2,7 @@
 
 how does a day on the watch end up as a line on `seniorintern.adhikrish.cloud/health`, and how does that page decide what to say about it?
 
-**the short answer.** the watch uploads to garmin through the phone. every hour a cron trigger wakes the senior intern worker, which asks garmin's official personal api for the days it doesn't have yet and writes one row per day (the day's numbers) plus that day's streams (heart rate every 2 minutes, overnight hrv, body battery) into d1. nothing runs on the thinkpad. `GET /api/health/_views` judges each metric's newest day by fixed rules, garmin's own verdict first, for the agent; the page shows only the days, each as a few words.
+**the short answer.** the watch uploads to garmin through the phone. every hour a cron trigger wakes the senior intern worker, which asks garmin's official personal api for the days it doesn't have yet and writes one row per day (the day's numbers) plus that day's streams (heart rate every 2 minutes, overnight hrv, body battery) into d1. nothing runs on the thinkpad. the page reads d1, judges each metric's newest day against your own last 28 days by fixed rules, and shows that verdict in words beside a small chart of the last 14 days.
 
 ## the objects
 
@@ -39,13 +39,15 @@ how does a day on the watch end up as a line on `seniorintern.adhikrish.cloud/he
 
 a recent day keeps changing (the phone syncs whenever it syncs), so recent days are fetched again every third hour; an older day is final. steady state is about 16 calls every third hour, about 130 a day. the weight range call's weigh-ins go to the body tab, not health. a full backfill of years of daily numbers takes a few days of hourly runs.
 
-## the verdicts
+## the page
 
-the agent reads them at `GET /api/health/_views`; they're off the page (`page: false`), which lists only the days. one line per metric, defined by the tab's `metrics` views ([`src/views.ts`](../private/snrintern/src/views.ts), contract in [`API.md`](../private/snrintern/API.md)):
+the dashboard is one line per metric, defined by the tab's `metrics` views ([`src/views.ts`](../private/snrintern/src/views.ts), contract in [`API.md`](../private/snrintern/API.md)):
 
 ```text
-{ "field": "sleep_score", "value": 53, "shown": "53",
-  "verdict": "poor", "tone": "bad", "when": "today" }
+sleep score                          53     ┌──────────────┐
+poor   today                                │ •─•  •─•─•   │  14 days, dots
+                                            │     •      ● │  and a line,
+                                            └──────────────┘  today white
 ```
 
 **how a day is judged, closest to the source of truth first.** each metric uses the first rule it has:
@@ -65,7 +67,7 @@ garmin's labels are taken as garmin returns them for each day, never re-derived 
 - **steps and intensity** judge yesterday: today isn't finished, so it's shown as "so far" and never judged.
 - **"today" means today where you are** (garmin's dates are local, so today or yesterday in utc). if the newest synced day is older than that, nothing reads as today, yesterday or "so far": days show their dates, so stale data can't pass for current.
 - **the log** reads each day as its big picture: every metric judged good or bad that day gives its words ("poor sleep", "well recovered"), at most two, bad first, else "an ordinary day".
-- **each metric still has its page by url** (`/health/metrics/<field>`, nothing links to it now): the value and its verdict, then a zoomable chart (lightweight-charts, served by the worker at `/_charts-<version>.js`). metrics with a stream open on `1d` / `3d` of it; `10d` to `all` show one dot per day; your usual shows as dashed lines only where the verdict is your own history. a click on a dot opens that day.
+- **a row opens the metric's page**: the value and its verdict, then a zoomable chart (lightweight-charts, served by the worker at `/_charts-<version>.js`). metrics with a stream open on `1d` / `3d` of it; `10d` to `all` show one dot per day; your usual shows as dashed lines only where the verdict is your own history. a click on a dot opens that day.
 
 all of this is arithmetic in the worker at render time: no model, so no cost, and the same numbers always read the same.
 
@@ -101,7 +103,7 @@ all of this is arithmetic in the worker at render time: no model, so no cost, an
 
 ## changing it safely
 
-- **a new metric:** add it to the `metrics` view in the definition (`PUT /api/_tabs/health`), keep `test/fixtures/tabs.json` in step, run `bun test`.
+- **a new metric on the dashboard:** add it to the `metrics` view in the definition (`PUT /api/_tabs/health`), keep `test/fixtures/tabs.json` in step, run `bun test`.
 - **a new garmin field:** map it in `daily()` or `summary()` in `src/garmin.ts`, add the field to the definition, and extend the fake in `test/fake-garmin.ts` (real response shapes, made-up numbers).
 - **refetching history** (after adding a field): delete the `garmin_backfill` key from `meta`; the next runs walk back again and merge the new field in.
 
