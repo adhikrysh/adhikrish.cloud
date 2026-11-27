@@ -18,9 +18,11 @@ const AUD = "e58f31f732ff5d00f7561ff36e3a9a23161176cdb806319370d50e6e2c0f387c"; 
 const report: { scenario: string; status: number; detail?: unknown }[] = [];
 /** The charts a page embeds: each one's data as the drawing script receives it. */
 const charts = (html: string) => [...html.matchAll(/data-chart="([^"]*)"/g)].map((m) => JSON.parse(m[1].replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&#39;", "'")));
-/** A page that opens from disk: the chart library inlined instead of fetched from the worker, so the artifact draws its charts. */
+/** A page that opens from disk: the chart and graph libraries inlined instead of fetched from the worker, so the artifact draws. */
 const CHART_LIB = readFileSync(join(import.meta.dir, "../node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"), "utf8");
-const standalone = (html: string) => html.replace(/<script src="\/_charts-[\d.]+\.js"><\/script>/, () => `<script>${CHART_LIB}</script>`);
+const GRAPH_LIB = readFileSync(join(import.meta.dir, "../node_modules/cytoscape/dist/cytoscape.min.js"), "utf8");
+const standalone = (html: string) => html.replace(/<script src="\/_charts-[\d.]+\.js"><\/script>/, () => `<script>${CHART_LIB}</script>`)
+  .replace(/<script src="\/_graph-[\d.]+\.js"><\/script>/, () => `<script>${GRAPH_LIB}</script>`);
 mkdirSync(artifacts, { recursive: true }); // ignored by git, so a fresh checkout does not have it
 
 let jwks: ReturnType<typeof Bun.serve>;
@@ -121,7 +123,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, forecasts: 4, training: 4, body: 2, books: 0, health: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, forecasts: 4, training: 4, body: 2, books: 0, health: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -662,24 +664,88 @@ test("training opens on what an agent needs, and /_views gives it the same numbe
   expect((await call("views of an unknown tab", "/api/nope/_views", { token: agent })).status).toBe(404);
 });
 
-test("people are a search and their groups, nothing above", async () => {
-  const token = await me();
+test("people link to companies, events and each other by name, and their page opens on the graph", async () => {
+  const token = await me(), agent = await instinct();
+  const count = async (tab: string) => (await call(`count ${tab}`, `/api/${tab}?limit=1000`, { token })).body.rows.length;
+  // the seeds already made their companies and event: a name with no row creates it
+  expect(await count("companies")).toBe(2);
+  expect((await call("seeded event", "/api/events", { token })).body.rows.map((r: any) => r.name)).toEqual(["space week"]);
+
+  // names match ignoring case and are stored as the row's own title; a new name makes its row; nobody knows themself
+  const gil = await send(agent, "/api/people", { name: "Gil Graph", company: "example labs", met_where: "Space Week", referred_by: "ben sample", knows: ["Ada Example", "Hal New", "gil graph", "ada example"] });
+  expect(gil.status).toBe(201);
+  expect(gil.body.row).toMatchObject({ company: "Example Labs", met_where: "space week", referred_by: "Ben Sample", knows: ["Ada Example", "Hal New"] });
+  expect(await count("companies")).toBe(2);
+  const hal = (await call("hal was made", "/api/people?q=Hal%20New", { token })).body.rows.filter((r: any) => r.name === "Hal New");
+  expect(hal.length).toBe(1); // the search also finds gil, who knows hal
+  expect(hal[0].updated_by).toBe("service:instinct-client-id");
+
+  // one title means one row: a second "example labs" is refused, so is a person with someone else's name
+  const dupe = await send(agent, "/api/companies", { name: "EXAMPLE LABS" });
+  expect(dupe.status).toBe(409);
+  expect(dupe.body.error).toContain('already has "Example Labs"');
+  expect((await send(agent, "/api/people", { name: "hal new" })).status).toBe(409);
+  for (const [body, why] of [[{ knows: 5 }, "must be a list of titles"], [{ company: ["a", "b"] }, "must be the title of a row in companies"]] as const) {
+    const r = await send(agent, `/api/people/${gil.body.row.id}`, body, "PATCH");
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain(why);
+  }
+  expect((await send(token, "/api/_tabs/scratch", { label: "scratch", about: "", fields: [{ name: "name", type: "text" }, { name: "boss", type: "ref", to: "nowhere" }] }, "PUT")).body.error).toContain('no tab "nowhere"');
+
+  // a rename rewrites every link to it, in single refs and in lists
+  const labs = (await call("labs", "/api/companies?q=Example%20Labs", { token })).body.rows[0];
+  expect((await send(agent, `/api/companies/${labs.id}`, { name: "Example Orbital", about: "small satellites" }, "PATCH")).status).toBe(200);
+  const ada = (await call("ada", "/api/people?q=Ada%20Example", { token })).body.rows.find((r: any) => r.name === "Ada Example");
+  expect((await send(agent, `/api/people/${ada.id}`, { name: "Ada Lovelace" }, "PATCH")).body.row.company).toBe("Example Orbital");
+  expect((await call("gil after renames", `/api/people/${gil.body.row.id}`, { token })).body.row).toMatchObject({ company: "Example Orbital", knows: ["Ada Lovelace", "Hal New"] });
+
+  // a row something links to stays until the links go
+  const kept = await call("delete a linked company", `/api/companies/${labs.id}`, { method: "DELETE", token: agent });
+  expect(kept.status).toBe(409);
+  expect(kept.body.error).toContain("people.company (2 rows)");
+  const unused = await send(agent, "/api/companies", { name: "Nobody Works Here" });
+  expect((await call("delete an unlinked company", `/api/companies/${unused.body.row.id}`, { method: "DELETE", token: agent })).status).toBe(200);
+
+  // the graph, as an agent reads it: every person, company and event a node, every link an edge
+  const views = (await call("people views", "/api/people/_views", { token: agent })).body.views;
+  expect(views.map((v: any) => [v.kind, v.label, v.on_page])).toEqual([["graph", "connections", true]]);
+  const g = views[0], name = new Map(g.nodes.map((n: any) => [n.id, n.label]));
+  expect(g.tabs.map((t: any) => t.slug)).toEqual(["people", "companies", "events"]);
+  const edges = g.edges.map((e: any) => `${name.get(e.from)} -${e.field}-> ${name.get(e.to)}`).sort();
+  expect(edges).toEqual([
+    "Ada Lovelace -company-> Example Orbital", "Ada Lovelace -met_where-> space week", "Ben Sample -company-> Sample VC",
+    "Gil Graph -company-> Example Orbital", "Gil Graph -knows-> Ada Lovelace", "Gil Graph -knows-> Hal New",
+    "Gil Graph -met_where-> space week", "Gil Graph -referred_by-> Ben Sample",
+  ]);
+  expect(g.nodes.find((n: any) => n.label === "Example Orbital").data).toEqual({ about: "small satellites" });
+  expect(g.nodes.find((n: any) => n.label === "Cy Placeholder")).toBeTruthy(); // nobody linked yet, still a node
+
+  // the page: the graph on top, drawn by the library the worker serves, and the groups under it
   const page = (await call("people page", "/people", { token })).body as string;
-  expect(page).not.toContain('<div class="views">');
+  expect(page).toContain('class="graph" data-graph="');
+  expect(page).toContain('<script src="/_graph-3.35.0.js"></script>');
+  expect(page).toContain("● people</span><span>■ companies</span><span>◆ events");
+  const lib = await fetch(`http://localhost:${port}/_graph-3.35.0.js`, { headers: { "cf-access-jwt-assertion": token } });
+  expect(lib.headers.get("cache-control")).toContain("immutable");
+  expect(await lib.text()).toContain("cytoscape");
   const list = page.split('<div class="rows">')[1];
-  expect(list).toContain('<details class="group">');
   expect(list).toContain("<summary>space &amp; deep tech</summary>");
   expect(list).toContain("<summary>no group</summary>");
+  expect(list).not.toContain('href="/companies'); // in the list only a row's title is a link
   // a topic nobody defined anywhere: the agent just writes it, and it becomes a group
   await send(await dots(), "/api/people", { name: "Eve New", group: "climate" });
   expect((await call("people page after new topic", "/people", { token })).body).toContain("<summary>climate</summary>");
-  writeFileSync(join(artifacts, "page-people.html"), page);
+  // a person's page links each name to its row
+  const gilPage = (await call("gil's page", `/people/${gil.body.row.id}`, { token })).body as string;
+  expect(gilPage).toContain('<a href="/companies?q=Example%20Orbital">Example Orbital</a>');
+  expect(gilPage).toContain('<a href="/people?q=Ada%20Lovelace">Ada Lovelace</a>, <a href="/people?q=Hal%20New">Hal New</a>');
+  writeFileSync(join(artifacts, "page-people.html"), standalone(page));
 });
 
 test("home is just the visible tabs, no numbers", async () => {
   const page = (await call("home", "/", { token: await me() })).body as string;
   for (const tab of ["people", "forecasts", "training"]) expect(page).toContain(`href="/${tab}"`);
-  expect(page).not.toContain('href="/body"'); // hidden
+  for (const hidden of ["body", "companies", "events"]) expect(page).not.toContain(`href="/${hidden}"`);
   expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
   expect(page).toContain('<nav aria-label="site"><a class="external" href="https://uptime.adhikrish.cloud/">uptime</a></nav>'); // only uptime, top right
@@ -737,7 +803,7 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
     const { status, body } = await call(`page ${tab}`, `/${tab}`, { token });
     expect(status).toBe(200);
     expect(body).not.toContain("#d9a441"); // greys, green and red only
-    writeFileSync(join(artifacts, `page-${tab}.html`), body);
+    writeFileSync(join(artifacts, `page-${tab}.html`), standalone(body));
   }
   const chest = (await call("chest", "/api/training?q=tricep", { token })).body.rows[0];
   const row = (await call("row page", `/training/${chest.id}`, { token })).body as string;

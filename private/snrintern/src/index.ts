@@ -10,6 +10,7 @@ import { handleApi } from "./api.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
 import { CHARTS_PATH, chartsAsset } from "./charts.ts";
+import { GRAPH_PATH, graphAsset } from "./graph.ts";
 import { sync } from "./garmin.ts";
 import { exercisePage, homePage, metricHistoryPage, rowPage, tabPage } from "./page.ts";
 
@@ -46,6 +47,7 @@ export default {
 
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return handleApi(request, env.DB, who.who);
     if (url.pathname === CHARTS_PATH) return chartsAsset(); // the chart library, cached forever (its version is in the path)
+    if (url.pathname === GRAPH_PATH) return graphAsset(); // the graph library, the same way
     if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
 
     const [, slug, id, name] = url.pathname.split("/");

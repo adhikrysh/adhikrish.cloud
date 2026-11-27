@@ -12,6 +12,7 @@
 import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
 import { claim, TRAINING } from "./activities.ts";
 import * as db from "./db.ts";
+import { linksTo, renamed, resolve } from "./refs.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 import { computeViews } from "./views.ts";
 
@@ -22,9 +23,10 @@ const API = {
   data: ["GET /api", "GET /api/<tab>?q=&limit=&offset= (pages: next_offset is null on the last)", "GET /api/<tab>/_views (the page's views as numbers: start here)", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00; time: true requires the time and offset)",
-    "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)"],
+    "url", "enum (options: [...])", "lifts ('flat db press: 45x10, 50x8; pull up: bwx10, +25x6'; 50x8x3 = three sets; unit lb by default)",
+    "ref (to: <tab>; the title of a row there, like \"Acme\"; many: true for a list; a name with no row creates it)"],
   views: ["progress (lifts field)", "strip (date field, label, days)", "line (field, tab)", "upcoming (date field, where, limit)", "calibration (confidence, verdict, right, min)", "list (label, where, sort, aside)", "metrics (label, metrics: [{ field, better, finished, change, stream, limit, per, goal, label, scale, log }])",
-    "load (field)", "limit (field, where, days, over)", "weeks (by, fields, zones, weeks)", "records (records: [{ label, field, best: max|min, where }], days)"],
+    "load (field)", "limit (field, where, days, over)", "weeks (by, fields, zones, weeks)", "records (records: [{ label, field, best: max|min, where }], days)", "graph (label): rows as nodes, refs as edges"],
 };
 
 export async function handleApi(request: Request, database: D1Database, who: string): Promise<Response> {
@@ -61,6 +63,7 @@ export async function handleApi(request: Request, database: D1Database, who: str
       const { after: _a, ...rest } = (raw ?? {}) as Record<string, unknown>;
       const definition = checkDefinition(after === undefined ? raw : rest);
       if (typeof definition === "string") return fail(400, definition);
+      for (const f of definition.fields) if (f.type === "ref" && f.to !== second && !(await db.tab(database, f.to!))) return fail(400, `field "${f.name}": no tab "${f.to}" to link to; define it first`);
       const { created } = await db.putTab(database, second, definition, who);
       if (after !== undefined) await db.placeAfter(database, second, after as string);
       return json({ tab: await db.tab(database, second) }, created ? 201 : 200);
@@ -99,6 +102,8 @@ export async function handleApi(request: Request, database: D1Database, who: str
     if (request.method === "POST") {
       const change = checkRow(tab, await body(), { partial: false });
       if (typeof change === "string") return fail(400, change);
+      const refused = await resolve(database, tab, change.set, who, {});
+      if (refused) return fail(409, refused);
       // a session garmin already stored (the watch synced first) becomes one row with it, not two
       const merged = tab.slug === TRAINING ? await claim(database, tab, change.set, who) : null;
       if (merged) return json({ row: merged, merged: "garmin" }, 200);
@@ -116,9 +121,21 @@ export async function handleApi(request: Request, database: D1Database, who: str
   if (request.method === "PATCH") {
     const change = checkRow(tab, await body(), { partial: true });
     if (typeof change === "string") return fail(400, change);
-    const row = await db.update(database, tab.slug, id, change, who);
-    return row ? json({ row }) : fail(404, "no such row");
+    const before = await db.get(database, tab.slug, id);
+    if (!before) return fail(404, "no such row");
+    const refused = await resolve(database, tab, change.set, who, { id, title: before[tab.title] as string | undefined });
+    if (refused) return fail(409, refused);
+    const row = (await db.update(database, tab.slug, id, change, who))!;
+    if (before[tab.title] !== undefined && row[tab.title] !== undefined) await renamed(database, tab, String(before[tab.title]), String(row[tab.title]), who);
+    return json({ row });
   }
-  if (request.method === "DELETE") return (await db.remove(database, tab.slug, id)) ? json({ deleted: id }) : fail(404, "no such row");
+  if (request.method === "DELETE") {
+    const row = await db.get(database, tab.slug, id);
+    if (!row) return fail(404, "no such row");
+    const linked = row[tab.title] === undefined ? [] : await linksTo(database, tab, String(row[tab.title]));
+    if (linked.length) return fail(409, `still linked from ${linked.join(", ")}: unlink them first`);
+    await db.remove(database, tab.slug, id);
+    return json({ deleted: id });
+  }
   return fail(405, "use GET, PATCH or DELETE");
 }

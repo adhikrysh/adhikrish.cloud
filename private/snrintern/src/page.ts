@@ -3,11 +3,13 @@
 import { escape, page as shell, type Design } from "../../../design/html.ts";
 import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
+import { GRAPH_CSS, withGraph } from "./graph.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
 import { amount, dayWords, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
 
-/** Every page goes through here: a page with a chart gets the chart library and its drawing script. */
-const page = (p: Parameters<typeof shell>[0]) => shell({ ...p, body: withCharts(p.body), css: `${p.css ?? ""}${p.body.includes("data-chart=") ? CHART_CSS : ""}` });
+/** Every page goes through here: a page with a chart or a graph gets its library and drawing script. */
+const page = (p: Parameters<typeof shell>[0]) => shell({ ...p, body: withGraph(withCharts(p.body)),
+  css: `${p.css ?? ""}${p.body.includes("data-chart=") ? CHART_CSS : ""}${p.body.includes("data-graph=") ? GRAPH_CSS : ""}` });
 
 const CSS = `
   nav { flex-wrap: wrap; row-gap: 6px; }
@@ -143,6 +145,11 @@ function show(f: Field, value: Value, where: "aside" | "line" | "detail"): strin
       return `<span class="pill${tone ? ` ${tone}` : ""}">${escape(value)}</span>`;
     }
     case "url": return `<a href="${escape(value)}" target="_blank" rel="noopener noreferrer">${escape(site(String(value)))}</a>`;
+    case "ref": {
+      // on a row's page, a link to the named row through its tab's search; in a list, only the row's title is a link
+      const titles = Array.isArray(value) ? value : [String(value)];
+      return titles.map((t) => (where !== "detail" ? escape(t) : `<a href="/${escape(f.to)}?q=${escape(encodeURIComponent(t))}">${escape(t)}</a>`)).join(", ");
+    }
     case "lifts": {
       const lifts = parseLifts(String(value));
       return escape(typeof lifts === "string" ? value : lifts.map((l) => l.exercise).join(", "));
@@ -160,10 +167,11 @@ function lineDate(tab: Tab, row: db.Row, f: Field): string | null {
   if (matches(view.where, row)) return `<span class="bad">${escape(`${name} overdue by ${relative(p).replace(" ago", "")}`)}</span>`;
   return escape(`${name.endsWith("e") ? `${name}d` : `${name}ed`} ${relative(p)}`);
 }
-const bits = (tab: Tab, row: db.Row, names: string[], where: "aside" | "line") =>
+// onPage: on the row's own page, where its refs are links (nothing around them is one)
+const bits = (tab: Tab, row: db.Row, names: string[], where: "aside" | "line", onPage = false) =>
   names.filter((n) => present(row[n])).map((n) => {
     const f = field(tab, n);
-    return `<span>${(where === "line" && (f.type === "date" || f.type === "datetime") && lineDate(tab, row, f)) || show(f, row[n] as Value, where)}</span>`;
+    return `<span>${(where === "line" && (f.type === "date" || f.type === "datetime") && lineDate(tab, row, f)) || show(f, row[n] as Value, onPage && f.type === "ref" ? "detail" : where)}</span>`;
   }).join("");
 const links = (tab: Tab, row: db.Row) => {
   const urls = tab.fields.filter((f) => f.type === "url" && present(row[f.name]) && !tab.aside.includes(f.name) && !tab.line.includes(f.name));
@@ -309,7 +317,7 @@ function part(tab: Tab, row: db.Row, p: { label: string; fields: string[] }): st
 }
 
 /** A value in a row page's list: numbers in their unit ("28:22", "148 bpm"), everything else as on the row's aside. */
-const detailValue = (f: Field, v: Value) => (f.type === "int" || f.type === "number" ? escape(amount(f, Number(v))) : show(f, v, "aside"));
+const detailValue = (f: Field, v: Value) => (f.type === "int" || f.type === "number" ? escape(amount(f, Number(v))) : show(f, v, f.type === "ref" ? "detail" : "aside"));
 
 /** A day of numbers (a tab with parts: health): each section's numbers under its heading, the parts as bars, then the day's timelines. */
 function sectioned(tab: Tab, row: db.Row, series: db.Series | null): string {
@@ -356,7 +364,7 @@ export function rowPage(design: Design, tab: Tab, row: db.Row, series: db.Series
     const fs = restFields.filter((f) => (f.section ?? "") === name);
     return name ? `<section class="section"><h2><span class="pill">${escape(name)}</span></h2>${dlOf(fs)}</section>` : dlOf(fs);
   });
-  const meta = [bits(tab, row, tab.line, "line"), bits(tab, row, tab.aside, "aside")].filter(Boolean).map((m) => `<p class="meta bits">${m}</p>`).join("\n");
+  const meta = [bits(tab, row, tab.line, "line", true), bits(tab, row, tab.aside, "aside", true)].filter(Boolean).map((m) => `<p class="meta bits">${m}</p>`).join("\n");
   const body = `      <article class="detail">
       <h1>${titleOf(tab, row, "detail")}</h1>
       ${meta}

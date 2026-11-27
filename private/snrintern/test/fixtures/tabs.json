@@ -1,4 +1,66 @@
 {
+ "companies": {
+  "label": "companies",
+  "about": "where the people work",
+  "title": "name",
+  "aside": [],
+  "line": [
+   "about"
+  ],
+  "sort": "id",
+  "hidden": true,
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "about",
+    "type": "text"
+   },
+   {
+    "name": "url",
+    "type": "url"
+   },
+   {
+    "name": "notes",
+    "type": "text"
+   }
+  ]
+ },
+ "events": {
+  "label": "events",
+  "about": "where you met people",
+  "title": "name",
+  "aside": [
+   "date"
+  ],
+  "line": [
+   "place"
+  ],
+  "sort": "date",
+  "hidden": true,
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "date",
+    "type": "date"
+   },
+   {
+    "name": "place",
+    "type": "text"
+   },
+   {
+    "name": "notes",
+    "type": "text"
+   }
+  ]
+ },
  "people": {
   "label": "people",
   "about": "people i've met, and where",
@@ -23,7 +85,8 @@
    },
    {
     "name": "company",
-    "type": "text"
+    "type": "ref",
+    "to": "companies"
    },
    {
     "name": "title",
@@ -31,7 +94,8 @@
    },
    {
     "name": "met_where",
-    "type": "text"
+    "type": "ref",
+    "to": "events"
    },
    {
     "name": "met_date",
@@ -51,7 +115,14 @@
    },
    {
     "name": "referred_by",
-    "type": "text"
+    "type": "ref",
+    "to": "people"
+   },
+   {
+    "name": "knows",
+    "type": "ref",
+    "to": "people",
+    "many": true
    },
    {
     "name": "notes",
@@ -66,7 +137,13 @@
     "type": "date"
    }
   ],
-  "group": "group"
+  "group": "group",
+  "views": [
+   {
+    "kind": "graph",
+    "label": "connections"
+   }
+  ]
  },
  "forecasts": {
   "label": "forecasts",

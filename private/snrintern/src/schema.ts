@@ -1,11 +1,13 @@
 // The schema is data. A tab definition says what fields a tab's rows may hold and how its list reads.
 // Definitions live in d1 (`tabs`) and change through PUT /api/_tabs/<slug>; this file only checks them.
 
-type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts";
+type FieldType = "text" | "int" | "number" | "date" | "datetime" | "url" | "enum" | "lifts" | "ref";
 export type Field = { name: string; type: FieldType; required?: boolean; min?: number; max?: number; unit?: string; options?: string[]; colors?: Record<string, Tone>;
   section?: string; // section: the heading it sits under on a row's page
   hidden?: boolean; // left off the pages (garmin_id): still in the api
-  time?: boolean }; // a datetime that must carry a time of day (a session's start), not just a date
+  time?: boolean; // a datetime that must carry a time of day (a session's start), not just a date
+  to?: string; // ref: the tab it links to; the value is the title of a row there (a company's name), as a wiki links by page name
+  many?: boolean }; // ref: a list of titles (everyone a person knows)
 /** How an enum value's pill looks: white (no tone), "outline" (black with a white border), "good" (green border), "bad" (red border). */
 export type Tone = "outline" | "good" | "bad";
 export type TabDefinition = {
@@ -40,7 +42,8 @@ type ViewKind =
   | { kind: "load"; field: string; label?: string } // the last 7 days' total next to the 28 days' weekly average; "higher" or "lower than usual" against your own past weeks
   | { kind: "limit"; field: string; where?: Record<string, string>; days?: number; over?: number; label?: string } // the longest in `days` (30) and the next one's limit, `over` (10) % past it; sessions that went past it
   | { kind: "weeks"; by: string; fields: string[]; zones?: string[]; weeks?: number; label?: string } // per value of `by` (a sport), `fields` summed over 7-day weeks; `zones` as shares of the last 28 days
-  | { kind: "records"; records: Record_[]; days?: number; label?: string }; // each record's best ever and its best in the last `days` (90)
+  | { kind: "records"; records: Record_[]; days?: number; label?: string } // each record's best ever and its best in the last `days` (90)
+  | { kind: "graph"; label?: string }; // the rows as nodes and their ref fields as edges, with the tabs those refs reach (people, companies, events)
 /** One record: the largest (or smallest, `best: "min"`, for times) value of `field`, among rows matching `where`. */
 export type Record_ = { label: string; field: string; best: "max" | "min"; where?: Record<string, string> };
 /** One number on a metrics view: a short verdict on its newest day and a box of its last 14 days. How a day is judged, in order
@@ -59,13 +62,13 @@ export type Metric = {
   label?: { field: string; good?: string[]; bad?: string[] }; scale?: Scale[]; log?: { good?: string; bad?: string };
 };
 export type Tab = TabDefinition & { slug: string; position: number };
-export type Value = string | number;
+export type Value = string | number | string[]; // string[]: a ref with many
 export type Data = Record<string, Value>;
 
 export const SLUG = /^[a-z][a-z0-9-]{0,39}$/;
 const FIELD_NAME = /^[a-z][a-z0-9_]{0,39}$/;
 const RESERVED = ["id", "created_at", "updated_at", "updated_by"];
-const TYPES: FieldType[] = ["text", "int", "number", "date", "datetime", "url", "enum", "lifts"];
+const TYPES: FieldType[] = ["text", "int", "number", "date", "datetime", "url", "enum", "lifts", "ref"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // a date, optionally with a time and an offset: 2026-07-18, 2026-07-07T17:25, 2026-07-18T01:34-07:00
 const DATETIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
@@ -89,7 +92,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
     if (RESERVED.includes(f.name)) return `field name "${f.name}" is reserved (every row already has ${RESERVED.join(", ")})`;
     if (names.has(f.name)) return `field "${f.name}" appears twice`;
     if (!TYPES.includes(f.type as FieldType)) return `field "${f.name}": type must be one of ${TYPES.join(", ")}`;
-    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section", "time", "hidden"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
+    for (const key of Object.keys(f)) if (!["name", "type", "required", "min", "max", "unit", "options", "colors", "section", "time", "hidden", "to", "many"].includes(key)) return `field "${f.name}": unknown key "${key}"`;
     const field: Field = { name: f.name, type: f.type as FieldType };
     if (f.required !== undefined) {
       if (typeof f.required !== "boolean") return `field "${f.name}": required must be true or false`;
@@ -124,6 +127,14 @@ export function checkDefinition(input: unknown): TabDefinition | string {
       if (field.type !== "datetime" || typeof f.time !== "boolean") return `field "${f.name}": time is true or false, on datetime fields only`;
       if (f.time) field.time = true;
     }
+    if (field.type === "ref") {
+      if (typeof f.to !== "string" || !SLUG.test(f.to)) return `field "${f.name}": a ref needs "to", the slug of the tab it links to`;
+      field.to = f.to;
+      if (f.many !== undefined) {
+        if (typeof f.many !== "boolean") return `field "${f.name}": many must be true or false`;
+        if (f.many) field.many = true;
+      }
+    } else if (f.to !== undefined || f.many !== undefined) return `field "${f.name}": to and many only apply to ref fields`;
     if (f.section !== undefined) {
       if (typeof f.section !== "string" || !f.section.trim()) return `field "${f.name}": section must be a heading like "sleep"`;
       field.section = f.section;
@@ -181,13 +192,13 @@ export function checkRow(tab: Tab, body: unknown, { partial }: { partial: boolea
   for (const [name, value] of Object.entries(body)) {
     const field = fields.get(name);
     if (!field) return `unknown field "${name}". fields: ${tab.fields.map((f) => f.name).join(", ")}`;
-    if (value === null || value === "") {
+    if (value === null || value === "" || (Array.isArray(value) && !value.length)) {
       if (field.required) return `"${name}" is required`;
       unset.push(name);
       continue;
     }
     const checked = checkValue(field, value);
-    if (typeof checked === "object") return checked.error;
+    if (typeof checked === "object" && !Array.isArray(checked)) return checked.error;
     set[name] = checked;
   }
   if (!partial) for (const f of tab.fields) if (f.required && set[f.name] === undefined) return `"${f.name}" is required`;
@@ -278,7 +289,11 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
         }
         if (v.days !== undefined && (!Number.isInteger(v.days) || v.days < 7 || v.days > 366)) return `${where}: "days" must be a whole number from 7 to 366`;
         break;
-      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics, load, limit, weeks, records`;
+      case "graph":
+        if (![...types.values()].includes("ref")) return `${where}: the tab needs a ref field to draw its links`;
+        if (v.label !== undefined && (typeof v.label !== "string" || !v.label.trim())) return `${where}: "label" must be a heading like "connections"`;
+        break;
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics, load, limit, weeks, records, graph`;
     }
     views.push(v as View);
   }
@@ -324,6 +339,14 @@ function checkValue(field: Field, value: unknown): Value | { error: string } {
     if (field.min !== undefined && n < field.min) return fail(`must be at least ${field.min}`);
     if (field.max !== undefined && n > field.max) return fail(`must be at most ${field.max}`);
     return n;
+  }
+  if (field.type === "ref") {
+    // a title, or for many a list of them (one title alone is taken as a list of one); the api resolves them (src/refs.ts)
+    const list = field.many && !Array.isArray(value) ? [value] : value;
+    const ok = (x: unknown) => typeof x === "string" && x.trim() !== "" && x.length <= 200;
+    if (!field.many) return ok(list) ? (list as string).trim() : fail(`must be the title of a row in ${field.to}, like "Acme"`);
+    if (!Array.isArray(list) || !list.every(ok)) return fail(`must be a list of titles of rows in ${field.to}, like ["Ada", "Ben"]`);
+    return [...new Set((list as string[]).map((x) => x.trim()))];
   }
   if (typeof value !== "string" && typeof value !== "number") return fail("must be text");
   const s = String(value).trim();

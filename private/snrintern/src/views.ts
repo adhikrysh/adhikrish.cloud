@@ -6,6 +6,8 @@
 import { escape } from "../../../design/html.ts";
 import { chart, type ChartPoint, type ChartStream } from "./charts.ts";
 import * as db from "./db.ts";
+import { graphBox } from "./graph.ts";
+import { graph } from "./refs.ts";
 import { parseLifts, type Field, type Metric, type Tab, type View } from "./schema.ts";
 
 export const VIEW_CSS = `
@@ -577,6 +579,12 @@ function records(v: Extract<View, { kind: "records" }>, { tab, rows }: Ctx): Vie
 
 /** Every view of a tab that has something to say, in order: its numbers and its html. Every row is loaded only for views that
  * need them all; metrics read a window of recent rows and let sqlite find the bests, so a tab with years of days stays cheap. */
+/** The rows and the tabs their refs reach as a graph: its nodes and edges are the data, drawn by src/graph.ts. */
+async function graphView(v: Extract<View, { kind: "graph" }>, { tab, database }: Ctx): Promise<ViewResult | null> {
+  const g = await graph(database, tab);
+  return g.nodes.length ? result("graph", v.label ?? "connections", g, graphBox(g)) : null;
+}
+
 export async function computeViews(tab: Tab, database: D1Database): Promise<ViewResult[]> {
   if (!tab.views?.length) return [];
   let recent: Promise<db.Row[]> | undefined;
@@ -595,6 +603,7 @@ export async function computeViews(tab: Tab, database: D1Database): Promise<View
       case "limit": return limit(v, ctx);
       case "weeks": return weeks(v, ctx);
       case "records": return records(v, ctx);
+      case "graph": return graphView(v, ctx);
     }
   }));
   const out: ViewResult[] = [];
