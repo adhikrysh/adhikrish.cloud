@@ -32,6 +32,13 @@ let worker: ReturnType<typeof Bun.spawn> | undefined;
 let port = 0;
 let sign: (claims: Record<string, unknown>, opts?: { aud?: string; forged?: boolean }) => Promise<string>;
 
+// the made-up birthday the worker gets in test mode (cloudflare.config.ts), and the live labels it should give, worked out here
+// on their own from the agreed formulas: 4,000 weeks minus weeks lived; felt time left = 1 - ln(age/7) / ln(end/7)
+const BIRTHDAY = "1990-01-01";
+const lived = () => Math.floor((Math.floor(Date.now() / 86_400_000) * 86_400_000 - Date.UTC(1990, 0, 1)) / 86_400_000);
+const weeksLeft = () => `${((28_000 - lived()) / 7).toFixed(2)} weeks`;
+const feltLeft = () => `${((1 - Math.log(lived() / 365.25 / 7) / Math.log(28_000 / 365.25 / 7)) * 100).toFixed(2)}% of perceptive time`;
+
 /** A date `days` from today (negative = past), as yyyy-mm-dd. */
 const day = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
@@ -238,7 +245,7 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(lift).toContain('best <span class="good">60 lb × 6</span>');
   expect(lift).toContain('<span class="sets"><span>50 lb × 8</span><span class="good">60 lb × 6</span></span>');
   expect((await call("unknown lift", "/training/lifts/nope", { token })).status).toBe(404);
-  expect(lift).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a lift goes back to its tab
+  expect(lift).toContain(`<a class="back" href="/training" aria-label="back to ${feltLeft()}">←</a>`); // a lift goes back to its tab
   writeFileSync(join(artifacts, "page-lift.html"), standalone(lift));
   // the library is served by the worker itself, cached forever
   const lib = await fetch(`http://localhost:${port}/_charts-5.2.1.js`, { headers: { "cf-access-jwt-assertion": token } });
@@ -272,21 +279,23 @@ test("ten years of rows: pages of 50, search over all of them, the api and the c
   const first = (await call("notes page 1", "/notes", { token })).body as string;
   expect(rowsOf(first)).toHaveLength(50);
   expect(rowsOf(first)[0]).toBe("note 1005 odd");
-  expect(first).toContain('<a href="/notes?page=2">older →</a>');
-  expect(first).not.toContain("← newer");
+  // the pages as numbers: 1 (here), 2, 3, …, 21
+  expect(first).toContain('<nav class="pager" aria-label="pages"><span class="at" aria-current="page">1</span><a href="/notes?page=2">2</a><a href="/notes?page=3">3</a><span class="gap">…</span><a href="/notes?page=21">21</a></nav>');
   expect(first).toContain("<span>+1004 since"); // 1005 - 1: every row, no cap
   // page 21 is past row 1000: the last 5, newer but no older, no views
   const last = (await call("notes page 21", "/notes?page=21", { token })).body as string;
   expect(rowsOf(last)).toEqual(["note 5 odd", "note 4 even", "note 3 odd", "note 2 even", "note 1 odd"]);
-  expect(last).toContain('<a href="/notes?page=20">← newer</a>');
-  expect(last).not.toContain("older →");
+  expect(last).toContain('<a href="/notes">1</a><a href="/notes?page=2">2</a><a href="/notes?page=3">3</a><span class="gap">…</span><a href="/notes?page=20">20</a><span class="at" aria-current="page">21</span></nav>');
+  const middle = (await call("notes page 10", "/notes?page=10", { token })).body as string;
+  expect(middle).toContain('<a href="/notes?page=3">3</a><span class="gap">…</span><a href="/notes?page=9">9</a><span class="at" aria-current="page">10</span><a href="/notes?page=11">11</a><span class="gap">…</span><a href="/notes?page=21">21</a></nav>');
   expect(last).not.toContain('class="views"');
   expect((await call("notes page 22", "/notes?page=22", { token })).body).toContain("nothing older.");
   // search runs on the server over every row, and pages the same way, keeping the query
   const even = (await call("search even", "/notes?q=even", { token })).body as string;
   expect(rowsOf(even)).toHaveLength(50);
   expect(rowsOf(even).every((r) => r.endsWith("even"))).toBe(true);
-  expect(even).toContain('<a href="/notes?q=even&amp;page=2">older →</a>');
+  expect(even).toContain('<a href="/notes?q=even&amp;page=2">2</a>');
+  expect(even).toContain('<a href="/notes?q=even&amp;page=11">11</a></nav>'); // 502 even rows: 11 pages
   expect(rowsOf((await call("search even, page 11", "/notes?q=even&page=11", { token })).body as string)).toHaveLength(2); // 502 even: 10 pages of 50, then 2
   // the api walks any tab in pages, past 1000
   const a = (await call("api page 1", "/api/notes?limit=1000", { token: agent })).body;
@@ -723,9 +732,10 @@ test("people link to companies, events and each other by name, and their page op
 
   // the page: the graph on top, drawn by the library the worker serves, and the groups under it
   const page = (await call("people page", "/people", { token })).body as string;
-  expect(page).toContain('class="graph" data-graph="');
+  expect(page).toContain('<section class="view"><div class="graph" data-graph="'); // no heading pill over it
+  expect(page).not.toContain('<span class="pill">connections</span>');
   expect(page).toContain('<script src="/_graph-3.35.0-fcose-2.2.0.js"></script>');
-  expect(page).toContain("● people</span><span>■ companies</span><span>◆ events");
+  expect(page).toContain("● sonder</span><span>■ companies</span><span>◆ events");
   const lib = await fetch(`http://localhost:${port}/_graph-3.35.0-fcose-2.2.0.js`, { headers: { "cf-access-jwt-assertion": token } });
   expect(lib.headers.get("cache-control")).toContain("immutable");
   const text = await lib.text();
@@ -742,6 +752,19 @@ test("people link to companies, events and each other by name, and their page op
   expect(gilPage).toContain('<a href="/companies?q=Example%20Orbital">Example Orbital</a>');
   expect(gilPage).toContain('<a href="/people?q=Ada%20Lovelace">Ada Lovelace</a>, <a href="/people?q=Hal%20New">Hal New</a>');
   writeFileSync(join(artifacts, "page-people.html"), standalone(page));
+});
+
+test("tabs go by their names, and health and training by live ones worked out from the birthday secret", async () => {
+  const token = await me();
+  const names = { people: "sonder", forecasts: "laplace's demon", books: "conversations with the dead", health: weeksLeft(), training: feltLeft() };
+  const home = (await call("home names", "/", { token })).body as string;
+  for (const [slug, name] of Object.entries(names)) expect(home).toContain(`<a href="/${slug}"><span>${name.replaceAll("'", "&#39;").replace("&#39;", "'")}</span></a>`);
+  // the agents see the same names in GET /api; the definition keeps its plain label and says it's live
+  const tabs = Object.fromEntries((await call("api names", "/api", { token: await instinct() })).body.tabs.map((t: any) => [t.slug, t.label]));
+  for (const [slug, name] of Object.entries(names)) expect(tabs[slug]).toBe(name);
+  expect((await call("health definition", "/api/_tabs/health", { token })).body.tab).toMatchObject({ label: "health", live: "weeks_left" });
+  expect((await call("health page", "/health", { token })).body).toContain(`<h1>${weeksLeft()}</h1>`);
+  expect((await send(token, "/api/_tabs/scratch2", { label: "x", about: "", live: "years_left", fields: [{ name: "a", type: "text" }] }, "PUT")).body.error).toContain('"live" must be one of weeks_left, felt_time_left');
 });
 
 test("home is just the visible tabs, no numbers", async () => {
@@ -811,7 +834,7 @@ test("every page and a row render; a row shows its lifts per exercise", async ()
   const row = (await call("row page", `/training/${chest.id}`, { token })).body as string;
   expect(row).toContain('<span class="ex">tricep pushdown</span>50 × 8   50 × 8   50 × 8');
   expect(row).toContain(`<a class="schema" href="/api/_tabs/training">schema</a>`);
-  expect(row).toContain('<a class="back" href="/training" aria-label="back to training">←</a>'); // a row goes back to its tab
+  expect(row).toContain(`<a class="back" href="/training" aria-label="back to ${feltLeft()}">←</a>`); // a row goes back to its tab
   expect(row).not.toContain('<a href="/people">'); // no sibling tabs in the nav
   writeFileSync(join(artifacts, "page-training-row.html"), row);
 });

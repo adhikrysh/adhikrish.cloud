@@ -78,6 +78,12 @@ export async function list(db: D1Database, t: Tab, { q, limit, offset = 0 }: { q
   return (await db.prepare(sql).bind(...binds).all<RowRecord>()).results.map(toRow);
 }
 
+/** How many rows of a tab match q (all of them without it): how many pages a list has. */
+export async function countMatching(db: D1Database, t: Tab, q?: string): Promise<number> {
+  const where = q ? "AND EXISTS (SELECT 1 FROM json_each(rows.data) WHERE CAST(json_each.value AS TEXT) LIKE ?)" : "";
+  return (await db.prepare(`SELECT COUNT(*) AS n FROM rows WHERE tab = ? ${where}`).bind(t.slug, ...(q ? [`%${q}%`] : [])).first<{ n: number }>())!.n;
+}
+
 export async function get(db: D1Database, slug: string, id: number): Promise<Row | null> {
   const r = await db.prepare("SELECT id, data, created_at, updated_at, updated_by FROM rows WHERE tab = ? AND id = ?").bind(slug, id).first<RowRecord>();
   return r ? toRow(r) : null;

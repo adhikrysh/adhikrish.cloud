@@ -582,7 +582,8 @@ function records(v: Extract<View, { kind: "records" }>, { tab, rows }: Ctx): Vie
 /** The rows and the tabs their refs reach as a graph: its nodes and edges are the data, drawn by src/graph.ts. */
 async function graphView(v: Extract<View, { kind: "graph" }>, { tab, database }: Ctx): Promise<ViewResult | null> {
   const g = await graph(database, tab);
-  return g.nodes.length ? result("graph", v.label ?? "connections", g, graphBox(g)) : null;
+  // no heading pill: the graph is the page's picture, not one view among several
+  return g.nodes.length ? { ...result("graph", v.label ?? "connections", g, ""), html: `<section class="view">${graphBox(g)}</section>` } : null;
 }
 
 export async function computeViews(tab: Tab, database: D1Database): Promise<ViewResult[]> {

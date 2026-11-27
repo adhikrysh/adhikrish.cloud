@@ -62,7 +62,7 @@
   ]
  },
  "people": {
-  "label": "people",
+  "label": "sonder",
   "about": "people i've met, and where",
   "title": "name",
   "aside": [],
@@ -146,7 +146,7 @@
   ]
  },
  "forecasts": {
-  "label": "forecasts",
+  "label": "laplace's demon",
   "about": "predictions to be scored later",
   "title": "decision",
   "aside": [
@@ -235,6 +235,7 @@
  },
  "training": {
   "label": "training",
+  "live": "felt_time_left",
   "about": "sessions: lifting, runs, hikes, swims, from the agent and the watch",
   "title": "title",
   "aside": [
@@ -643,7 +644,7 @@
   "hidden": true
  },
  "books": {
-  "label": "books",
+  "label": "conversations with the dead",
   "about": "what i have read, what i think of it, and what is next",
   "title": "title",
   "aside": [
@@ -727,6 +728,7 @@
  },
  "health": {
   "label": "health",
+  "live": "weeks_left",
   "about": "garmin, every day: recovery, sleep, activity, fitness",
   "title": "date",
   "aside": [

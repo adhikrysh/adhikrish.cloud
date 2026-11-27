@@ -1,3 +1,5 @@
+import { LIVE, type Live } from "./live.ts";
+
 // The schema is data. A tab definition says what fields a tab's rows may hold and how its list reads.
 // Definitions live in d1 (`tabs`) and change through PUT /api/_tabs/<slug>; this file only checks them.
 
@@ -22,6 +24,7 @@ export type TabDefinition = {
   views?: View[]; // what the tab opens on, above the list (see View)
   hidden?: boolean; // left out of the nav and home (its data still feeds other tabs' views)
   parts?: Part[]; // on a row's page: one bar per part, each field a share of it (sleep: deep, light, rem, awake)
+  live?: Live; // the label becomes a number about your life, from the BIRTHDAY secret (src/live.ts); `label` stays the fallback
   fields: Field[];
 };
 
@@ -78,7 +81,7 @@ const validDate = (s: string) => !Number.isNaN(Date.parse(s.slice(0, 10)));
 export function checkDefinition(input: unknown): TabDefinition | string {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return "definition must be a json object";
   const d = input as Record<string, unknown>;
-  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "views", "hidden", "parts", "fields"]);
+  const known = new Set(["label", "about", "title", "aside", "line", "sort", "snippet", "group", "views", "hidden", "parts", "live", "fields"]);
   for (const key of Object.keys(d)) if (!known.has(key)) return `unknown key "${key}". keys: ${[...known].join(", ")}`;
   if (typeof d.label !== "string" || !d.label.trim()) return '"label" must be a non-empty string';
   if (typeof d.about !== "string") return '"about" must be a string';
@@ -179,8 +182,9 @@ export function checkDefinition(input: unknown): TabDefinition | string {
   const views = checkViews(d.views, types);
   if (typeof views === "string") return views;
   if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
+  if (d.live !== undefined && !LIVE.includes(d.live as Live)) return `"live" must be one of ${LIVE.join(", ")}`;
   return { label: d.label.trim(), about: d.about, title, aside, line, sort, ...(snippet ? { snippet } : {}),
-    ...(group ? { group } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), ...(parts.length ? { parts } : {}), fields };
+    ...(group ? { group } : {}), ...(views.length ? { views } : {}), ...(d.hidden ? { hidden: true } : {}), ...(parts.length ? { parts } : {}), ...(d.live ? { live: d.live as Live } : {}), fields };
 }
 
 /** Checks one row body against a tab's fields. `partial` is for PATCH: only the given fields are checked. */

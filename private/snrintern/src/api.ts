@@ -12,6 +12,7 @@
 import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
 import { claim, TRAINING } from "./activities.ts";
 import * as db from "./db.ts";
+import { named } from "./live.ts";
 import { linksTo, renamed, resolve } from "./refs.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 import { computeViews } from "./views.ts";
@@ -29,7 +30,7 @@ const API = {
     "load (field)", "limit (field, where, days, over)", "weeks (by, fields, zones, weeks)", "records (records: [{ label, field, best: max|min, where }], days)", "graph (label): rows as nodes, refs as edges"],
 };
 
-export async function handleApi(request: Request, database: D1Database, who: string): Promise<Response> {
+export async function handleApi(request: Request, database: D1Database, who: string, birthday?: string): Promise<Response> {
   const url = new URL(request.url);
   const [, , first, second, extra] = url.pathname.split("/"); // "", "api", first, second
   const body = () => request.json().catch(() => undefined);
@@ -38,7 +39,8 @@ export async function handleApi(request: Request, database: D1Database, who: str
   if (!first) {
     if (request.method !== "GET") return fail(405, "use GET");
     const [tabs, counts] = await Promise.all([db.tabs(database), db.counts(database)]);
-    return json({ tabs: tabs.map((t) => ({ ...t, rows: counts.get(t.slug) ?? 0 })), api: API });
+    // each tab under the name the pages show (a live label is worked out now); GET /api/_tabs/<slug> keeps the definition as written
+    return json({ tabs: tabs.map((t) => ({ ...named(t, birthday), rows: counts.get(t.slug) ?? 0 })), api: API });
   }
 
   if (first === "_docs") {

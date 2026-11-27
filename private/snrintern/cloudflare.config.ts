@@ -36,6 +36,9 @@ export default defineConfig(({ mode }) => ({
       // The test talks to a fake garmin instead.
       GARMIN_API_KEY: mode === "test" ? bindings.text("test-garmin-key") : bindings.secret(),
       GARMIN_URL: mode === "test" && bindings.text(process.env.GARMIN_URL ?? ""),
+      // Your birthday (yyyy-mm-dd) for the live tab labels (src/live.ts); 1password: Personal > snrintern birthday. Never in git:
+      // the repo is public. The test uses a made-up one.
+      BIRTHDAY: mode === "test" ? bindings.text("1990-01-01") : bindings.secret(),
     },
   },
 }));

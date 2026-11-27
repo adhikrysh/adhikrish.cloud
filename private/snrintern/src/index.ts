@@ -7,6 +7,7 @@
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";
 import { handleApi } from "./api.ts";
+import { named } from "./live.ts";
 import { verifier } from "./auth.ts";
 import * as db from "./db.ts";
 import { CHARTS_PATH, chartsAsset } from "./charts.ts";
@@ -14,7 +15,7 @@ import { GRAPH_PATH, graphAsset } from "./graph.ts";
 import { sync } from "./garmin.ts";
 import { exercisePage, homePage, metricHistoryPage, rowPage, tabPage } from "./page.ts";
 
-type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string; GARMIN_API_KEY?: string; GARMIN_URL?: string };
+type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string; GARMIN_API_KEY?: string; GARMIN_URL?: string; BIRTHDAY?: string };
 
 const design = { base, list };
 const html = (body: string, status = 200) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
@@ -45,15 +46,16 @@ export default {
       return Response.json({ error: "this service token may only call /_health" }, { status: 403 });
     }
 
-    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return handleApi(request, env.DB, who.who);
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return handleApi(request, env.DB, who.who, env.BIRTHDAY);
     if (url.pathname === CHARTS_PATH) return chartsAsset(); // the chart library, cached forever (its version is in the path)
     if (url.pathname === GRAPH_PATH) return graphAsset(); // the graph library, the same way
     if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
 
     const [, slug, id, name] = url.pathname.split("/");
-    if (!slug) return html(await homePage(design, env.DB));
-    const tab = await db.tab(env.DB, slug);
-    if (!tab) return html("not found", 404);
+    if (!slug) return html(await homePage(design, env.DB, env.BIRTHDAY));
+    const found = await db.tab(env.DB, slug);
+    if (!found) return html("not found", 404);
+    const tab = named(found, env.BIRTHDAY); // a live label (weeks left) everywhere the page names the tab
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? "", Math.max(1, Math.floor(Number(url.searchParams.get("page"))) || 1)));
     if (id === "metrics" && name) {
       const metric = await metricHistoryPage(design, env.DB, tab, decodeURIComponent(name));

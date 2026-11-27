@@ -3,6 +3,7 @@
 import { escape, page as shell, type Design } from "../../../design/html.ts";
 import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
+import { named } from "./live.ts";
 import { GRAPH_CSS, withGraph } from "./graph.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
 import { amount, dayWords, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
@@ -45,8 +46,14 @@ const CSS = `
   .views + .search { margin-top: 40px; }
   .searching .views { display: none; }
   .empty { color: var(--muted); margin-top: 32px; }
-  .pager { display: flex; justify-content: space-between; margin-top: 40px; font-size: var(--fs-small); }
-  .pager a { color: var(--muted); }
+  /* pages as white rounded squares; the one you're on is outlined, like a state pill */
+  .pager { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 40px; }
+  .pager a, .pager span { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 8px;
+                          border-radius: 6px; font-size: var(--fs-tiny); text-decoration: none; }
+  .pager a { background: var(--text); color: var(--bg); transition: background 220ms ease; }
+  .pager a:hover, .pager a:focus-visible { background: var(--hover); color: var(--bg); }
+  .pager .at { color: var(--text); box-shadow: inset 0 0 0 1px currentColor; }
+  .pager .gap { color: var(--faint); min-width: 0; padding: 0 2px; }
   .day { margin-top: 36px; }
   .day h2 { font-size: var(--fs-small); font-weight: 450; color: var(--faint); }
   .day .project-list { margin-top: 12px; }
@@ -193,8 +200,8 @@ function nav(parent?: { href: string; label: string }): string {
 }
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
-export async function homePage(design: Design, database: D1Database): Promise<string> {
-  const tabs = (await db.tabs(database)).filter((t) => !t.hidden);
+export async function homePage(design: Design, database: D1Database, birthday?: string): Promise<string> {
+  const tabs = (await db.tabs(database)).filter((t) => !t.hidden).map((t) => named(t, birthday));
   const items = tabs.map((tab) => `          <li>
             <a href="/${tab.slug}"><span>${escape(tab.label)}</span></a>
             <p>${escape(tab.about)}</p>
@@ -213,11 +220,11 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
   const groupBy = tab.group ? field(tab, tab.group) : undefined;
   const byDay = groupBy && (groupBy.type === "date" || groupBy.type === "datetime") ? groupBy : undefined;
   const paged = !groupBy || !!byDay;
-  const [fetched, views] = await Promise.all([
-    db.list(database, tab, { q: q || undefined, ...(paged ? { limit: PAGE + 1, offset: (at - 1) * PAGE } : {}) }),
+  const [rows, views, total] = await Promise.all([
+    db.list(database, tab, { q: q || undefined, ...(paged ? { limit: PAGE, offset: (at - 1) * PAGE } : {}) }),
     q || at > 1 ? Promise.resolve("") : renderViews(tab, database),
+    paged ? db.countMatching(database, tab, q || undefined) : Promise.resolve(0),
   ]);
-  const rows = paged ? fetched.slice(0, PAGE) : fetched, older = paged && fetched.length > PAGE;
   // a tab whose metrics carry good / bad words (health): each day in the list reads as its big picture instead of numbers
   let words: Map<number, string> | null = null;
   if (tab.sort !== "id" && rows.length && tab.views?.some((v) => v.kind === "metrics" && v.metrics.some((m) => m.log?.good || m.log?.bad))) {
@@ -261,21 +268,28 @@ export async function tabPage(design: Design, database: D1Database, tab: Tab, q:
   } else list = ul(rows);
   const icon = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>`;
   const body = `      <h1>${escape(tab.label)}</h1>
-${views ? `      ${views}\n` : ""}      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search ${escape(tab.label)}" aria-label="search ${escape(tab.label)}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
+${views ? `      ${views}\n` : ""}      <form class="search" action="/${tab.slug}" role="search">${icon}<input type="search" name="q" value="${escape(q)}" placeholder="search" aria-label="search ${escape(tab.slug)}" autocomplete="off" spellcheck="false"><kbd>/</kbd></form>
       <div class="results">
 ${rows.length ? `      <div class="rows">\n${list}\n      </div>` : `      <p class="empty">${q ? `nothing matches "${escape(q)}"` : at > 1 ? "nothing older" : "nothing yet"}.</p>`}
-${pager(tab, q, at, older)}
+${pager(tab, q, at, Math.ceil(total / PAGE))}
       </div>
       ${schemaLink(tab)}
       ${LIVE_SEARCH}`;
   return page({ design, title: `${tab.label} | senior intern`, nav: nav({ href: "/", label: "senior intern" }), body, css: CSS + VIEW_CSS });
 }
 
-/** "← newer" and "older →" under a paged list; the search, if any, comes along. */
-function pager(tab: Tab, q: string, at: number, older: boolean): string {
+/** The pages under a paged list, newest first: every page when there are few, else 1 2 3, the pages beside the one you're on and
+ * the last, with "…" for the rest (1 2 3 … 9 10 11 … 21). The search, if any, comes along. */
+function pager(tab: Tab, q: string, at: number, pages: number): string {
+  if (pages < 2) return "";
   const href = (p: number) => `/${tab.slug}${p > 1 || q ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { page: String(p) } : {}) })}` : ""}`;
-  const newer = at > 1 ? `<a href="${escape(href(at - 1))}">← newer</a>` : "<span></span>";
-  return at > 1 || older ? `      <nav class="pager" aria-label="pages">${newer}${older ? `<a href="${escape(href(at + 1))}">older →</a>` : ""}</nav>` : "";
+  const shown = [...new Set(pages <= 7 ? Array.from({ length: pages }, (_, i) => i + 1) : [1, 2, 3, at - 1, at, at + 1, pages])]
+    .filter((p) => p >= 1 && p <= pages).sort((a, b) => a - b);
+  const items = shown.flatMap((p, i) => [
+    ...(i && p - shown[i - 1] > 1 ? ['<span class="gap">…</span>'] : []),
+    p === at ? `<span class="at" aria-current="page">${p}</span>` : `<a href="${escape(href(p))}">${p}</a>`,
+  ]);
+  return `      <nav class="pager" aria-label="pages">${items.join("")}</nav>`;
 }
 
 /** A clock time for minutes from midnight ("-20" is 11:40pm the night before). */
