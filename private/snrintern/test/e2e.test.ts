@@ -105,7 +105,7 @@ beforeAll(async () => {
     if (r.status >= 300) throw new Error(`${slug}: ${JSON.stringify(r.body)}`);
   }
   // home's order, set the way production's was: each tab right after the one before it
-  const home = ["obsessions", "training", "health", "people", "predictions", "reccos"];
+  const home = ["obsessions", "training", "health", "people", "predictions", "recommendations"];
   for (let i = 1; i < home.length; i++) await send(token, `/api/_tabs/${home[i]}`, { ...(fixtures as any)[home[i]], after: home[i - 1] }, "PUT");
   for (const old of ["outbound", "gym", "forecasts"]) await call(`drop seed tab ${old}`, `/api/_tabs/${old}`, { method: "DELETE", token });
 
@@ -142,7 +142,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, reccos: 0, health: 0, obsessions: 0, notes: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, recommendations: 0, health: 0, obsessions: 0, notes: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -272,14 +272,14 @@ test("the contract is served by the api itself, split so an agent reads only wha
   const core = await call("docs core", "/api/_docs", { token: agent });
   expect(core.status).toBe(200);
   expect(core.body).toBe(file("core"));
-  for (const name of ["training", "health", "people", "predictions", "reccos", "obsessions", "notes", "schema"])
+  for (const name of ["training", "health", "people", "predictions", "recommendations", "obsessions", "notes", "schema"])
     expect((await call(`docs ${name}`, `/api/_docs/${name}`, { token: agent })).body).toBe(file(name));
   // every visible tab has its rules; a missing page lists the real ones
   const tabs = (await call("api index", "/api", { token: agent })).body;
   for (const t of tabs.tabs.filter((t: any) => !t.hidden)) expect((await call(`docs for ${t.slug}`, `/api/_docs/${t.slug}`, { token: agent })).status).toBe(200);
   const missing = await call("docs missing", "/api/_docs/nope", { token: agent });
   expect(missing.status).toBe(404);
-  expect(missing.body.error).toBe("no such page; there are: health, notes, obsessions, people, predictions, reccos, schema, training");
+  expect(missing.body.error).toBe("no such page; there are: health, notes, obsessions, people, predictions, recommendations, schema, training");
   expect(tabs.api.agents).toStartWith("GET /api/_agents");
   // core.md names exactly the visible tabs, each with its own page, so the agent's instructions never miss one or name a gone one
   const fixtures = JSON.parse(readFileSync(join(import.meta.dir, "fixtures/tabs.json"), "utf8"));
@@ -466,53 +466,53 @@ test("predictions open on the score, then every open bet counting down with its 
   writeFileSync(join(artifacts, "page-predictions.html"), after);
 });
 
-test("reccos open on cards for what you're on and what's next, with who recommended each and its kind; everything else waits under the search", async () => {
+test("recommendations open on cards for what you're on and what's next, with who recommended each and its kind; everything else waits under the search", async () => {
   const token = await me(), agent = await dots();
-  const add = async (row: Record<string, unknown>) => (await send(agent, "/api/reccos", row)).body.row;
+  const add = async (row: Record<string, unknown>) => (await send(agent, "/api/recommendations", row)).body.row;
   const bomb = await add({ title: "The Making of the Atomic Bomb", kind: "book", creator: "Richard Rhodes", status: "next", recommended_by: "priya" });
   await add({ title: "Perfect Days", kind: "movie", creator: "Wim Wenders", status: "next", recommended_by: "maya" });
   await add({ title: "Severance", kind: "show", status: "on it", recommended_by: "jules" });
   await add({ title: "Blueprint for Armageddon", kind: "podcast", creator: "Dan Carlin", status: "next" }); // no recommender: the corner stays empty
   await add({ title: "Thinking in Systems", kind: "book", status: "finished", recommended_by: "priya" });
   await add({ title: "Antifragile", kind: "book", status: "dropped" });
-  expect((await send(agent, "/api/reccos", { title: "No Kind", status: "next" })).body.error).toStartWith('"kind" is required');
-  expect((await send(agent, "/api/reccos", { title: "Bad Kind", kind: "game", status: "next" })).body.error).toStartWith('"kind" must be one of: book, movie, show, podcast, article');
-  expect((await send(agent, "/api/reccos", { title: "Bad Status", kind: "book", status: "to read" })).body.error).toStartWith('"status" must be one of: next, on it, finished, dropped');
+  expect((await send(agent, "/api/recommendations", { title: "No Kind", status: "next" })).body.error).toStartWith('"kind" is required');
+  expect((await send(agent, "/api/recommendations", { title: "Bad Kind", kind: "game", status: "next" })).body.error).toStartWith('"kind" must be one of: book, movie, show, podcast, article');
+  expect((await send(agent, "/api/recommendations", { title: "Bad Status", kind: "book", status: "to read" })).body.error).toStartWith('"status" must be one of: next, on it, finished, dropped');
   // a cards view checks its definition like every view
-  const bad = await send(token, "/api/_tabs/reccos-bad", { label: "x", about: "x", title: "title", fields: [{ name: "title", type: "text" }, { name: "status", type: "enum", options: ["a", "b"] }], views: [{ kind: "cards", field: "status", show: ["c"] }] }, "PUT");
+  const bad = await send(token, "/api/_tabs/recommendations-bad", { label: "x", about: "x", title: "title", fields: [{ name: "title", type: "text" }, { name: "status", type: "enum", options: ["a", "b"] }], views: [{ kind: "cards", field: "status", show: ["c"] }] }, "PUT");
   expect(bad.body.error).toContain('"show" must list values of "status"');
 
   const cards = (html: string) => html.split('<div class="cards">')[1]?.split("</div>")[0] ?? "";
   const cardTitles = (html: string) => [...cards(html).matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1]);
-  const page = (await call("reccos page", "/reccos", { token })).body as string;
+  const page = (await call("recommendations page", "/recommendations", { token })).body as string;
   // on it first and outlined, then next newest first; finished and dropped have no card
   expect(cardTitles(page)).toEqual(["Severance", "Blueprint for Armageddon", "Perfect Days", "The Making of the Atomic Bomb"]);
   expect(cards(page).match(/class="card first"/g)?.length).toBe(1);
-  expect(cards(page)).toContain('<a class="card first" href="/reccos/');
+  expect(cards(page)).toContain('<a class="card first" href="/recommendations/');
   for (const k of ["show", "podcast", "movie", "book"]) expect(cards(page)).toContain(`aria-label="${k}"`);
   expect(cards(page)).toContain('<span class="sub">Richard Rhodes</span>');
   expect(cards(page)).toContain("<span>maya</span>");
   expect(cards(page)).not.toContain('<span class="pill">'); // no heading: the cards are the page
-  // under the search: every recco, the two without cards included
+  // under the search: every recommendation, the two without cards included
   const log = page.split('<div class="rows">')[1];
   for (const t of ["Severance", "Perfect Days", "Thinking in Systems", "Antifragile"]) expect(log).toContain(t);
   // the api gives the same cards as data, for an agent that wants "what's next"
-  const views = (await call("reccos views", "/api/reccos/_views", { token: agent })).body;
+  const views = (await call("recommendations views", "/api/recommendations/_views", { token: agent })).body;
   const v = views.views.find((x: any) => x.kind === "cards");
   expect(v.rows.map((r: any) => r.title)).toEqual(cardTitles(page));
   expect(v.rows[0]).toMatchObject({ title: "Severance", status: "on it", kind: "show", recommended_by: "jules" });
-  expect((await call("search reccos by who recommended", "/api/reccos?q=priya", { token: agent })).body.rows.map((r: any) => r.title).sort()).toEqual(["The Making of the Atomic Bomb", "Thinking in Systems"]);
+  expect((await call("search recommendations by who recommended", "/api/recommendations?q=priya", { token: agent })).body.rows.map((r: any) => r.title).sort()).toEqual(["The Making of the Atomic Bomb", "Thinking in Systems"]);
 
   // one row for its whole life: start it, it joins the outlined ones; finish it, its card goes and it stays in the list
-  await send(agent, `/api/reccos/${bomb.id}`, { status: "on it" }, "PATCH");
-  const started = (await call("reccos page after starting", "/reccos", { token })).body as string;
+  await send(agent, `/api/recommendations/${bomb.id}`, { status: "on it" }, "PATCH");
+  const started = (await call("recommendations page after starting", "/recommendations", { token })).body as string;
   expect(cardTitles(started)).toEqual(["Severance", "The Making of the Atomic Bomb", "Blueprint for Armageddon", "Perfect Days"]); // on it now, outlined, newest added first among them
-  await send(agent, `/api/reccos/${bomb.id}`, { status: "finished" }, "PATCH");
-  const done = (await call("reccos page after finishing", "/reccos", { token })).body as string;
+  await send(agent, `/api/recommendations/${bomb.id}`, { status: "finished" }, "PATCH");
+  const done = (await call("recommendations page after finishing", "/recommendations", { token })).body as string;
   expect(cardTitles(done)).not.toContain("The Making of the Atomic Bomb");
   expect(done.split('<div class="rows">')[1]).toContain("The Making of the Atomic Bomb");
-  expect((await call("finished recco row", `/reccos/${bomb.id}`, { token })).body).toContain("priya");
-  writeFileSync(join(artifacts, "page-reccos.html"), started);
+  expect((await call("finished recommendation row", `/recommendations/${bomb.id}`, { token })).body).toContain("priya");
+  writeFileSync(join(artifacts, "page-recommendations.html"), started);
 });
 
 test("garmin fills health: full backfill under the request cap, merged days, intraday detail, metrics that judge the week", async () => {
@@ -886,11 +886,12 @@ test("tabs keep fixed titles; obsessions' and health's descriptions are live, wo
   await findHere();
   const home = (await call("home names", "/", { token })).body as string;
   // fixed titles over their descriptions, in this order: what you live for first, then the body, then everyone else
-  const order = [["obsessions", feltLeft()], ["training", "entropy"], ["health", weeksLeft()], ["people", "sonder"], ["predictions", "receipts"], ["reccos", "conversations with the dead"]];
+  const order = [["obsessions", feltLeft()], ["training", "entropy"], ["health", weeksLeft()], ["people", "sonder"], ["predictions", "receipts"], ["recommendations", "conversations with the dead"]];
   for (const [slug, about] of order) expect(home).toContain(`<a href="/${slug}"><span>${slug}</span></a>\n            <p>${about}</p>`);
   const at = order.map(([slug]) => home.indexOf(`href="/${slug}"`));
   expect(at).toEqual([...at].sort((x, y) => x - y));
   expect((await call("old path", "/forecasts", { token })).status).toBe(404); // renamed, no alias
+  expect((await call("old path reccos", "/reccos", { token })).status).toBe(404);
   // the agents see the same in GET /api; the definition keeps what was written and says it's live
   const tabs = Object.fromEntries((await call("api names", "/api", { token: await instinct() })).body.tabs.map((t: any) => [t.slug, t]));
   expect(tabs.obsessions).toMatchObject({ label: "obsessions", about: feltLeft() });
