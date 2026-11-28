@@ -335,6 +335,32 @@ test("a coach keeps its memory as notes; each coach gets a link in the top bar, 
   writeFileSync(join(artifacts, "page-home-coaches.html"), home);
 });
 
+test("a coach's memory has a size cap: every write says how full it is, a write past it is refused, and editing or removing frees room", async () => {
+  const agent = await dots();
+  const words = (n: number, w = "shin") => Array(n).fill(w).join(" ");
+  const write = (note: string, coach = "memory test coach") => send(agent, "/api/notes", { at: "2026-11-28T08:00-08:00", coach, note });
+  const first = await write(words(600));
+  expect(first.status).toBe(201);
+  expect(first.body.memory["memory test coach"]).toEqual({ used: 600, cap: 1000 });
+  // 600 + 450 passes the cap: refused, with what to do, and nothing written
+  const refused = await write(words(450));
+  expect(refused.status).toBe(400);
+  expect(refused.body.error).toBe("memory full: memory test coach's notes would be 1050 of 1000 words. edit or remove notes that no longer matter, then retry");
+  // another coach has its own cap
+  expect((await write(words(450), "other test coach")).status).toBe(201);
+  // editing the long note down frees room; growing it past the cap is refused too
+  expect((await send(agent, `/api/notes/${first.body.row.id}`, { note: words(1001) }, "PATCH")).status).toBe(400);
+  const edited = await send(agent, `/api/notes/${first.body.row.id}`, { note: words(100, "flat feet") }, "PATCH");
+  expect(edited.body.memory["memory test coach"]).toEqual({ used: 200, cap: 1000 });
+  const second = await write(words(450));
+  expect(second.status).toBe(201);
+  // reading says how full each coach is; removing a note gives the room back
+  expect((await call("notes with memory", "/api/notes?limit=1", { token: agent })).body.memory["memory test coach"]).toEqual({ used: 650, cap: 1000 });
+  const removed = await call("remove a note", `/api/notes/${second.body.row.id}`, { method: "DELETE", token: agent });
+  expect(removed.body.memory["memory test coach"]).toEqual({ used: 200, cap: 1000 });
+  for (const r of (await call("test notes", "/api/notes?q=test coach", { token: agent })).body.rows) await call("clean up", `/api/notes/${r.id}`, { method: "DELETE", token: agent });
+});
+
 test("the agent reads its own instructions from senior intern; only adhi can change them, never an agent", async () => {
   const agent = await dots(), token = await me();
   const core = readFileSync(join(import.meta.dir, "../docs/core.md"), "utf8");

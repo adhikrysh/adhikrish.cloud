@@ -5,6 +5,7 @@ import { CHART_CSS, withCharts } from "./charts.ts";
 import * as db from "./db.ts";
 import { todayHere } from "./here.ts";
 import { described } from "./live.ts";
+import { NOTES } from "./memory.ts";
 import { GRAPH_CSS, withGraph } from "./graph.ts";
 import { parseLifts, type Field, type Tab, type Value } from "./schema.ts";
 import { amount, dayWords, LIFT_CSS, liftPage, matches, metricName, metricPage, renderViews, VIEW_CSS } from "./views.ts";
@@ -202,7 +203,6 @@ function nav(parent?: { href: string; label: string }, left = ""): string {
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
 // ---- coaches: each coach's memory (the hidden notes tab), on its own page. a coach reads many tabs, so it sits above them ----
-const NOTES = "notes";
 const coachSlug = (coach: string) => coach.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 async function coaches(database: D1Database): Promise<string[]> {
   const notes = await db.tab(database, NOTES);

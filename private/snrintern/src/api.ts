@@ -28,6 +28,7 @@ import * as db from "./db.ts";
 import { todayHere } from "./here.ts";
 import { described } from "./live.ts";
 import { linksTo, renamed, resolve } from "./refs.ts";
+import { NOTES, overCap, report, usage } from "./memory.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 import { computeViews } from "./views.ts";
 
@@ -142,7 +143,7 @@ export async function handleApi(request: Request, database: D1Database, who: str
       // pages: ask for one more than the limit to know whether there is a next page
       const n = limit(100), offset = Math.max(0, Math.floor(Number(url.searchParams.get("offset") ?? 0)) || 0);
       const rows = await db.list(database, tab, { q: url.searchParams.get("q") ?? undefined, limit: n + 1, offset });
-      return json({ rows: rows.slice(0, n), next_offset: rows.length > n ? offset + n : null });
+      return json({ rows: rows.slice(0, n), next_offset: rows.length > n ? offset + n : null, ...(tab.slug === NOTES ? { memory: report(await usage(database, tab)) } : {}) });
     }
     if (request.method === "POST") {
       const change = checkRow(tab, await body(), { partial: false });
@@ -152,6 +153,12 @@ export async function handleApi(request: Request, database: D1Database, who: str
       // a session garmin already stored (the watch synced first) becomes one row with it, not two
       const merged = tab.slug === TRAINING ? await claim(database, tab, change.set, who) : null;
       if (merged) return json({ row: merged, merged: "garmin" }, 200);
+      if (tab.slug === NOTES) { // a coach's memory: refused past its cap (src/memory.ts), and every write says how full it is
+        const used = await usage(database, tab, { coach: String(change.set.coach), note: String(change.set.note) });
+        const full = overCap(used, String(change.set.coach));
+        if (full) return fail(400, full);
+        return json({ row: await db.insert(database, tab.slug, change.set, who), memory: report(used) }, 201);
+      }
       return json({ row: await db.insert(database, tab.slug, change.set, who) }, 201);
     }
     return fail(405, "use GET or POST");
@@ -170,9 +177,16 @@ export async function handleApi(request: Request, database: D1Database, who: str
     if (!before) return fail(404, "no such row");
     const refused = await resolve(database, tab, change.set, who, { id, title: before[tab.title] as string | undefined });
     if (refused) return fail(409, refused);
+    let used: Map<string, number> | undefined;
+    if (tab.slug === NOTES) {
+      const coach = String(change.set.coach ?? before.coach), note = String(change.set.note ?? before.note);
+      used = await usage(database, tab, { id, coach, note });
+      const full = overCap(used, coach);
+      if (full) return fail(400, full);
+    }
     const row = (await db.update(database, tab.slug, id, change, who))!;
     if (before[tab.title] !== undefined && row[tab.title] !== undefined) await renamed(database, tab, String(before[tab.title]), String(row[tab.title]), who);
-    return json({ row });
+    return json({ row, ...(used ? { memory: report(used) } : {}) });
   }
   if (request.method === "DELETE") {
     const row = await db.get(database, tab.slug, id);
@@ -180,7 +194,7 @@ export async function handleApi(request: Request, database: D1Database, who: str
     const linked = row[tab.title] === undefined ? [] : await linksTo(database, tab, String(row[tab.title]));
     if (linked.length) return fail(409, `still linked from ${linked.join(", ")}: unlink them first`);
     await db.remove(database, tab.slug, id);
-    return json({ deleted: id });
+    return json({ deleted: id, ...(tab.slug === NOTES ? { memory: report(await usage(database, tab)) } : {}) });
   }
   return fail(405, "use GET, PATCH or DELETE");
 }

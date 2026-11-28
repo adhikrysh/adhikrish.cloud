@@ -1,7 +1,7 @@
 # notes
 
-each coach's memory: `at` (now, with time and offset), `coach` (which coach is writing, by its skill's name in words, like the heading of its skill), `note` (the thought).
+each coach's memory, one row per thing worth remembering: `at` (when it was written or last changed, with time and offset), `coach` (which coach, in words, like the heading of its skill), `note`.
 
-- one note per thought, written as you'd want to read it back tomorrow: a plan, something you noticed, a decision and why, a fact he told you.
-- a note is never edited to rewrite history; a changed plan is a new note.
-- adhi reads them on the coach's page, newest first.
+- add a note for something lasting; edit the note when it changes (`PATCH`); remove it when it's no longer true or useful (`DELETE`). one thing, one note.
+- a coach's notes together are capped at about a thousand words. `GET /api/notes` and every write return `memory`: how many words each coach uses of its cap. a write past the cap is refused with what to do.
+- adhi reads them on the coach's page.
