@@ -364,13 +364,13 @@ app on its own. beszel keeps cpu, memory, disk and temperature history
 on the box.</p>
 <h2 id="senior-intern">senior intern</h2>
 <p>senior intern is the data store for my personal agents, dots and
-instinct. it holds people i've met, forecasts i want to be scored on,
-training sessions, weigh-ins, books and my health. it started as a
-google sheet. tabs are data too: a tab's definition lives in d1 and
-every row is a json document checked against it, so a new tab or column
-is one <code>PUT</code>, with no migration and no deploy. the agents
-write to it with plain http calls, and i read it as a minimal page with
-a tab per subject.</p>
+instinct. it holds people i've met, predictions i want to be scored on,
+training sessions, weigh-ins, recommendations (books, movies, shows) and
+my health. it started as a google sheet. tabs are data too: a tab's
+definition lives in d1 and every row is a json document checked against
+it, so a new tab or column is one <code>PUT</code>, with no migration
+and no deploy. the agents write to it with plain http calls, and i read
+it as a minimal page with a tab per subject.</p>
 <p>it's a worker, so it stays up when the thinkpad doesn't, and it costs
 nothing: the free plan allows 100,000 requests and 100,000 row writes a
 day, and even a row per day of health data keeps it tiny. access sits in
