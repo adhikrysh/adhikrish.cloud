@@ -138,7 +138,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, books: 0, health: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, reccos: 0, health: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -347,52 +347,53 @@ test("predictions open on what is upcoming and how calibrated; scoring one (by t
   writeFileSync(join(artifacts, "page-predictions.html"), after);
 });
 
-test("books open on what is being read and what is next; the agent moves a book through its life", async () => {
+test("reccos open on cards for what you're on and what's next, with who recommended each and its kind; everything else waits under the search", async () => {
   const token = await me(), agent = await dots();
-  const add = async (row: Record<string, unknown>) => (await send(agent, "/api/books", row)).body.row;
-  const old = await add({ title: "The Old Recommendation", author: "A. Writer", status: "to read", recommended_by: "priya" });
-  await add({ title: "A Newer Pick", status: "to read", recommended_by: "a podcast" });
-  await add({ title: "Slow Read", status: "reading", started: day(-400) }); // a year in: still not late, nothing goes red
-  await add({ title: "Done Book", author: "B. Author", status: "finished", started: day(-60), finished: day(-30), take: "the second half argues against the first" });
-  await add({ title: "Quit Book", status: "dropped", started: day(-90) });
-  expect((await send(agent, "/api/books", { title: "No Status" })).body.error).toStartWith('"status" is required');
-  expect((await send(agent, "/api/books", { title: "Bad Status", status: "someday" })).body.error).toStartWith('"status" must be one of: to read, reading, finished, dropped');
-  const views = (html: string) => html.split('<div class="views">')[1].split('<form class="search"')[0];
-  const section = (html: string, label: string) => views(html).split(`<h2><span class="pill">${label}</span></h2>`)[1]?.split("</section>")[0] ?? "";
-  const titles = (html: string) => [...html.matchAll(/<a href="\/books\/\d+">([^<]+)<\/a>/g)].map((m) => m[1]);
+  const add = async (row: Record<string, unknown>) => (await send(agent, "/api/reccos", row)).body.row;
+  const bomb = await add({ title: "The Making of the Atomic Bomb", kind: "book", creator: "Richard Rhodes", status: "next", recommended_by: "priya" });
+  await add({ title: "Perfect Days", kind: "movie", creator: "Wim Wenders", status: "next", recommended_by: "maya" });
+  await add({ title: "Severance", kind: "show", status: "on it", recommended_by: "jules" });
+  await add({ title: "Blueprint for Armageddon", kind: "podcast", creator: "Dan Carlin", status: "next" }); // no recommender: the corner stays empty
+  await add({ title: "Thinking in Systems", kind: "book", status: "finished", recommended_by: "priya" });
+  await add({ title: "Antifragile", kind: "book", status: "dropped" });
+  expect((await send(agent, "/api/reccos", { title: "No Kind", status: "next" })).body.error).toStartWith('"kind" is required');
+  expect((await send(agent, "/api/reccos", { title: "Bad Kind", kind: "game", status: "next" })).body.error).toStartWith('"kind" must be one of: book, movie, show, podcast, article');
+  expect((await send(agent, "/api/reccos", { title: "Bad Status", kind: "book", status: "to read" })).body.error).toStartWith('"status" must be one of: next, on it, finished, dropped');
+  // a cards view checks its definition like every view
+  const bad = await send(token, "/api/_tabs/reccos-bad", { label: "x", about: "x", title: "title", fields: [{ name: "title", type: "text" }, { name: "status", type: "enum", options: ["a", "b"] }], views: [{ kind: "cards", field: "status", show: ["c"] }] }, "PUT");
+  expect(bad.body.error).toContain('"show" must list values of "status"');
 
-  const page = (await call("books page", "/books", { token })).body as string;
-  expect(titles(section(page, "reading"))).toEqual(["Slow Read"]);
-  expect(section(page, "reading")).toContain("<small>13 months ago</small>");
-  expect(titles(section(page, "to read"))).toEqual(["A Newer Pick", "The Old Recommendation"]); // newest recommendation first
-  expect(section(page, "to read")).toContain("<small>priya</small>");
-  expect(views(page)).not.toContain("Quit Book"); // dropped: only in the log
-  expect(views(page)).not.toContain("Done Book");
-  expect(views(page)).not.toContain('class="bad"');
-  expect(views(page).indexOf("reading")).toBeLessThan(views(page).indexOf("to read"));
-  // the log under the search: every book, finished ones by date, the take previewed
+  const cards = (html: string) => html.split('<div class="cards">')[1]?.split("</div>")[0] ?? "";
+  const cardTitles = (html: string) => [...cards(html).matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1]);
+  const page = (await call("reccos page", "/reccos", { token })).body as string;
+  // on it first and outlined, then next newest first; finished and dropped have no card
+  expect(cardTitles(page)).toEqual(["Severance", "Blueprint for Armageddon", "Perfect Days", "The Making of the Atomic Bomb"]);
+  expect(cards(page).match(/class="card first"/g)?.length).toBe(1);
+  expect(cards(page)).toContain('<a class="card first" href="/reccos/');
+  for (const k of ["show", "podcast", "movie", "book"]) expect(cards(page)).toContain(`aria-label="${k}"`);
+  expect(cards(page)).toContain('<span class="sub">Richard Rhodes</span>');
+  expect(cards(page)).toContain("<span>maya</span>");
+  expect(cards(page)).not.toContain('<span class="pill">'); // no heading: the cards are the page
+  // under the search: every recco, the two without cards included
   const log = page.split('<div class="rows">')[1];
-  for (const t of ["Done Book", "Quit Book", "Slow Read", "A Newer Pick", "The Old Recommendation"]) expect(log).toContain(t);
-  expect(log.indexOf("Done Book")).toBeLessThan(log.indexOf("Quit Book"));
-  expect(log).toContain('<p class="snippet">the second half argues against the first</p>');
-  expect((await call("search books by who recommended", "/api/books?q=priya", { token: agent })).body.rows.map((r: any) => r.title)).toEqual(["The Old Recommendation"]);
+  for (const t of ["Severance", "Perfect Days", "Thinking in Systems", "Antifragile"]) expect(log).toContain(t);
+  // the api gives the same cards as data, for an agent that wants "what's next"
+  const views = (await call("reccos views", "/api/reccos/_views", { token: agent })).body;
+  const v = views.views.find((x: any) => x.kind === "cards");
+  expect(v.rows.map((r: any) => r.title)).toEqual(cardTitles(page));
+  expect(v.rows[0]).toMatchObject({ title: "Severance", status: "on it", kind: "show", recommended_by: "jules" });
+  expect((await call("search reccos by who recommended", "/api/reccos?q=priya", { token: agent })).body.rows.map((r: any) => r.title).sort()).toEqual(["The Making of the Atomic Bomb", "Thinking in Systems"]);
 
-  // the agent starts the old recommendation, then finishes it after a conversation: one row the whole way
-  await send(agent, `/api/books/${old.id}`, { status: "reading", started: day(-14) }, "PATCH");
-  const reading = (await call("books page after starting", "/books", { token })).body as string;
-  expect(titles(section(reading, "reading"))).toEqual(["The Old Recommendation", "Slow Read"]);
-  expect(titles(section(reading, "to read"))).toEqual(["A Newer Pick"]);
-  await send(agent, `/api/books/${old.id}`, { status: "finished", finished: day(0), take: "convincing on habits, wrong about willpower" }, "PATCH");
-  const done = (await call("books page after finishing", "/books", { token })).body as string;
-  expect(titles(section(done, "reading"))).toEqual(["Slow Read"]);
-  expect(views(done)).not.toContain("The Old Recommendation");
-  const doneLog = done.split('<div class="rows">')[1];
-  expect(doneLog.indexOf("The Old Recommendation")).toBeLessThan(doneLog.indexOf("Done Book")); // finished today, so first
-  expect(doneLog).toContain("convincing on habits, wrong about willpower");
-  const row = (await call("finished book row", `/books/${old.id}`, { token })).body as string;
-  expect(row).toContain("convincing on habits, wrong about willpower");
-  expect(row).toContain("priya"); // who recommended it stays on the row
-  writeFileSync(join(artifacts, "page-books.html"), done);
+  // one row for its whole life: start it, it joins the outlined ones; finish it, its card goes and it stays in the list
+  await send(agent, `/api/reccos/${bomb.id}`, { status: "on it" }, "PATCH");
+  const started = (await call("reccos page after starting", "/reccos", { token })).body as string;
+  expect(cardTitles(started)).toEqual(["Severance", "The Making of the Atomic Bomb", "Blueprint for Armageddon", "Perfect Days"]); // on it now, outlined, newest added first among them
+  await send(agent, `/api/reccos/${bomb.id}`, { status: "finished" }, "PATCH");
+  const done = (await call("reccos page after finishing", "/reccos", { token })).body as string;
+  expect(cardTitles(done)).not.toContain("The Making of the Atomic Bomb");
+  expect(done.split('<div class="rows">')[1]).toContain("The Making of the Atomic Bomb");
+  expect((await call("finished recco row", `/reccos/${bomb.id}`, { token })).body).toContain("priya");
+  writeFileSync(join(artifacts, "page-reccos.html"), started);
 });
 
 test("garmin fills health: full backfill under the request cap, merged days, intraday detail, metrics that judge the week", async () => {
@@ -764,13 +765,13 @@ test("people link to companies, events and each other by name, and their page op
 test("tabs keep fixed titles; health's and training's descriptions are live, worked out from the birthday secret", async () => {
   const token = await me();
   await findHere();
-  const titles = { people: "people", predictions: "predictions", books: "books", health: "health", training: "training" };
+  const titles = { people: "people", predictions: "predictions", reccos: "reccos", health: "health", training: "training" };
   const home = (await call("home names", "/", { token })).body as string;
   for (const [slug, title] of Object.entries(titles)) expect(home).toContain(`<a href="/${slug}"><span>${title}</span></a>`);
   expect(home).toContain(`<a href="/health"><span>health</span></a>\n            <p>${weeksLeft()}</p>`);
   expect(home).toContain(`<a href="/training"><span>training</span></a>\n            <p>${feltLeft()}</p>`);
   // the rest have written descriptions: the names live there, the titles stay plain
-  for (const [slug, about] of [["people", "sonder"], ["predictions", "laplace's demon"], ["books", "conversations with the dead"]])
+  for (const [slug, about] of [["people", "sonder"], ["predictions", "laplace's demon"], ["reccos", "conversations with the dead"]])
     expect(home).toContain(`<a href="/${slug}"><span>${slug}</span></a>\n            <p>${about}</p>`);
   expect((await call("old path", "/forecasts", { token })).status).toBe(404); // renamed, no alias
   // the agents see the same in GET /api; the definition keeps what was written and says it's live
@@ -817,7 +818,7 @@ test("tabs and columns are added through the api, with no migration, and every c
   expect((await send(token, "/api/_tabs/health", { ...health, after: "training" }, "PUT")).status).toBe(200);
   const home = (await call("home after reorder", "/", { token: await me() })).body as string;
   expect(home.indexOf('href="/health"')).toBeGreaterThan(home.indexOf('href="/training"'));
-  expect(home.indexOf('href="/health"')).toBeLessThan(home.indexOf('href="/books"'));
+  expect(home.indexOf('href="/health"')).toBeLessThan(home.indexOf('href="/reccos"'));
   expect((await send(token, "/api/_tabs/health", { ...health, after: "nope" }, "PUT")).body.error).toBe('"after" must be the slug of another tab');
   const log = (await call("schema log", "/api/_log", { token })).body.changes;
   expect(log.slice(0, 3).map((c: any) => [c.tab, c.before === null ? "created" : "changed", c.by])).toEqual([

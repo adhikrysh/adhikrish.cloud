@@ -122,7 +122,7 @@ the tunnel alert covers the whole box; the uptime page covers each app on its ow
 
 ## senior intern
 
-senior intern is the data store for my personal agents, dots and instinct. it holds people i've met, forecasts i want to be scored on, training sessions, weigh-ins, books and my health. it started as a google sheet. tabs are data too: a tab's definition lives in d1 and every row is a json document checked against it, so a new tab or column is one `PUT`, with no migration and no deploy. the agents write to it with plain http calls, and i read it as a minimal page with a tab per subject.
+senior intern is the data store for my personal agents, dots and instinct. it holds people i've met, predictions i want to be scored on, training sessions, weigh-ins, recommendations (books, movies, shows) and my health. it started as a google sheet. tabs are data too: a tab's definition lives in d1 and every row is a json document checked against it, so a new tab or column is one `PUT`, with no migration and no deploy. the agents write to it with plain http calls, and i read it as a minimal page with a tab per subject.
 
 it's a worker, so it stays up when the thinkpad doesn't, and it costs nothing: the free plan allows 100,000 requests and 100,000 row writes a day, and even a row per day of health data keeps it tiny. access sits in front of it. each agent carries its own service token, and the worker still checks the signed jwt that access attaches to every request it lets through, which is also how every row records who wrote it last. `GET /api` lists every tab with its fields, so a new tab is something the agents discover on their own, not a new endpoint. backups come from d1 itself, which can restore the database to any minute in the last 30 days.
 

@@ -24,6 +24,14 @@ export const VIEW_CSS = `
   .strip i { flex: 1; height: 22px; border-radius: 1px; background: var(--line); }
   .strip i.up { background: var(--good); }
   .strip-ends { display: flex; justify-content: space-between; color: var(--faint); font-size: var(--fs-tiny); margin-top: 6px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .card { aspect-ratio: 2 / 3; border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; }
+  .card:hover { background: var(--surface); }
+  .card.first { border-color: var(--text); }
+  .card b { font-weight: 450; line-height: 1.25; display: block; color: var(--text); }
+  .card .sub { display: block; }
+  .card .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--faint); font-size: var(--fs-tiny); }
+  .card .foot svg { color: var(--muted); flex: none; margin-left: auto; }
   .lifts { display: grid; gap: 16px; }
   .lift { display: grid; grid-template-columns: minmax(0, 1fr) 120px; column-gap: 16px; align-items: center; }
   .lift .name { color: var(--bright); }
@@ -66,7 +74,6 @@ function ago(t: number, today: number): string {
   const span = `${c} ${u}${c === 1 ? "" : "s"}`;
   return days < 0 ? `${span} ago` : `in ${span}`;
 }
-
 
 type Ctx = { tab: Tab; rows: db.Row[]; database: D1Database; recent: () => Promise<db.Row[]>; today: number };
 const dateField = (tab: Tab) => (tab.sort !== "id" ? tab.sort : tab.group ?? "created_at");
@@ -155,7 +162,7 @@ function strip(v: Extract<View, { kind: "strip" }>, { rows, today: now }: Ctx): 
 /** Chart points, one per day (a day with two rows keeps the later). */
 function perDay(pts: { t: number; y: number; id: number }[]): ChartPoint[] {
   const byDay = new Map<string, ChartPoint>();
-  for (const p of pts) { const d = new Date(p.t).toISOString().slice(0, 10); byDay.set(d, [d, p.y, p.id]); }
+  for (const p of pts) { const d = isoDay(p.t); byDay.set(d, [d, p.y, p.id]); }
   return [...byDay.values()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
 }
 
@@ -240,13 +247,12 @@ function quantile(xs: number[], q: number): number {
   const s = [...xs].sort((a, b) => a - b), i = (s.length - 1) * q, lo = Math.floor(i);
   return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo);
 }
-/** Minutes after 6pm, so bedtimes either side of midnight compare as one line (11pm = 300, 1am = 420). */
 export type Verdict = { day: db.Row; value: number; word: string; tone: "" | "good" | "bad"; band: [number, number] | null; box: { t: number; y: number }[]; soFar?: number };
 
 /** Judges one metric's newest day (or newest finished day), or the day `on`, by the first rule it has. rows: oldest first. */
 export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | null, today: number, on?: string): Verdict | null {
   const dateF = dateField(tab), f = tab.fields.find((x) => x.name === m.field);
-  const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]), row: r })).filter((p): p is Pt & { row: db.Row } => p.t !== null && r0(p.row[m.field]) && finite(p.y));
+  const pts = rows.map((r) => ({ t: dayOf(r[dateF]), y: Number(r[m.field]), row: r })).filter((p): p is Pt & { row: db.Row } => p.t !== null && filled(p.row[m.field]) && finite(p.y));
   if (!pts.length) return null;
   let at = pts.length - 1, soFar: number | undefined;
   if (on !== undefined) { at = pts.findIndex((p) => String(p.row[dateF]).slice(0, 10) === on); if (at < 0) return null; }
@@ -285,7 +291,7 @@ export function judge(tab: Tab, m: Metric, rows: db.Row[], newestDate: string | 
   const box = pts.filter((p) => p.t <= day.t && p.t > day.t - BOX * DAY).map((p) => ({ t: p.t, y: p.y }));
   return { day: day.row, value, word, tone, band, box, soFar };
 }
-const r0 = (v: unknown) => v !== undefined && v !== null && v !== "";
+const filled = (v: unknown) => v !== undefined && v !== null && v !== "";
 /** The newest date if it is today where you are (garmin's dates are local, so today or yesterday in utc), else null: a tab that
  * hasn't synced for days has no "today", so nothing reads as today, yesterday or "so far". */
 const liveDay = (d: string | null, today: number) => (d !== null && (dayOf(d) ?? 0) >= today - DAY ? d : null);
@@ -344,7 +350,7 @@ async function metrics(v: Extract<View, { kind: "metrics" }>, { tab, recent, tod
     data.push({ field: m.field, name: metricName(m.field), value: verdict.value, shown, verdict: verdict.word || null, tone: verdict.tone || null,
       day: String(verdict.day[dateF]).slice(0, 10), when, ...(m.per === "week" ? { per: "week" } : {}),
       ...(verdict.soFar !== undefined ? { today_so_far: verdict.soFar } : {}), ...(verdict.band ? { usual: verdict.band.map((x) => Math.round(x * 10) / 10) } : {}) });
-    return `<a class="metric" href="/${tab.slug}/metrics/${m.field}"><span class="name">${escape(metricName(m.field))}</span><span class="val${verdict.tone ? ` ${verdict.tone}` : ""}">${escape(m.per === "week" ? `${Math.round(verdict.value)}${f?.unit ? ` ${f.unit}` : ""}` : amount(f, verdict.value))}</span><span class="why">${words.join("")}</span>${verdict.box.length > 1 ? box(verdict, t) : "<span></span>"}</a>`;
+    return `<a class="metric" href="/${tab.slug}/metrics/${m.field}"><span class="name">${escape(metricName(m.field))}</span><span class="val${verdict.tone ? ` ${verdict.tone}` : ""}">${escape(shown)}</span><span class="why">${words.join("")}</span>${verdict.box.length > 1 ? box(verdict, t) : "<span></span>"}</a>`;
   }).filter(Boolean);
   return items.length ? result("metrics", v.label, { metrics: data }, `<div class="metrics">${items.join("")}</div>`) : null;
 }
@@ -374,11 +380,10 @@ export async function metricPage(tab: Tab, database: D1Database, name: string): 
     }
   }
   const week = best ? pts.slice(best.from, best.to + 1) : [];
-  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
   const byDay = new Map<string, ChartPoint>();
-  for (const p of pts) byDay.set(iso(p.t), [iso(p.t), p.y, p.id]);
+  for (const p of pts) byDay.set(isoDay(p.t), [isoDay(p.t), p.y, p.id]);
   const plot = chart({ points: [...byDay.values()], streams: metric.stream ? streamsOf(recentStreams, metric.stream) : undefined, base: `/${tab.slug}/`,
-    unit: f.unit, int: f.type === "int", usual: verdict?.band ?? undefined, best: week.length > 1 ? [iso(week[0].t), iso(week.at(-1)!.t)] : undefined });
+    unit: f.unit, int: f.type === "int", usual: verdict?.band ?? undefined, best: week.length > 1 ? [isoDay(week[0].t), isoDay(week.at(-1)!.t)] : undefined });
   const inBest = new Set(week.map((p) => p.id));
   const lastDays = [...pts].reverse().slice(0, 14).map((p) => `<li><a href="/${tab.slug}/${p.id}">${short(p.t)}</a><span class="sets"><span${inBest.has(p.id) ? ' class="good"' : ""}>${escape(amount(f, p.y))}</span></span></li>`);
   // just the value and its verdict: the chart says the rest (the best week is drawn in green on it)
@@ -407,7 +412,6 @@ function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): 
   return result("calibration", "calibration", Object.fromEntries(items), `<dl class="facts">${items.map(([k, val]) => `<dt>${escape(k)}</dt><dd>${escape(val)}</dd>`).join("")}</dl>`);
 }
 
-
 /** One exercise: every session on a zoomable chart (a dot opens its session), then every session's sets, the best in green. */
 export async function liftPage(tab: Tab, database: D1Database, exercise: string): Promise<string | null> {
   const field = tab.views?.find((v): v is Extract<View, { kind: "progress" }> => v.kind === "progress")?.field;
@@ -417,8 +421,8 @@ export async function liftPage(tab: Tab, database: D1Database, exercise: string)
   const best = pts.reduce((a, p) => (p.top > a.top || (p.top === a.top && p.reps > a.reps) ? p : a));
   // one dot per session day (a day with two sessions keeps its heavier best set); the best session in green
   const byDay = new Map<string, (typeof pts)[number]>();
-  for (const p of pts) { const d = new Date(p.t).toISOString().slice(0, 10), had = byDay.get(d); if (!had || p.top >= had.top) byDay.set(d, p); }
-  const bestDay = new Date(best.t).toISOString().slice(0, 10);
+  for (const p of pts) { const d = isoDay(p.t), had = byDay.get(d); if (!had || p.top >= had.top) byDay.set(d, p); }
+  const bestDay = isoDay(best.t);
   const plot = chart({ points: [...byDay].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([d, p]) => [d, p.top, p.row.id]), base: `/${tab.slug}/`,
     unit: tab.fields.find((f) => f.name === field)?.unit ?? "lb", int: false, best: [bestDay, bestDay] });
   const sessions = [...pts].reverse().map((p) => `<li><a href="/${tab.slug}/${p.row.id}">${short(p.t)}</a><span class="sets">${p.sets.map((s) => { const cls = s === p.label ? (p === best ? "good" : "top") : ""; return `<span${cls ? ` class="${cls}"` : ""}>${escape(s)}</span>`; }).join("")}</span></li>`);
@@ -447,11 +451,10 @@ export const LIFT_CSS = `
 // against your own past weeks, and the run limit is the 2025 study's (a run over 10% longer than the longest of the 30 days
 // before it raised overuse injuries, Frandsen et al., BJSM; docs/training.md).
 
-const OFFSET = /([+-])(\d{2}):(\d{2})$/;
 type Session = { t: number; at: number; y: number; row: db.Row };
 /** Rows matching `where` with a number in `field`, by local day (and instant, for order within a day), oldest first. */
 function sessions(rows: db.Row[], dateF: string, field: string, where?: Record<string, string>): Session[] {
-  return rows.filter((r) => matches(where, r) && r0(r[field]) && finite(Number(r[field])))
+  return rows.filter((r) => matches(where, r) && filled(r[field]) && finite(Number(r[field])))
     .map((r) => ({ t: dayOf(r[dateF]), at: Date.parse(String(r[dateF])), y: Number(r[field]), row: r }))
     .filter((s): s is Session => s.t !== null).map((s) => ({ ...s, at: finite(s.at) ? s.at : s.t })).sort((a, b) => a.at - b.at);
 }
@@ -567,8 +570,6 @@ function records(v: Extract<View, { kind: "records" }>, { tab, rows, today }: Ct
   return result("records", v.label ?? "records", { days, records: out }, `<div class="metrics">${html.join("")}</div>`);
 }
 
-/** Every view of a tab that has something to say, in order: its numbers and its html. Every row is loaded only for views that
- * need them all; metrics read a window of recent rows and let sqlite find the bests, so a tab with years of days stays cheap. */
 /** The rows and the tabs their refs reach as a graph: its nodes and edges are the data, drawn by src/graph.ts. */
 async function graphView(v: Extract<View, { kind: "graph" }>, { tab, database }: Ctx): Promise<ViewResult | null> {
   const g = await graph(database, tab);
@@ -576,6 +577,34 @@ async function graphView(v: Extract<View, { kind: "graph" }>, { tab, database }:
   return g.nodes.length ? { ...result("graph", v.label ?? "connections", g, ""), html: `<section class="view">${graphBox(g)}</section>` } : null;
 }
 
+// a card's picture, by the value of its icon field: monoline, 16px, in currentColor so it follows the design's colours.
+// a value without one shows no picture.
+const ICONS: Record<string, string> = {
+  book: '<path d="M2 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-6a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h7z"/>',
+  movie: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="7.5" r="1.6"/><circle cx="12" cy="16.5" r="1.6"/><circle cx="7.5" cy="12" r="1.6"/><circle cx="16.5" cy="12" r="1.6"/>',
+  show: '<rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M8 2l4 4 4-4"/>',
+  podcast: '<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/>',
+  article: '<path d="M6 2.5h9l4 4v15H6z"/><path d="M9 11h7M9 15h7M9 7h3"/>',
+};
+const icon = (value: unknown) => typeof value === "string" && ICONS[value]
+  ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${escape(value)}"><title>${escape(value)}</title>${ICONS[value]}</svg>` : "";
+
+/** A card per row whose `field` is one of `show`, grouped in that order (on it, then next), the first group outlined: the title and
+ * `sub` on top, `foot` bottom left, the `icon` field's picture bottom right. No heading unless it has a label: the cards are the page. */
+function cards(v: Extract<View, { kind: "cards" }>, { tab, rows }: Ctx): ViewResult | null {
+  const shown = v.show.flatMap((value) => rows.filter((row) => row[v.field] === value));
+  if (!shown.length) return null;
+  const text = (row: db.Row, f?: string) => (f && row[f] !== undefined && row[f] !== "" ? escape(Array.isArray(row[f]) ? (row[f] as string[]).join(", ") : row[f]) : "");
+  const html = shown.map((row) => `<a class="card${row[v.field] === v.show[0] ? " first" : ""}" href="/${tab.slug}/${row.id}"><span><b>${title(tab, row)}</b>${v.sub && text(row, v.sub) ? `<span class="sub">${text(row, v.sub)}</span>` : ""}</span>
+<span class="foot"><span>${text(row, v.foot)}</span>${v.icon ? icon(row[v.icon]) : ""}</span></a>`);
+  const pick = (row: db.Row, f?: string) => (f ? { [f]: row[f] ?? null } : {});
+  const data = { rows: shown.map((row) => ({ id: row.id, title: row[tab.title] ?? null, [v.field]: row[v.field], ...pick(row, v.sub), ...pick(row, v.foot), ...pick(row, v.icon) })) };
+  const body = `<div class="cards">${html.join("")}</div>`;
+  return v.label ? result("cards", v.label, data, body) : { ...result("cards", "cards", data, ""), html: `<section class="view">${body}</section>` };
+}
+
+/** Every view of a tab that has something to say, in order: its numbers and its html. Every row is loaded only for views that
+ * need them all; metrics read a window of recent rows and let sqlite find the bests, so a tab with years of days stays cheap. */
 export async function computeViews(tab: Tab, database: D1Database): Promise<ViewResult[]> {
   if (!tab.views?.length) return [];
   let recent: Promise<db.Row[]> | undefined;
@@ -595,6 +624,7 @@ export async function computeViews(tab: Tab, database: D1Database): Promise<View
       case "weeks": return weeks(v, ctx);
       case "records": return records(v, ctx);
       case "graph": return graphView(v, ctx);
+      case "cards": return cards(v, ctx);
     }
   }));
   const out: ViewResult[] = [];

@@ -109,7 +109,6 @@ function day(p: Parts, style: "short" | "long"): string {
   return p.y === new Date().getUTCFullYear() ? base : `${base}, ${p.y}`;
 }
 
-/** "today", "yesterday", "3 weeks ago", "in 2 years", in whole calendar days from today (utc). */
 /** "yesterday", "2 weeks ago", "in 3 days", counted from `today`: the date where you are (src/here.ts), never the utc clock. */
 function relative(p: Parts, today: number): string {
   const days = Math.round((Date.UTC(p.y, p.mo - 1, p.d) - today) / 86_400_000);

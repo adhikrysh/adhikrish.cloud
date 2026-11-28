@@ -2,7 +2,7 @@
 //   /_health         readiness for the uptime page (underscored like every system path, so no tab slug can shadow it)
 //   /api/...         json api (src/api.ts): dots and scripts
 //   /, /<tab>, /<tab>/<id>, /<tab>/lifts/<exercise>, /<tab>/metrics/<field>  read-only pages (src/page.ts). all writes go through the api,
-//   except the hourly garmin sync (src/garmin.ts), which writes the health tab directly.
+//   except the hourly garmin sync (src/garmin.ts), which writes the health, training and body tabs directly.
 // Every request except /_health must carry the jwt cloudflare access signs for requests it let in.
 import base from "../../../design/base.css?raw";
 import list from "../../../design/list.css?raw";

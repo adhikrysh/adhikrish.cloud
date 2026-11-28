@@ -1,4 +1,4 @@
-// The json api. dots, scripts and the pages all go through these handlers.
+// The json api. dots and scripts go through these handlers; the pages (src/page.ts) read the same db.
 //
 //   data                                   schema (tabs and their fields; every change is logged)
 //   GET    /api                            GET    /api/_tabs/<slug>

@@ -643,36 +643,29 @@
   ],
   "hidden": true
  },
- "books": {
-  "label": "books",
+ "reccos": {
+  "label": "reccos",
   "about": "conversations with the dead",
   "title": "title",
   "aside": [
    "status"
   ],
   "line": [
-   "author",
-   "finished"
+   "creator",
+   "recommended_by"
   ],
-  "sort": "finished",
-  "snippet": "take",
+  "sort": "id",
   "views": [
    {
-    "kind": "list",
-    "label": "reading",
-    "where": {
-     "status": "reading"
-    },
-    "sort": "started",
-    "aside": "started"
-   },
-   {
-    "kind": "list",
-    "label": "to read",
-    "where": {
-     "status": "to read"
-    },
-    "aside": "recommended_by"
+    "kind": "cards",
+    "field": "status",
+    "show": [
+     "on it",
+     "next"
+    ],
+    "sub": "creator",
+    "foot": "recommended_by",
+    "icon": "kind"
    }
   ],
   "fields": [
@@ -682,15 +675,27 @@
     "required": true
    },
    {
-    "name": "author",
+    "name": "kind",
+    "type": "enum",
+    "options": [
+     "book",
+     "movie",
+     "show",
+     "podcast",
+     "article"
+    ],
+    "required": true
+   },
+   {
+    "name": "creator",
     "type": "text"
    },
    {
     "name": "status",
     "type": "enum",
     "options": [
-     "to read",
-     "reading",
+     "next",
+     "on it",
      "finished",
      "dropped"
     ],
@@ -702,22 +707,6 @@
    },
    {
     "name": "recommended_by",
-    "type": "text"
-   },
-   {
-    "name": "started",
-    "type": "date"
-   },
-   {
-    "name": "finished",
-    "type": "date"
-   },
-   {
-    "name": "take",
-    "type": "text"
-   },
-   {
-    "name": "quotes",
     "type": "text"
    },
    {

@@ -46,7 +46,8 @@ type ViewKind =
   | { kind: "limit"; field: string; where?: Record<string, string>; days?: number; over?: number; label?: string } // the longest in `days` (30) and the next one's limit, `over` (10) % past it; sessions that went past it
   | { kind: "weeks"; by: string; fields: string[]; zones?: string[]; weeks?: number; label?: string } // per value of `by` (a sport), `fields` summed over 7-day weeks; `zones` as shares of the last 28 days
   | { kind: "records"; records: Record_[]; days?: number; label?: string } // each record's best ever and its best in the last `days` (90)
-  | { kind: "graph"; label?: string }; // the rows as nodes and their ref fields as edges, with the tabs those refs reach (people, companies, events)
+  | { kind: "graph"; label?: string } // the rows as nodes and their ref fields as edges, with the tabs those refs reach (people, companies, events)
+  | { kind: "cards"; field: string; show: string[]; sub?: string; foot?: string; icon?: string; label?: string }; // a card per row whose enum `field` is one of `show`, in that order, the first outlined; `sub` under the title, `foot` bottom left, the enum `icon` as a picture bottom right
 /** One record: the largest (or smallest, `best: "min"`, for times) value of `field`, among rows matching `where`. */
 export type Record_ = { label: string; field: string; best: "max" | "min"; where?: Record<string, string> };
 /** One number on a metrics view: a short verdict on its newest day and a box of its last 14 days. How a day is judged, in order
@@ -179,7 +180,7 @@ export function checkDefinition(input: unknown): TabDefinition | string {
       parts.push({ label: p.label, fields: p.fields as string[] });
     }
   }
-  const views = checkViews(d.views, types);
+  const views = checkViews(d.views, types, fields);
   if (typeof views === "string") return views;
   if (d.hidden !== undefined && typeof d.hidden !== "boolean") return `"hidden" must be true or false`;
   if (d.live !== undefined && !LIVE.includes(d.live as Live)) return `"live" must be one of ${LIVE.join(", ")}`;
@@ -210,7 +211,7 @@ export function checkRow(tab: Tab, body: unknown, { partial }: { partial: boolea
   return { set, unset };
 }
 
-function checkViews(input: unknown, types: Map<string, FieldType>): View[] | string {
+function checkViews(input: unknown, types: Map<string, FieldType>, fields: Field[]): View[] | string {
   if (input === undefined) return [];
   if (!Array.isArray(input)) return '"views" must be a list';
   const views: View[] = [];
@@ -297,7 +298,16 @@ function checkViews(input: unknown, types: Map<string, FieldType>): View[] | str
         if (![...types.values()].includes("ref")) return `${where}: the tab needs a ref field to draw its links`;
         if (v.label !== undefined && (typeof v.label !== "string" || !v.label.trim())) return `${where}: "label" must be a heading like "connections"`;
         break;
-      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics, load, limit, weeks, records, graph`;
+      case "cards": {
+        const options = fields.find((f) => f.name === v.field && f.type === "enum")?.options;
+        if (!options) return `${where}: "field" must name an enum field, like "status"`;
+        if (!Array.isArray(v.show) || !v.show.length || !v.show.every((o: unknown) => typeof o === "string" && options.includes(o))) return `${where}: "show" must list values of "${v.field}", like ["on it", "next"]`;
+        for (const k of ["sub", "foot"]) if (v[k] !== undefined && !types.has(v[k])) return `${where}: "${k}" must name a field`;
+        if (v.icon !== undefined && !isField(v.icon, ["enum"])) return `${where}: "icon" must name an enum field, like "kind"`;
+        if (v.label !== undefined && (typeof v.label !== "string" || !v.label.trim())) return `${where}: "label" must be a heading like "next"`;
+        break;
+      }
+      default: return `views[${i}]: kind must be one of progress, strip, line, upcoming, calibration, list, metrics, load, limit, weeks, records, graph, cards`;
     }
     views.push(v as View);
   }
