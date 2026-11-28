@@ -6,3 +6,6 @@ node_modules/
 *.db-shm
 **/test/artifacts/
 .dev.vars
+
+# the agent's own instructions: personal, so never in this public repo. a link to the source of truth in drive (obsidian/ai-configs/built, which parity-check.sh writes)
+private/snrintern/senior-intern-AGENTS.md

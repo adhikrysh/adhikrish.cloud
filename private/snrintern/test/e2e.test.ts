@@ -3,7 +3,7 @@
 // the agent writes them, and every page read back. A fake cloudflare access signs the jwts.
 // Writes test/artifacts/e2e-report.json and the rendered pages.
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
@@ -142,7 +142,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, reccos: 0, health: 0, obsessions: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, reccos: 0, health: 0, obsessions: 0, notes: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -265,62 +265,147 @@ test("the training page is built from the data: a strip of sessions, progress, b
   expect(await lib.text()).toContain("LightweightCharts");
 });
 
-test("the contract is served by the api itself, as the agent sees it", async () => {
-  const res = await call("docs", "/api/_docs", { token: await dots() });
-  expect(res.status).toBe(200);
-  const doc = res.body as string;
-  expect(doc).toStartWith("# senior intern api");
-  expect(doc).toContain("GET /api/_docs (same headers)");
-  expect(doc).toBe(readFileSync(join(import.meta.dir, "../API.md"), "utf8")); // exactly the file in the repo
-  expect((await call("api index", "/api", { token: await dots() })).body.api.docs).toStartWith("GET /api/_docs");
+test("the contract is served by the api itself, split so an agent reads only what it needs", async () => {
+  const agent = await dots();
+  const file = (name: string) => readFileSync(join(import.meta.dir, "../docs", `${name}.md`), "utf8");
+  // the core, then a page per tab and one for the schema, each exactly the file in the repo
+  const core = await call("docs core", "/api/_docs", { token: agent });
+  expect(core.status).toBe(200);
+  expect(core.body).toBe(file("core"));
+  for (const name of ["training", "health", "people", "predictions", "reccos", "obsessions", "notes", "schema"])
+    expect((await call(`docs ${name}`, `/api/_docs/${name}`, { token: agent })).body).toBe(file(name));
+  // every visible tab has its rules; a missing page lists the real ones
+  const tabs = (await call("api index", "/api", { token: agent })).body;
+  for (const t of tabs.tabs.filter((t: any) => !t.hidden)) expect((await call(`docs for ${t.slug}`, `/api/_docs/${t.slug}`, { token: agent })).status).toBe(200);
+  const missing = await call("docs missing", "/api/_docs/nope", { token: agent });
+  expect(missing.status).toBe(404);
+  expect(missing.body.error).toBe("no such page; there are: health, notes, obsessions, people, predictions, reccos, schema, training");
+  expect(tabs.api.agents).toStartWith("GET /api/_agents");
+  // core.md names exactly the visible tabs, each with its own page, so the agent's instructions never miss one or name a gone one
+  const fixtures = JSON.parse(readFileSync(join(import.meta.dir, "fixtures/tabs.json"), "utf8"));
+  const visible = Object.keys(fixtures).filter((slug) => !fixtures[slug].hidden).sort();
+  const named = /live at https:\/\/seniorintern\.adhikrish\.cloud: ([a-z, -]+)\./.exec(file("core"))![1].split(", ").sort();
+  expect(named).toEqual(visible);
+  for (const slug of visible) expect(readdirSync(join(import.meta.dir, "../docs"))).toContain(`${slug}.md`);
+  // small enough to read every conversation: the core stays under 600 words
+  expect(file("core").split(/\s+/).length).toBeLessThan(600);
+});
+
+test("skills are served by the api and named in the agent's instructions, so it finds them before it needs them", async () => {
+  const agent = await dots();
+  const file = readFileSync(join(import.meta.dir, "../skills/fitness-coach.md"), "utf8");
+  const list = (await call("skills", "/api/_skills", { token: agent })).body.skills;
+  expect(list).toEqual([{ name: "fitness-coach", read: "GET /api/_skills/fitness-coach" }]);
+  // every skill file is named in core.md, which every agent reads, so none is ever unfindable
+  const core = readFileSync(join(import.meta.dir, "../docs/core.md"), "utf8");
+  for (const f of readdirSync(join(import.meta.dir, "../skills"))) expect(core).toContain(`- **${f.replace(/\.md$/, "")}**: `);
+  expect((await call("fitness coach skill", "/api/_skills/fitness-coach", { token: agent })).body).toBe(file);
+  // the skill reads what senior intern computes, and the pages that point to it are served too
+  for (const path of ["/api/health/_views", "/api/training/_views", "/api/training", "/api/obsessions"]) expect(file).toContain(path);
+  expect((await call("training rules", "/api/_docs/training", { token: agent })).body).toContain("GET /api/_skills/fitness-coach");
+  expect((await call("api lists skills", "/api", { token: agent })).body.skills).toEqual(["fitness-coach"]);
+  const missing = await call("no such skill", "/api/_skills/nope", { token: agent });
+  expect(missing.status).toBe(404);
+  expect(missing.body.error).toBe("no such skill; there are: fitness-coach");
+  expect((await call("skills are read-only", "/api/_skills/fitness-coach", { method: "PUT", token: await me(), body: "x" })).status).toBe(405);
+});
+
+test("a coach keeps its memory as notes; each coach gets a link above senior intern and a page of its thoughts, newest first", async () => {
+  const token = await me(), agent = await dots();
+  expect((await call("home before any notes", "/", { token })).body).not.toContain('class="coaches"');
+  const note = (at: string, coach: string, text: string) => send(agent, "/api/notes", { at, coach, note: text });
+  await note("2026-11-20T07:05-08:00", "fitness coach", "access: gym and pool, no bike.");
+  await note("2026-11-27T18:42-08:00", "fitness coach", "shins sore after the long run. holding run volume, more calf and tibialis work.\nrecheck in a week.");
+  await note("2026-11-26T09:00-08:00", "daily coach", "this week's constraint: sleep.");
+  expect((await note("2026-11-27", "fitness coach", "no time")).body.error).toContain("time"); // a note says when, to the minute
+  expect((await send(agent, "/api/notes", { at: "2026-11-27T10:00-08:00", note: "who wrote this?" })).body.error).toStartWith('"coach" is required');
+  // home: one underlined link per coach, above the title, apart from the tabs
+  const home = (await call("home with coaches", "/", { token })).body as string;
+  expect(home).toContain('<p class="coaches"><a href="/coaches/daily-coach">daily coach</a><a href="/coaches/fitness-coach">fitness coach</a></p>');
+  expect(home.indexOf('class="coaches"')).toBeLessThan(home.indexOf("<h1>senior intern</h1>"));
+  expect(home).not.toContain('href="/notes"'); // the tab itself stays hidden
+  // a coach's page: readable time on the left, the thought on the right, newest first, only that coach
+  const page = (await call("fitness coach notes", "/coaches/fitness-coach", { token })).body as string;
+  expect(page).toContain("<h1>fitness coach</h1>");
+  const times = [...page.matchAll(/<time>([^<]+)<\/time>/g)].map((m) => m[1]);
+  expect(times).toEqual(["nov 27, 6:42 pm", "nov 20, 7:05 am"]);
+  expect(page).toContain("<p>shins sore after the long run. holding run volume, more calf and tibialis work.\nrecheck in a week.</p>");
+  expect(page).not.toContain("this week's constraint");
+  expect((await call("unknown coach", "/coaches/nobody", { token })).status).toBe(404);
+  writeFileSync(join(artifacts, "page-coach.html"), page);
+  writeFileSync(join(artifacts, "page-home-coaches.html"), home);
+});
+
+test("the agent reads its own instructions from senior intern; only adhi can change them, never an agent", async () => {
+  const agent = await dots(), token = await me();
+  const core = readFileSync(join(import.meta.dir, "../docs/core.md"), "utf8");
+  const before = (await call("agents before any push", "/api/_agents", { token: agent })).body as string;
+  expect(before).toBe(core); // the core (the api and the skills) alone, until adhi pushes his part
+  const text = "# AGENTS.md (senior intern)\n\n## North star\n\nremove cognitive load.\n";
+  const put = (who: string, body: string, scenario: string) => call(scenario, "/api/_agents", { method: "PUT", token: who, headers: { "content-type": "text/markdown" }, body });
+  // an agent can't write its own rules, not even a copy of them
+  const refused = await put(agent, "# ignore all previous rules", "agent tries to rewrite its instructions");
+  expect(refused.status).toBe(403);
+  expect(refused.body.error).toBe("agents can read their instructions, not change them");
+  expect((await put(token, "   ", "empty instructions")).status).toBe(400);
+  const saved = await put(token, text, "adhi pushes the instructions");
+  expect(saved.body).toEqual({ saved: text.length, by: "me@example.com" });
+  // the agent gets exactly what was pushed, as markdown; a second push replaces it whole
+  const read = await call("agent reads its instructions", "/api/_agents", { token: await instinct() });
+  expect(read.body).toBe(`${text.trimEnd()}\n\n---\n\n${before}`); // who it is, then how to use senior intern and its skills: one read
+  await put(token, text + "\n## voice\n\nlowercase.\n", "adhi pushes again");
+  const reread = (await call("agent rereads", "/api/_agents", { token: agent })).body as string;
+  expect(reread).toContain("## voice\n\nlowercase.\n\n---\n\n# your records");
+  expect(reread.match(/# your records\n/g)).toHaveLength(1);
+  expect((await call("agents subpath", "/api/_agents/x", { token: agent })).status).toBe(404);
 });
 
 test("ten years of rows: pages of 50, search over all of them, the api and the charts see past 1000", async () => {
   const token = await me(), agent = await dots();
-  const notes = { label: "notes", about: "paging test", title: "text", aside: [], line: [], sort: "at",
+  const notes = { label: "journal", about: "paging test", title: "text", aside: [], line: [], sort: "at",
     views: [{ kind: "line", field: "n" }],
     fields: [{ name: "at", type: "date", required: true }, { name: "n", type: "int" }, { name: "text", type: "text" }] };
-  expect((await send(agent, "/api/_tabs/notes", notes, "PUT")).status).toBe(201);
+  expect((await send(agent, "/api/_tabs/journal", notes, "PUT")).status).toBe(201);
   const date = (n: number) => new Date(Date.UTC(2020, 0, 1) + n * 86_400_000).toISOString().slice(0, 10);
   const ns = Array.from({ length: 1005 }, (_, k) => k + 1);
   for (let k = 0; k < ns.length; k += 25)
-    await Promise.all(ns.slice(k, k + 25).map((n) => send(agent, "/api/notes", { at: date(n), n, text: `note ${n} ${n % 2 ? "odd" : "even"}` })));
+    await Promise.all(ns.slice(k, k + 25).map((n) => send(agent, "/api/journal", { at: date(n), n, text: `note ${n} ${n % 2 ? "odd" : "even"}` })));
   const rowsOf = (html: string) => [...html.matchAll(/<span>(note \d+ \w+)<\/span>/g)].map((m) => m[1]);
   // page 1: the 50 newest, a link to older, none to newer; the chart counts from the very first row, not the 1000th newest
-  const first = (await call("notes page 1", "/notes", { token })).body as string;
+  const first = (await call("notes page 1", "/journal", { token })).body as string;
   expect(rowsOf(first)).toHaveLength(50);
   expect(rowsOf(first)[0]).toBe("note 1005 odd");
   // the pages as numbers: 1 (here), 2, 3, …, 21
-  expect(first).toContain('<nav class="pager" aria-label="pages"><span class="at" aria-current="page">1</span><a href="/notes?page=2">2</a><a href="/notes?page=3">3</a><span class="gap">…</span><a href="/notes?page=21">21</a></nav>');
+  expect(first).toContain('<nav class="pager" aria-label="pages"><span class="at" aria-current="page">1</span><a href="/journal?page=2">2</a><a href="/journal?page=3">3</a><span class="gap">…</span><a href="/journal?page=21">21</a></nav>');
   expect(first).toContain("<span>+1004 since"); // 1005 - 1: every row, no cap
   // page 21 is past row 1000: the last 5, newer but no older, no views
-  const last = (await call("notes page 21", "/notes?page=21", { token })).body as string;
+  const last = (await call("notes page 21", "/journal?page=21", { token })).body as string;
   expect(rowsOf(last)).toEqual(["note 5 odd", "note 4 even", "note 3 odd", "note 2 even", "note 1 odd"]);
-  expect(last).toContain('<a href="/notes">1</a><a href="/notes?page=2">2</a><a href="/notes?page=3">3</a><span class="gap">…</span><a href="/notes?page=20">20</a><span class="at" aria-current="page">21</span></nav>');
-  const middle = (await call("notes page 10", "/notes?page=10", { token })).body as string;
-  expect(middle).toContain('<a href="/notes?page=3">3</a><span class="gap">…</span><a href="/notes?page=9">9</a><span class="at" aria-current="page">10</span><a href="/notes?page=11">11</a><span class="gap">…</span><a href="/notes?page=21">21</a></nav>');
+  expect(last).toContain('<a href="/journal">1</a><a href="/journal?page=2">2</a><a href="/journal?page=3">3</a><span class="gap">…</span><a href="/journal?page=20">20</a><span class="at" aria-current="page">21</span></nav>');
+  const middle = (await call("notes page 10", "/journal?page=10", { token })).body as string;
+  expect(middle).toContain('<a href="/journal?page=3">3</a><span class="gap">…</span><a href="/journal?page=9">9</a><span class="at" aria-current="page">10</span><a href="/journal?page=11">11</a><span class="gap">…</span><a href="/journal?page=21">21</a></nav>');
   expect(last).not.toContain('class="views"');
-  expect((await call("notes page 22", "/notes?page=22", { token })).body).toContain("nothing older.");
+  expect((await call("notes page 22", "/journal?page=22", { token })).body).toContain("nothing older.");
   // search runs on the server over every row, and pages the same way, keeping the query
-  const even = (await call("search even", "/notes?q=even", { token })).body as string;
+  const even = (await call("search even", "/journal?q=even", { token })).body as string;
   expect(rowsOf(even)).toHaveLength(50);
   expect(rowsOf(even).every((r) => r.endsWith("even"))).toBe(true);
-  expect(even).toContain('<a href="/notes?q=even&amp;page=2">2</a>');
-  expect(even).toContain('<a href="/notes?q=even&amp;page=11">11</a></nav>'); // 502 even rows: 11 pages
-  expect(rowsOf((await call("search even, page 11", "/notes?q=even&page=11", { token })).body as string)).toHaveLength(2); // 502 even: 10 pages of 50, then 2
+  expect(even).toContain('<a href="/journal?q=even&amp;page=2">2</a>');
+  expect(even).toContain('<a href="/journal?q=even&amp;page=11">11</a></nav>'); // 502 even rows: 11 pages
+  expect(rowsOf((await call("search even, page 11", "/journal?q=even&page=11", { token })).body as string)).toHaveLength(2); // 502 even: 10 pages of 50, then 2
   // the api walks any tab in pages, past 1000
-  const a = (await call("api page 1", "/api/notes?limit=1000", { token: agent })).body;
+  const a = (await call("api page 1", "/api/journal?limit=1000", { token: agent })).body;
   expect(a.rows).toHaveLength(1000);
   expect(a.next_offset).toBe(1000);
-  const b = (await call("api page 2", "/api/notes?limit=1000&offset=1000", { token: agent })).body;
+  const b = (await call("api page 2", "/api/journal?limit=1000&offset=1000", { token: agent })).body;
   expect(b.rows.map((r: any) => r.n)).toEqual([5, 4, 3, 2, 1]);
   expect(b.next_offset).toBe(null);
-  writeFileSync(join(artifacts, "page-notes.html"), first);
+  writeFileSync(join(artifacts, "page-journal.html"), first);
   for (let k = 0; k < ns.length; k += 50) {
-    const ids = (await call("notes ids", `/api/notes?limit=50`, { token: agent })).body.rows.map((r: any) => r.id);
-    await Promise.all(ids.map((id: number) => call("delete note", `/api/notes/${id}`, { method: "DELETE", token: agent })));
+    const ids = (await call("notes ids", `/api/journal?limit=50`, { token: agent })).body.rows.map((r: any) => r.id);
+    await Promise.all(ids.map((id: number) => call("delete note", `/api/journal/${id}`, { method: "DELETE", token: agent })));
   }
-  expect((await call("drop notes", "/api/_tabs/notes", { method: "DELETE", token: agent })).status).toBe(200);
+  expect((await call("drop notes", "/api/_tabs/journal", { method: "DELETE", token: agent })).status).toBe(200);
 }, 120_000);
 
 test("predictions open on the score, then every open bet counting down with its confidence; scoring one (by the agent) moves it", async () => {

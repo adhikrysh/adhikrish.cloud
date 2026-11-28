@@ -13,7 +13,7 @@ import * as db from "./db.ts";
 import { CHARTS_PATH, chartsAsset } from "./charts.ts";
 import { GRAPH_PATH, graphAsset } from "./graph.ts";
 import { sync } from "./garmin.ts";
-import { exercisePage, homePage, metricHistoryPage, rowPage, tabPage } from "./page.ts";
+import { coachPage, exercisePage, homePage, metricHistoryPage, rowPage, tabPage } from "./page.ts";
 
 type Env = { DB: D1Database; ACCESS_TEAM: string; ACCESS_AUD: string; AGENT_CLIENT_IDS: string; ACCESS_CERTS_URL?: string; GARMIN_API_KEY?: string; GARMIN_URL?: string; BIRTHDAY?: string };
 
@@ -53,6 +53,10 @@ export default {
 
     const [, slug, id, name] = url.pathname.split("/");
     if (!slug) return html(await homePage(design, env.DB, env.BIRTHDAY));
+    if (slug === "coaches") {
+      const notes = id && !name ? await coachPage(design, env.DB, id) : null;
+      return notes ? html(notes) : html("not found", 404);
+    }
     const tab = await db.tab(env.DB, slug);
     if (!tab) return html("not found", 404);
     if (!id) return html(await tabPage(design, env.DB, tab, url.searchParams.get("q") ?? "", Math.max(1, Math.floor(Number(url.searchParams.get("page"))) || 1)));

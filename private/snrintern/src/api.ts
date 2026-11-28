@@ -5,11 +5,24 @@
 //   GET    /api/<tab>?q=&limit=&offset=    PUT    /api/_tabs/<slug>      create or replace a tab definition
 //   GET    /api/<tab>/<id>                 DELETE /api/_tabs/<slug>      only when the tab has no rows
 //   POST   /api/<tab>                      GET    /api/_log?limit=       recent schema changes
-//   PATCH  /api/<tab>/<id>                 GET    /api/_docs             this api's contract (API.md), as markdown
+//   PATCH  /api/<tab>/<id>                 GET    /api/_docs             the core contract (docs/core.md), as markdown
+//                                          GET    /api/_docs/<name>      a tab's rules (docs/<tab>.md), or the schema's
+//                                          GET    /api/_skills           the skills: name and when to use each
+//                                          GET    /api/_skills/<name>    one skill (skills/<name>.md), as markdown
 //   DELETE /api/<tab>/<id>
 //   GET    /api/<tab>/<id>/series          a row's intraday detail (a health day's heart rate, overnight hrv)
 //   GET    /api/<tab>/_views               what the tab's page opens on, as numbers (verdicts, load, limits, records)
-import docs from "../API.md?raw"; // bundled at deploy, so the contract always matches the running code
+//   GET    /api/_agents                    everything an agent starts with: adhi's AGENTS.md (personal, so in d1, never in
+//                                          this public repo), then core.md (the api and the skills), joined per request
+//   PUT    /api/_agents                    replace the AGENTS.md part: adhi only, signed in through access; never an agent
+// the contract, bundled at deploy so it always matches the running code: core.md, then a page per tab and schema.md
+const DOCS = Object.fromEntries(Object.entries(import.meta.glob<string>("../docs/*.md", { query: "?raw", import: "default", eager: true }))
+  .map(([path, text]) => [path.slice("../docs/".length, -".md".length), text]));
+// skills: procedures an agent follows (the fitness coach), one file each, read when one applies. core.md lists them by name and
+// when to use each, so the agent knows they exist from its instructions; a test fails if a skill is missing from that list
+const SKILLS = Object.fromEntries(Object.entries(import.meta.glob<string>("../skills/*.md", { query: "?raw", import: "default", eager: true }))
+  .map(([path, text]) => [path.slice("../skills/".length, -".md".length), text]));
+const markdown = (text: string) => new Response(text, { headers: { "content-type": "text/markdown; charset=utf-8" } });
 import { claim, TRAINING } from "./activities.ts";
 import * as db from "./db.ts";
 import { todayHere } from "./here.ts";
@@ -18,10 +31,13 @@ import { linksTo, renamed, resolve } from "./refs.ts";
 import { checkDefinition, checkRow, SLUG } from "./schema.ts";
 import { computeViews } from "./views.ts";
 
+const AGENTS = "agents.md"; // the meta key holding the agent's instructions
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 const API = {
-  docs: "GET /api/_docs (the full contract, as markdown; read it before writing)",
+  agents: "GET /api/_agents (your instructions and this api's core, as markdown: read it first)",
+  skills: "GET /api/_skills (name and when to use each); GET /api/_skills/<name> (follow it when it applies)",
+  docs: "GET /api/_docs/<tab> (that tab's rules: read before your first write to it); GET /api/_docs/schema (changing tabs)",
   data: ["GET /api", "GET /api/<tab>?q=&limit=&offset= (pages: next_offset is null on the last)", "GET /api/<tab>/_views (the page's views as numbers: start here)", "GET /api/<tab>/<id>", "POST /api/<tab>", "PATCH /api/<tab>/<id>", "DELETE /api/<tab>/<id>"],
   schema: ["GET /api/_tabs/<slug>", "PUT /api/_tabs/<slug>", "DELETE /api/_tabs/<slug>", "GET /api/_log"],
   field_types: ["text", "int (min, max, unit)", "number (decimals; min, max, unit)", "date (2026-11-18)", "datetime (2026-11-18 or 2026-11-18T09:30-08:00; time: true requires the time and offset)",
@@ -41,12 +57,38 @@ export async function handleApi(request: Request, database: D1Database, who: str
     if (request.method !== "GET") return fail(405, "use GET");
     const [tabs, counts, today] = await Promise.all([db.tabs(database), db.counts(database), todayHere(database)]);
     // each tab as home shows it (a live description is worked out now); GET /api/_tabs/<slug> keeps the definition as written
-    return json({ tabs: tabs.map((t) => ({ ...described(t, birthday, today), rows: counts.get(t.slug) ?? 0 })), api: API });
+    return json({ tabs: tabs.map((t) => ({ ...described(t, birthday, today), rows: counts.get(t.slug) ?? 0 })), skills: Object.keys(SKILLS).sort(), api: API });
   }
 
   if (first === "_docs") {
     if (request.method !== "GET") return fail(405, "use GET");
-    return new Response(docs, { headers: { "content-type": "text/markdown; charset=utf-8" } });
+    const name = second ?? "core";
+    if (extra !== undefined || !Object.hasOwn(DOCS, name)) return fail(404, `no such page; there are: ${Object.keys(DOCS).filter((n) => n !== "core").sort().join(", ")}`);
+    return markdown(DOCS[name]);
+  }
+
+  if (first === "_skills") {
+    if (request.method !== "GET") return fail(405, "use GET");
+    if (second === undefined) return json({ skills: Object.keys(SKILLS).sort().map((name) => ({ name, read: `GET /api/_skills/${name}` })) });
+    return Object.hasOwn(SKILLS, second) && extra === undefined ? markdown(SKILLS[second]) : fail(404, `no such skill; there are: ${Object.keys(SKILLS).sort().join(", ")}`);
+  }
+
+  if (first === "_agents") {
+    // the source of truth is adhi's drive (obsidian/ai-configs/built); scripts/push-agents.sh copies it here.
+    // an agent may read its instructions but never rewrite them, so only a signed-in person can PUT
+    if (second !== undefined) return fail(404, "use /api/_agents");
+    if (request.method === "GET") {
+      // who the agent is, then how to use senior intern: one read, so the api is part of its instructions, not a lookup
+      const mine = await db.getMeta(database, AGENTS);
+      return markdown(mine === null ? DOCS.core : `${mine.trimEnd()}\n\n---\n\n${DOCS.core}`);
+    }
+    if (request.method !== "PUT") return fail(405, "use GET or PUT");
+    if (who.startsWith("service:")) return fail(403, "agents can read their instructions, not change them");
+    const text = await request.text();
+    if (!text.trim()) return fail(400, "send the instructions as the body, in markdown");
+    if (text.length > 100_000) return fail(400, "instructions must be under 100,000 characters");
+    await db.setMeta(database, AGENTS, text).run();
+    return json({ saved: text.length, by: who });
   }
 
   if (first === "_log") {

@@ -1234,5 +1234,34 @@
     "type": "url"
    }
   ]
+ },
+ "notes": {
+  "label": "notes",
+  "about": "each coach's memory",
+  "title": "note",
+  "aside": [],
+  "line": [
+   "coach"
+  ],
+  "sort": "at",
+  "hidden": true,
+  "fields": [
+   {
+    "name": "at",
+    "type": "datetime",
+    "time": true,
+    "required": true
+   },
+   {
+    "name": "coach",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "note",
+    "type": "text",
+    "required": true
+   }
+  ]
  }
 }

@@ -41,7 +41,7 @@ a recent day keeps changing (the phone syncs whenever it syncs), so recent days 
 
 ## the page
 
-the dashboard is one line per metric, defined by the tab's `metrics` views ([`src/views.ts`](../private/snrintern/src/views.ts), contract in [`API.md`](../private/snrintern/API.md)):
+the dashboard is one line per metric, defined by the tab's `metrics` views ([`src/views.ts`](../private/snrintern/src/views.ts), contract in [`docs/schema.md`](../private/snrintern/docs/schema.md)):
 
 ```text
 sleep score                          53     ┌──────────────┐

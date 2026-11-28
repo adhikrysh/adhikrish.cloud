@@ -200,18 +200,51 @@ function nav(parent?: { href: string; label: string }): string {
 }
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
+// ---- coaches: each coach's memory (the hidden notes tab), on its own page. a coach reads many tabs, so it sits above them ----
+const NOTES = "notes";
+const coachSlug = (coach: string) => coach.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+async function coaches(database: D1Database): Promise<string[]> {
+  const notes = await db.tab(database, NOTES);
+  if (!notes) return [];
+  return [...new Set((await db.list(database, notes)).map((r) => String(r.coach ?? "")).filter(Boolean))].sort();
+}
+
+/** One coach's notes, newest first: when it wrote each, readable and in the time it was written, on the left; the thought on the right. */
+export async function coachPage(design: Design, database: D1Database, slug: string): Promise<string | null> {
+  const notes = await db.tab(database, NOTES);
+  if (!notes) return null;
+  const rows = (await db.list(database, notes)).filter((r) => coachSlug(String(r.coach ?? "")) === slug);
+  if (!rows.length) return null;
+  const when = (v: unknown) => { const p = parse(String(v ?? "")); return p ? `${day(p, "short")}${clock(p) ? `, ${clock(p)}` : ""}` : ""; };
+  const items = rows.map((r) => `        <li><time>${escape(when(r.at))}</time><p>${escape(String(r.note ?? ""))}</p></li>`);
+  const body = `      <h1>${escape(String(rows[0].coach))}</h1>
+      <ul class="notes">
+${items.join("\n")}
+      </ul>`;
+  return page({ design, title: `${String(rows[0].coach)} | senior intern`, nav: nav({ href: "/", label: "senior intern" }), body, css: CSS + NOTES_CSS });
+}
+const NOTES_CSS = `
+  .notes { list-style: none; margin-top: 32px; display: grid; gap: 18px; }
+  .notes li { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); column-gap: 24px; align-items: baseline; }
+  .notes time { color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
+  .notes p { white-space: pre-wrap; }
+  .coaches { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-bottom: 28px; }
+  @media (max-width: 520px) { .notes li { grid-template-columns: 1fr; row-gap: 4px; } }
+`;
+
 export async function homePage(design: Design, database: D1Database, birthday?: string): Promise<string> {
-  const [all, today] = await Promise.all([db.tabs(database), todayHere(database)]);
+  const [all, today, coachList] = await Promise.all([db.tabs(database), todayHere(database), coaches(database)]);
   const tabs = all.filter((t) => !t.hidden).map((t) => described(t, birthday, today)); // live descriptions (weeks left) under fixed titles
   const items = tabs.map((tab) => `          <li>
             <a href="/${tab.slug}"><span>${escape(tab.label)}</span></a>
             <p>${escape(tab.about)}</p>
           </li>`);
-  const body = `      <h1>senior intern</h1>
+  const coachLinks = coachList.length ? `      <p class="coaches">${coachList.map((c) => `<a href="/coaches/${coachSlug(c)}">${escape(c)}</a>`).join("")}</p>\n` : "";
+  const body = `${coachLinks}      <h1>senior intern</h1>
       <ul class="project-list">
 ${items.join("\n")}
       </ul>`;
-  return page({ design, title: "senior intern", nav: nav(), body, css: CSS });
+  return page({ design, title: "senior intern", nav: nav(), body, css: CSS + NOTES_CSS });
 }
 
 /** Rows a page shows. A tab grouped by a value (people by topic) is one page: its groups are collapsed, and pages would split a topic. */

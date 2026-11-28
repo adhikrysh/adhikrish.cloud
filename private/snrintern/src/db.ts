@@ -125,7 +125,7 @@ export const putSeries = (db: D1Database, rowId: number, series: Series) =>
   db.prepare("INSERT INTO series (row_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT (row_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at")
     .bind(rowId, JSON.stringify(series), new Date().toISOString());
 
-// ---- meta: small state kept between cron runs ----
+// ---- meta: small state kept between requests (how far back the garmin backfill has reached; the agent's instructions) ----
 
 export async function getMeta(db: D1Database, key: string): Promise<string | null> {
   return (await db.prepare("SELECT value FROM meta WHERE key = ?").bind(key).first<{ value: string }>())?.value ?? null;

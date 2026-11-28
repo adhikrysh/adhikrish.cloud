@@ -1,6 +1,6 @@
 # AGENTS.md (docs/: how the system works)
 
-Docs for whoever maintains this repo next. The repo-root AGENTS.md and the global AGENTS.md still apply. Every doc about how the system works lives here: mechanisms and runbooks. A file that ships with one service stays with that service, like senior intern's api contract (`private/snrintern/API.md`), which the worker serves and a test checks. Folder READMEs only say what a folder holds and link here; public write-ups stay in `public/content/`.
+Docs for whoever maintains this repo next. The repo-root AGENTS.md and the global AGENTS.md still apply. Every doc about how the system works lives here: mechanisms and runbooks. A file that ships with one service stays with that service, like senior intern's api contract (`private/snrintern/docs/`), which the worker serves and a test checks. Folder READMEs only say what a folder holds and link here; public write-ups stay in `public/content/`.
 
 ## The repo is public
 
@@ -32,4 +32,5 @@ Plain words, short sentences, lowercase prose like the rest of the private docs,
 - [`latency.md`](latency.md): measuring each request phase before tuning anything.
 - [`health.md`](health.md): garmin into senior intern: the hourly cron, its request budget and backfill, rows and streams, and how the health page judges a day.
 - [`people.md`](people.md): links between rows by name (`ref` fields): how a name finds or creates its row, unique titles, renames, deletes, and the graph people opens on.
+- [`fitness-coach.md`](fitness-coach.md): the fitness coach: why it exists, the three layers (ingest, numbers, the coaching skill senior intern serves at `/api/_skills`), what's decided, and what's open.
 - [`training.md`](training.md): garmin activities and the agent's sessions as one training log: who owns which field, how a session is matched both ways, the one delete, and what the page and `/_views` compute (load, run limit, weeks, records).
