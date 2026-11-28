@@ -99,10 +99,14 @@ beforeAll(async () => {
 
   // the schema, as production has it
   const token = await me();
-  for (const [slug, definition] of Object.entries(await Bun.file(join(import.meta.dir, "fixtures", "tabs.json")).json())) {
+  const fixtures = await Bun.file(join(import.meta.dir, "fixtures", "tabs.json")).json();
+  for (const [slug, definition] of Object.entries(fixtures)) {
     const r = await send(token, `/api/_tabs/${slug}`, definition, "PUT");
     if (r.status >= 300) throw new Error(`${slug}: ${JSON.stringify(r.body)}`);
   }
+  // home's order, set the way production's was: each tab right after the one before it
+  const home = ["obsessions", "training", "health", "people", "predictions", "reccos"];
+  for (let i = 1; i < home.length; i++) await send(token, `/api/_tabs/${home[i]}`, { ...(fixtures as any)[home[i]], after: home[i - 1] }, "PUT");
   for (const old of ["outbound", "gym", "forecasts"]) await call(`drop seed tab ${old}`, `/api/_tabs/${old}`, { method: "DELETE", token });
 
   // rows, written the way the agent writes them
@@ -138,7 +142,7 @@ afterAll(async () => {
 
 test("the schema and rows are in place", async () => {
   const { body } = await call("list tabs", "/api", { token: await me() });
-  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, reccos: 0, health: 0 });
+  expect(Object.fromEntries(body.tabs.map((t: any) => [t.slug, t.rows]))).toEqual({ people: 3, companies: 2, events: 1, predictions: 4, training: 4, body: 2, reccos: 0, health: 0, obsessions: 0 });
   expect(body.api.field_types.join(" ")).toContain("lifts");
 });
 
@@ -762,25 +766,32 @@ test("people link to companies, events and each other by name, and their page op
   writeFileSync(join(artifacts, "page-people.html"), standalone(page));
 });
 
-test("tabs keep fixed titles; health's and training's descriptions are live, worked out from the birthday secret", async () => {
+test("tabs keep fixed titles; obsessions' and health's descriptions are live, worked out from the birthday secret; home goes obsessions first", async () => {
   const token = await me();
   await findHere();
-  const titles = { people: "people", predictions: "predictions", reccos: "reccos", health: "health", training: "training" };
   const home = (await call("home names", "/", { token })).body as string;
-  for (const [slug, title] of Object.entries(titles)) expect(home).toContain(`<a href="/${slug}"><span>${title}</span></a>`);
-  expect(home).toContain(`<a href="/health"><span>health</span></a>\n            <p>${weeksLeft()}</p>`);
-  expect(home).toContain(`<a href="/training"><span>training</span></a>\n            <p>${feltLeft()}</p>`);
-  // the rest have written descriptions: the names live there, the titles stay plain
-  for (const [slug, about] of [["people", "sonder"], ["predictions", "laplace's demon"], ["reccos", "conversations with the dead"]])
-    expect(home).toContain(`<a href="/${slug}"><span>${slug}</span></a>\n            <p>${about}</p>`);
+  // fixed titles over their descriptions, in this order: what you live for first, then the body, then everyone else
+  const order = [["obsessions", feltLeft()], ["training", "entropy"], ["health", weeksLeft()], ["people", "sonder"], ["predictions", "receipts"], ["reccos", "conversations with the dead"]];
+  for (const [slug, about] of order) expect(home).toContain(`<a href="/${slug}"><span>${slug}</span></a>\n            <p>${about}</p>`);
+  const at = order.map(([slug]) => home.indexOf(`href="/${slug}"`));
+  expect(at).toEqual([...at].sort((x, y) => x - y));
   expect((await call("old path", "/forecasts", { token })).status).toBe(404); // renamed, no alias
   // the agents see the same in GET /api; the definition keeps what was written and says it's live
   const tabs = Object.fromEntries((await call("api names", "/api", { token: await instinct() })).body.tabs.map((t: any) => [t.slug, t]));
+  expect(tabs.obsessions).toMatchObject({ label: "obsessions", about: feltLeft() });
   expect(tabs.health).toMatchObject({ label: "health", about: weeksLeft() });
-  expect(tabs.training).toMatchObject({ label: "training", about: feltLeft() });
-  expect(tabs.people).toMatchObject({ label: "people", about: "sonder" });
-  expect((await call("health definition", "/api/_tabs/health", { token })).body.tab).toMatchObject({ label: "health", live: "weeks_left" });
-  expect((await call("health page", "/health", { token })).body).toContain("<h1>health</h1>");
+  expect(tabs.training).toMatchObject({ label: "training", about: "entropy" });
+  expect((await call("obsessions definition", "/api/_tabs/obsessions", { token })).body.tab).toMatchObject({ label: "obsessions", about: "what i live for", live: "felt_time_left" });
+  // one row per obsession, the why under it; the page keeps its plain title
+  const agent = await dots();
+  await send(agent, "/api/obsessions", { obsession: "build things people use every day", why: "the feeling when a stranger depends on it" });
+  await send(agent, "/api/obsessions", { obsession: "the annapurna circuit" });
+  expect((await send(agent, "/api/obsessions", { why: "no obsession" })).body.error).toStartWith('"obsession" is required');
+  const page = (await call("obsessions page", "/obsessions", { token })).body as string;
+  expect(page).toContain("<h1>obsessions</h1>");
+  for (const t of ["build things people use every day", "the annapurna circuit", "the feeling when a stranger depends on it"]) expect(page).toContain(t);
+  writeFileSync(join(artifacts, "page-home.html"), home);
+  writeFileSync(join(artifacts, "page-obsessions.html"), page);
   expect((await send(token, "/api/_tabs/scratch2", { label: "x", about: "", live: "years_left", fields: [{ name: "a", type: "text" }] }, "PUT")).body.error).toContain('"live" must be one of weeks_left, felt_time_left');
 });
 
@@ -815,10 +826,10 @@ test("tabs and columns are added through the api, with no migration, and every c
   for (const [d, message] of bad) expect((await send(token, "/api/_tabs/scratch", d, "PUT")).body.error).toStartWith(message);
   // order is data too: "after" puts a tab right after another on the home page
   const health = (await Bun.file(join(import.meta.dir, "fixtures", "tabs.json")).json()).health;
-  expect((await send(token, "/api/_tabs/health", { ...health, after: "training" }, "PUT")).status).toBe(200);
+  expect((await send(token, "/api/_tabs/health", { ...health, after: "people" }, "PUT")).status).toBe(200);
   const home = (await call("home after reorder", "/", { token: await me() })).body as string;
-  expect(home.indexOf('href="/health"')).toBeGreaterThan(home.indexOf('href="/training"'));
-  expect(home.indexOf('href="/health"')).toBeLessThan(home.indexOf('href="/reccos"'));
+  expect(home.indexOf('href="/health"')).toBeGreaterThan(home.indexOf('href="/people"'));
+  expect(home.indexOf('href="/health"')).toBeLessThan(home.indexOf('href="/predictions"'));
   expect((await send(token, "/api/_tabs/health", { ...health, after: "nope" }, "PUT")).body.error).toBe('"after" must be the slug of another tab');
   const log = (await call("schema log", "/api/_log", { token })).body.changes;
   expect(log.slice(0, 3).map((c: any) => [c.tab, c.before === null ? "created" : "changed", c.by])).toEqual([

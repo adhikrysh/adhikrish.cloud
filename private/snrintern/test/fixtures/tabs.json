@@ -61,182 +61,82 @@
    }
   ]
  },
- "people": {
-  "label": "people",
-  "about": "sonder",
-  "title": "name",
+ "obsessions": {
+  "label": "obsessions",
+  "about": "what i live for",
+  "title": "obsession",
   "aside": [],
-  "line": [
-   "title",
-   "company",
-   "met_where"
-  ],
+  "line": [],
   "sort": "id",
-  "snippet": "notes",
+  "snippet": "why",
+  "live": "felt_time_left",
   "fields": [
    {
-    "name": "name",
+    "name": "obsession",
     "type": "text",
     "required": true
    },
    {
-    "name": "email",
+    "name": "why",
     "type": "text"
+   }
+  ]
+ },
+ "body": {
+  "label": "body",
+  "about": "weigh-ins and measurements",
+  "title": "at",
+  "aside": [
+   "bodyweight_kg",
+   "bodyfat_percentage"
+  ],
+  "line": [],
+  "sort": "at",
+  "views": [
+   {
+    "kind": "line",
+    "field": "bodyweight_kg"
    },
    {
-    "name": "company",
-    "type": "ref",
-    "to": "companies"
+    "kind": "line",
+    "field": "bodyfat_percentage"
+   }
+  ],
+  "fields": [
+   {
+    "name": "at",
+    "type": "datetime",
+    "required": true
    },
    {
-    "name": "title",
-    "type": "text"
+    "name": "bodyweight_kg",
+    "type": "number",
+    "min": 20,
+    "max": 300,
+    "unit": "kg"
    },
    {
-    "name": "met_where",
-    "type": "ref",
-    "to": "events"
+    "name": "bodyfat_percentage",
+    "type": "number",
+    "min": 1,
+    "max": 70,
+    "unit": "%"
    },
    {
-    "name": "met_date",
-    "type": "date"
-   },
-   {
-    "name": "location",
-    "type": "text"
-   },
-   {
-    "name": "linkedin",
-    "type": "url"
-   },
-   {
-    "name": "twitter",
-    "type": "url"
-   },
-   {
-    "name": "referred_by",
-    "type": "ref",
-    "to": "people"
-   },
-   {
-    "name": "knows",
-    "type": "ref",
-    "to": "people",
-    "many": true
+    "name": "garmin_id",
+    "type": "int",
+    "min": 0
    },
    {
     "name": "notes",
     "type": "text"
-   },
-   {
-    "name": "group",
-    "type": "text"
-   },
-   {
-    "name": "last_contact",
-    "type": "date"
    }
   ],
-  "group": "group",
-  "views": [
-   {
-    "kind": "graph",
-    "label": "connections"
-   }
-  ]
- },
- "predictions": {
-  "label": "predictions",
-  "about": "laplace's demon",
-  "title": "decision",
-  "aside": [
-   "verdict",
-   "status"
-  ],
-  "line": [
-   "confidence",
-   "review_date"
-  ],
-  "sort": "date",
-  "fields": [
-   {
-    "name": "date",
-    "type": "date"
-   },
-   {
-    "name": "decision",
-    "type": "text",
-    "required": true
-   },
-   {
-    "name": "rationale",
-    "type": "text"
-   },
-   {
-    "name": "confidence",
-    "type": "int",
-    "min": 0,
-    "max": 100,
-    "unit": "%"
-   },
-   {
-    "name": "expected",
-    "type": "text"
-   },
-   {
-    "name": "review_date",
-    "type": "date"
-   },
-   {
-    "name": "outcome",
-    "type": "text"
-   },
-   {
-    "name": "verdict",
-    "type": "enum",
-    "options": [
-     "right",
-     "wrong"
-    ],
-    "colors": {
-     "right": "good",
-     "wrong": "bad"
-    }
-   },
-   {
-    "name": "status",
-    "type": "enum",
-    "options": [
-     "open",
-     "closed"
-    ],
-    "colors": {
-     "closed": "outline"
-    }
-   }
-  ],
-  "views": [
-   {
-    "kind": "upcoming",
-    "field": "review_date",
-    "where": {
-     "status": "open"
-    },
-    "limit": 3
-   },
-   {
-    "kind": "calibration",
-    "confidence": "confidence",
-    "verdict": "verdict",
-    "right": "right",
-    "min": 10
-   }
-  ]
+  "hidden": true
  },
  "training": {
   "label": "training",
-  "live": "felt_time_left",
-  "about": "sessions: lifting, runs, hikes, swims, from the agent and the watch",
+  "about": "entropy",
   "title": "title",
   "aside": [
    "at",
@@ -588,130 +488,6 @@
    {
     "name": "notes",
     "type": "text"
-   }
-  ]
- },
- "body": {
-  "label": "body",
-  "about": "weigh-ins and measurements",
-  "title": "at",
-  "aside": [
-   "bodyweight_kg",
-   "bodyfat_percentage"
-  ],
-  "line": [],
-  "sort": "at",
-  "views": [
-   {
-    "kind": "line",
-    "field": "bodyweight_kg"
-   },
-   {
-    "kind": "line",
-    "field": "bodyfat_percentage"
-   }
-  ],
-  "fields": [
-   {
-    "name": "at",
-    "type": "datetime",
-    "required": true
-   },
-   {
-    "name": "bodyweight_kg",
-    "type": "number",
-    "min": 20,
-    "max": 300,
-    "unit": "kg"
-   },
-   {
-    "name": "bodyfat_percentage",
-    "type": "number",
-    "min": 1,
-    "max": 70,
-    "unit": "%"
-   },
-   {
-    "name": "garmin_id",
-    "type": "int",
-    "min": 0
-   },
-   {
-    "name": "notes",
-    "type": "text"
-   }
-  ],
-  "hidden": true
- },
- "reccos": {
-  "label": "reccos",
-  "about": "conversations with the dead",
-  "title": "title",
-  "aside": [
-   "status"
-  ],
-  "line": [
-   "creator",
-   "recommended_by"
-  ],
-  "sort": "id",
-  "views": [
-   {
-    "kind": "cards",
-    "field": "status",
-    "show": [
-     "on it",
-     "next"
-    ],
-    "sub": "creator",
-    "foot": "recommended_by",
-    "icon": "kind"
-   }
-  ],
-  "fields": [
-   {
-    "name": "title",
-    "type": "text",
-    "required": true
-   },
-   {
-    "name": "kind",
-    "type": "enum",
-    "options": [
-     "book",
-     "movie",
-     "show",
-     "podcast",
-     "article"
-    ],
-    "required": true
-   },
-   {
-    "name": "creator",
-    "type": "text"
-   },
-   {
-    "name": "status",
-    "type": "enum",
-    "options": [
-     "next",
-     "on it",
-     "finished",
-     "dropped"
-    ],
-    "required": true,
-    "colors": {
-     "finished": "outline",
-     "dropped": "outline"
-    }
-   },
-   {
-    "name": "recommended_by",
-    "type": "text"
-   },
-   {
-    "name": "link",
-    "type": "url"
    }
   ]
  },
@@ -1211,6 +987,250 @@
     "name": "fitness_age",
     "type": "number",
     "section": "fitness"
+   }
+  ]
+ },
+ "people": {
+  "label": "people",
+  "about": "sonder",
+  "title": "name",
+  "aside": [],
+  "line": [
+   "title",
+   "company",
+   "met_where"
+  ],
+  "sort": "id",
+  "snippet": "notes",
+  "fields": [
+   {
+    "name": "name",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "email",
+    "type": "text"
+   },
+   {
+    "name": "company",
+    "type": "ref",
+    "to": "companies"
+   },
+   {
+    "name": "title",
+    "type": "text"
+   },
+   {
+    "name": "met_where",
+    "type": "ref",
+    "to": "events"
+   },
+   {
+    "name": "met_date",
+    "type": "date"
+   },
+   {
+    "name": "location",
+    "type": "text"
+   },
+   {
+    "name": "linkedin",
+    "type": "url"
+   },
+   {
+    "name": "twitter",
+    "type": "url"
+   },
+   {
+    "name": "referred_by",
+    "type": "ref",
+    "to": "people"
+   },
+   {
+    "name": "knows",
+    "type": "ref",
+    "to": "people",
+    "many": true
+   },
+   {
+    "name": "notes",
+    "type": "text"
+   },
+   {
+    "name": "group",
+    "type": "text"
+   },
+   {
+    "name": "last_contact",
+    "type": "date"
+   }
+  ],
+  "group": "group",
+  "views": [
+   {
+    "kind": "graph",
+    "label": "connections"
+   }
+  ]
+ },
+ "predictions": {
+  "label": "predictions",
+  "about": "receipts",
+  "title": "decision",
+  "aside": [
+   "verdict",
+   "status"
+  ],
+  "line": [
+   "confidence",
+   "review_date"
+  ],
+  "sort": "date",
+  "fields": [
+   {
+    "name": "date",
+    "type": "date"
+   },
+   {
+    "name": "decision",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "rationale",
+    "type": "text"
+   },
+   {
+    "name": "confidence",
+    "type": "int",
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   },
+   {
+    "name": "expected",
+    "type": "text"
+   },
+   {
+    "name": "review_date",
+    "type": "date"
+   },
+   {
+    "name": "outcome",
+    "type": "text"
+   },
+   {
+    "name": "verdict",
+    "type": "enum",
+    "options": [
+     "right",
+     "wrong"
+    ],
+    "colors": {
+     "right": "good",
+     "wrong": "bad"
+    }
+   },
+   {
+    "name": "status",
+    "type": "enum",
+    "options": [
+     "open",
+     "closed"
+    ],
+    "colors": {
+     "closed": "outline"
+    }
+   }
+  ],
+  "views": [
+   {
+    "kind": "upcoming",
+    "field": "review_date",
+    "where": {
+     "status": "open"
+    },
+    "limit": 3
+   },
+   {
+    "kind": "calibration",
+    "confidence": "confidence",
+    "verdict": "verdict",
+    "right": "right",
+    "min": 10
+   }
+  ]
+ },
+ "reccos": {
+  "label": "reccos",
+  "about": "conversations with the dead",
+  "title": "title",
+  "aside": [
+   "status"
+  ],
+  "line": [
+   "creator",
+   "recommended_by"
+  ],
+  "sort": "id",
+  "views": [
+   {
+    "kind": "cards",
+    "field": "status",
+    "show": [
+     "on it",
+     "next"
+    ],
+    "sub": "creator",
+    "foot": "recommended_by",
+    "icon": "kind"
+   }
+  ],
+  "fields": [
+   {
+    "name": "title",
+    "type": "text",
+    "required": true
+   },
+   {
+    "name": "kind",
+    "type": "enum",
+    "options": [
+     "book",
+     "movie",
+     "show",
+     "podcast",
+     "article"
+    ],
+    "required": true
+   },
+   {
+    "name": "creator",
+    "type": "text"
+   },
+   {
+    "name": "status",
+    "type": "enum",
+    "options": [
+     "next",
+     "on it",
+     "finished",
+     "dropped"
+    ],
+    "required": true,
+    "colors": {
+     "finished": "outline",
+     "dropped": "outline"
+    }
+   },
+   {
+    "name": "recommended_by",
+    "type": "text"
+   },
+   {
+    "name": "link",
+    "type": "url"
    }
   ]
  }

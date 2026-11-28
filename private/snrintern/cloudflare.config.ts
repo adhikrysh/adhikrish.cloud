@@ -1,4 +1,4 @@
-// seniorintern.adhikrish.cloud: people, predictions, training, reccos, health, for me and my personal agents.
+// seniorintern.adhikrish.cloud: obsessions, training, health, people, predictions, reccos, for me and my personal agents.
 // A worker with a d1 database: it keeps working when the thinkpad is off, and stays on the free plan.
 import { bindings, defineConfig, triggers } from "cf/config";
 

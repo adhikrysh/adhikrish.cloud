@@ -8,7 +8,7 @@ One repo for everything under `*.adhikrish.cloud`. The global AGENTS.md still ap
 |---|---|---|---|
 | `public/` | adhikrish.cloud, static site (`public/site/` is what gets served) | cloudflare worker, assets only (`public/cloudflare.config.ts`) | `.github/workflows/public.yml` |
 | `private/admin/` | uptime.adhikrish.cloud: links + live health of every service | cloudflare worker | `.github/workflows/admin.yml` |
-| `private/snrintern/` | seniorintern.adhikrish.cloud ("senior intern"): people, predictions, training, body, reccos, health; json api for the personal agents (contract: `private/snrintern/API.md`); an hourly cron pulls garmin into health, training and body (`src/garmin.ts`, `src/activities.ts`) | cloudflare worker + d1 + cron | `.github/workflows/snrintern.yml` |
+| `private/snrintern/` | seniorintern.adhikrish.cloud ("senior intern"): obsessions, training, health, body, people, predictions, reccos; json api for the personal agents (contract: `private/snrintern/API.md`); an hourly cron pulls garmin into health, training and body (`src/garmin.ts`, `src/activities.ts`) | cloudflare worker + d1 + cron | `.github/workflows/snrintern.yml` |
 | `private/infra/` | the thinkpad's compose files, scripts, configs, runbooks | thinkpad | by hand (see `private/infra/README.md`) |
 | `docs/` | how the cross-cutting mechanisms work (start with `docs/access.md`); rules for writing them in `docs/AGENTS.md` | | |
 | `design/` | shared css (`base.css`, `list.css`) and the html shell for the private sites (`html.ts`) | | triggers every site |
