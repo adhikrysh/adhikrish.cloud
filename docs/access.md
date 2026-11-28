@@ -73,7 +73,7 @@ the naming convention is that a policy is named after **who** it lets in (`owner
 
 each case below follows from the rules above. try to answer each one before reading the answer.
 
-1. **you open a private service in a browser.** its name has no app of its own, so the wildcard wins. the owner policy asks you to log in once, and the session cookie then covers every app for the session length (24 hours). you see the service.
+1. **you open a private service in a browser.** its name has no app of its own, so the wildcard wins. the owner policy asks you to log in, then face id (see [the second step](#the-second-step-face-id)), and the session cookie covers the app for an hour. you see the service.
 2. **someone else opens the same service.** the wildcard wins, no policy matches their login, and they get the login page and stop there. the request never leaves cloudflare, so the server never sees it.
 3. **you add an exact-name app for a phone app's token and attach only the token's policy.** the phone works. your browser is now refused on that hostname, because the wildcard's owner policy no longer applies there. fix: attach the owner and prober policies too.
 4. **a visitor opens `www.adhikrish.cloud`.** the bypass app is more specific than the wildcard, so it wins, and "everyone" matches. no login. now delete the bypass app: the wildcard wins instead, and the public site suddenly demands a login. the bare `adhikrish.cloud` is unaffected either way, because `*.adhikrish.cloud` matches subdomains, not the bare name.
@@ -93,6 +93,47 @@ the audience tag belongs to the app, not to the hostname. renaming an app's host
 a bypass app attaches no pass, because nobody was checked. anything that relies on the pass can't sit behind a bypass.
 
 a public page that does work on every visit can be used to make *you* do work. the uptime page used to probe every service on each load, about one request per service through the tunnel, so anyone reloading it in a loop could push traffic into the box. it went public only after it switched to reading what its 5-minute timer stored. before you bypass a page, check what a single visit costs.
+
+## the second step: face id
+
+a person who passes a policy still has one more step. access asks for a biometric check (face id or touch id) before it sets the session cookie. cloudflare calls this **independent mfa**: it runs in access itself, after the login and the policy, whatever the identity provider did.
+
+```text
+browser opens a private name, no cookie
+    │
+    ▼
+1. log in with google
+    │
+    ▼
+2. the app's policies: does this person match?  no → stop
+    │ yes
+    ▼
+3. face id / touch id on this device             fails → stop
+    │
+    ▼
+4. session cookie for 1 hour. every request in that hour goes
+   straight through: no login, no face id
+    │
+    ▼
+5. the hour ends → back to step 1
+```
+
+three settings make it, all in zero trust's access settings, made with `cf`:
+
+- **mfa for every app by default**, with biometrics as the only method. a new app gets it without anyone remembering to switch it on.
+- **an mfa duration of 0.** face id is asked on every login, never skipped because an earlier approval is still fresh.
+- **a session of 1 hour on every app** (it was 24 hours, and 6 for some). the session is a fixed clock from the login, not an idle timer: cloudflare has no "lock after x minutes idle" for these apps.
+
+**wrong model:** a short session only makes you log in more often. **why it fails:** the cookie, not the login, is what lets someone in. while a cookie is alive, anyone holding the unlocked device gets in, mfa or not. **replacement model:** the session length is the window a borrowed device stays open. it trades that window against how often a long stretch of use gets interrupted. an hour keeps both small, and an interruption costs one click (google remembers you) plus face id.
+
+**enrolling.** the first login after mfa is on asks you to register a device, and its face id or touch id becomes your second factor. enroll more than one device (a laptop and a phone), so losing one doesn't lock you out. if every device is lost, turn mfa off in the cloudflare dashboard. that needs your cloudflare account login, not access, so a lockout of access never locks you out of the fix.
+
+**who skips it.**
+
+- **machines.** service tokens never meet mfa: there's no person and no device to check. the agents and the uptime prober carry on unchanged.
+- **one visitor's policy turns mfa off** (`mfa_disabled` on the policy). it's for a family member whose device may not do biometrics. it only reaches the one app that policy is attached to, and that policy keeps its own 24-hour session.
+
+predict it: you sign in at 9:00 and use a service until 9:40. you come back at 9:50: the cookie is still good, so no prompt. at 10:05 the next request finds the cookie expired, and you go through google and face id again, mid-use if you happen to be on the page.
 
 ## invariants
 
