@@ -24,6 +24,18 @@ export const VIEW_CSS = `
   .strip i { flex: 1; height: 22px; border-radius: 1px; background: var(--line); }
   .strip i.up { background: var(--good); }
   .strip-ends { display: flex; justify-content: space-between; color: var(--faint); font-size: var(--fs-tiny); margin-top: 6px; }
+  .score { display: flex; flex-wrap: wrap; gap: 8px 48px; align-items: flex-end; }
+  .score .said { color: var(--muted); }
+  .score + .facts { margin-top: 16px; }
+  .countdown { list-style: none; display: grid; gap: 14px; }
+  .countdown li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; row-gap: 6px; align-items: baseline; }
+  .countdown.led li { grid-template-columns: 3.2em minmax(0, 1fr) auto; }
+  .countdown .lead { color: var(--bright); }
+  .countdown small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
+  .countdown small.bad { color: var(--bad); }
+  .countdown .near { grid-column: 1 / -1; height: 3px; background: var(--line); border-radius: 2px; }
+  .countdown.led .near { grid-column: 2 / -1; }
+  .countdown .near i { display: block; height: 3px; background: var(--muted); border-radius: 2px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
   .card { aspect-ratio: 2 / 3; border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; }
   .card:hover { background: var(--surface); }
@@ -193,9 +205,17 @@ function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows, today: no
   const next = rows.filter((row) => matches(v.where, row)).map((row) => ({ row, t: dayOf(row[v.field]) }))
     .filter((x): x is { row: db.Row; t: number } => x.t !== null).sort((a, b) => a.t - b.t).slice(0, v.limit ?? 3);
   if (!next.length) return null;
-  const html = next.map(({ row, t }) => `<li><a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${t < now ? "bad" : ""}">${t < now ? `overdue ${ago(t, now).replace(" ago", "")}` : ago(t, now)}</small></li>`);
-  return result("upcoming", "upcoming", { rows: next.map(({ row, t }) => ({ id: row.id, title: row[tab.title] ?? null, date: isoDay(t), overdue: t < now })) },
-    `<ul class="rowlist">${html.join("")}</ul>`);
+  // the bar: how near each one is, on a log scale so next week and next year both read; overdue ones have none, their words are red
+  const far = Math.max(...next.map(({ t }) => (t - now) / DAY), 1);
+  const unit = tab.fields.find((f) => f.name === v.lead)?.unit ?? "";
+  const html = next.map(({ row, t }) => {
+    const days = (t - now) / DAY, over = days < 0;
+    const lead = v.lead && Number.isFinite(Number(row[v.lead])) && row[v.lead] !== null && row[v.lead] !== "" ? `<span class="lead">${escape(fmt(Number(row[v.lead])))}${escape(unit)}</span>` : "";
+    const bar = over ? "" : `<i style="width:${Math.max(2, (Math.log1p(days) / Math.log1p(far)) * 100).toFixed(1)}%"></i>`;
+    return `<li>${lead}<a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${over ? "bad" : ""}">${over ? `overdue ${ago(t, now).replace(" ago", "")}` : ago(t, now)}</small><span class="near">${bar}</span></li>`;
+  });
+  return result("upcoming", "upcoming", { rows: next.map(({ row, t }) => ({ id: row.id, title: row[tab.title] ?? null, date: isoDay(t), overdue: t < now, ...(v.lead ? { [v.lead]: row[v.lead] ?? null } : {}) })) },
+    `<ul class="countdown${v.lead ? " led" : ""}">${html.join("")}</ul>`);
 }
 
 /** The rows matching `where`, headed by `label`: largest `sort` first (empty last, then the tab's order), or the tab's order; `aside` shows one field at the right (a date as "2 weeks ago").
@@ -409,7 +429,12 @@ function calibration(v: Extract<View, { kind: "calibration" }>, { rows }: Ctx): 
     for (const row of scored) { const b = Math.round(Number(row[v.confidence]) / 10) * 10; buckets.set(b, [...(buckets.get(b) ?? []), row]); }
     for (const [b, rs] of [...buckets].sort((a, z) => a[0] - z[0])) items.push([`said ${b}%`, `${right(rs)} of ${rs.length} came true`]);
   }
-  return result("calibration", "calibration", Object.fromEntries(items), `<dl class="facts">${items.map(([k, val]) => `<dt>${escape(k)}</dt><dd>${escape(val)}</dd>`).join("")}</dl>`);
+  // the score, big: how many came true next to how sure you said you were, as counts until there are enough to make a rate honest;
+  // with `min` scored, each confidence level's record under it. no heading: it's the page's headline
+  const bands = items.slice(2);
+  const body = `<div class="score"><div><p class="big">${right(scored)} of ${scored.length}</p><p class="sub">came true</p></div><div><p class="big said">${said}%</p><p class="sub">you said, on average</p></div></div>`
+    + (bands.length ? `<dl class="facts">${bands.map(([k, val]) => `<dt>${escape(k)}</dt><dd>${escape(val)}</dd>`).join("")}</dl>` : "");
+  return { ...result("calibration", "calibration", Object.fromEntries(items), ""), html: `<section class="view">${body}</section>` };
 }
 
 /** One exercise: every session on a zoomable chart (a dot opens its session), then every session's sets, the best in green. */

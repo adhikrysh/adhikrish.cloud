@@ -323,17 +323,26 @@ test("ten years of rows: pages of 50, search over all of them, the api and the c
   expect((await call("drop notes", "/api/_tabs/notes", { method: "DELETE", token: agent })).status).toBe(200);
 }, 120_000);
 
-test("predictions open on what is upcoming and how calibrated; scoring one (by the agent) moves it", async () => {
+test("predictions open on the score, then every open bet counting down with its confidence; scoring one (by the agent) moves it", async () => {
   const token = await me();
   const page = (await call("predictions page", "/predictions", { token })).body as string;
-  // upcoming: the next 3 open ones, overdue first, however far away the rest are
+  // the score first, big, as counts: 1 of 1 came true, next to how sure you said you were
+  expect(page).toContain('<div class="score"><div><p class="big">1 of 1</p><p class="sub">came true</p></div><div><p class="big said">80%</p><p class="sub">you said, on average</p></div></div>');
+  expect(page.indexOf('class="score"')).toBeLessThan(page.indexOf('<span class="pill">upcoming</span>'));
+  // upcoming: every open one, overdue first, each with its confidence and a bar for how near; the overdue one has words in red, no bar
   const upcoming = page.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0];
   expect(upcoming.indexOf("Overdue bet")).toBeLessThan(upcoming.indexOf("Due soon bet"));
   expect(upcoming.indexOf("Due soon bet")).toBeLessThan(upcoming.indexOf("Far away bet"));
-  expect(upcoming).toContain('<small class="bad">overdue 10 days</small>');
+  expect(upcoming).toContain('<small class="bad">overdue 10 days</small><span class="near"></span>');
+  expect(upcoming).toContain('<li><span class="lead">80%</span><a href="/predictions/');
+  const bars = [...upcoming.matchAll(/<i style="width:([\d.]+)%"><\/i>/g)].map((m) => Number(m[1]));
+  expect(bars).toHaveLength(2);
+  expect(bars[0]).toBeLessThan(bars[1]); // 5 days is a short bar, 900 days the full one
+  expect(bars[1]).toBe(100);
   expect(upcoming).not.toContain("Scored bet");
-  // calibration from the first scored one, as plain rows
-  expect(page).toContain('<dl class="facts"><dt>avg confidence</dt><dd>80%</dd><dt>came true</dt><dd>1 of 1</dd></dl>');
+  const views = (await call("predictions views", "/api/predictions/_views", { token: await dots() })).body.views;
+  expect(views.find((v: any) => v.kind === "calibration")).toMatchObject({ "avg confidence": "80%", "came true": "1 of 1" }); // the api keeps its numbers
+  expect(views.find((v: any) => v.kind === "upcoming").rows[0]).toMatchObject({ title: "Overdue bet", overdue: true, confidence: 60 });
   // rows: open a white pill, closed outlined, right green, wrong red; confidence and the review under the title, no description
   expect(page).toContain('<span class="pill">open</span>');
   expect(page).toContain('<span><span class="pill good">right</span></span><span><span class="pill outline">closed</span></span>');
@@ -346,7 +355,7 @@ test("predictions open on what is upcoming and how calibrated; scoring one (by t
   const after = (await call("predictions page after scoring", "/predictions", { token })).body as string;
   expect(after.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0]).not.toContain("Overdue bet");
   expect(after).toContain("<span>reviewed 10 days ago</span>");
-  expect(after).toContain("<dt>avg confidence</dt><dd>70%</dd><dt>came true</dt><dd>1 of 2</dd>");
+  expect(after).toContain('<p class="big">1 of 2</p><p class="sub">came true</p></div><div><p class="big said">70%</p>');
   expect(after).toContain('<span class="pill bad">wrong</span>');
   writeFileSync(join(artifacts, "page-predictions.html"), after);
 });

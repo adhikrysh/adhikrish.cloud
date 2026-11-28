@@ -37,7 +37,7 @@ type ViewKind =
   | { kind: "progress"; field: string } // lifts field: each exercise's top set over time
   | { kind: "strip"; field: string; label?: string; days?: number } // a tick per day with a row, from the first (at most `days` back) to today
   | { kind: "line"; field: string; tab?: string } // a number over time, from this tab or another
-  | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number } // the next rows by a date, overdue first
+  | { kind: "upcoming"; field: string; where?: Record<string, string>; limit?: number; lead?: string } // the next rows by a date, overdue first, each with a bar for how near it is; `lead` (a number field, like confidence) before the title
   | { kind: "list"; label: string; where: Record<string, string>; sort?: string; aside?: string } // the rows matching `where`, by `sort` or in the tab's order
   | { kind: "calibration"; confidence: string; verdict: string; right: string; min?: number } // how often each confidence level came true
   | { kind: "metrics"; label: string; metrics: Metric[] } // each number's last 7 days against its usual, its best, 90 days of it
@@ -238,6 +238,7 @@ function checkViews(input: unknown, types: Map<string, FieldType>, fields: Field
       case "upcoming":
         if (!isField(v.field, ["date", "datetime"])) return `${where}: "field" must name a date field`;
         if (v.limit !== undefined && (!Number.isInteger(v.limit) || v.limit < 1 || v.limit > 20)) return `${where}: "limit" must be a whole number from 1 to 20`;
+        if (v.lead !== undefined && !isField(v.lead, ["int", "number"])) return `${where}: "lead" must name a number field, like "confidence"`;
         break;
       case "calibration": if (!isField(v.confidence, ["int", "number"]) || !isField(v.verdict, ["enum"]) || typeof v.right !== "string") return `${where}: needs a number "confidence", an enum "verdict" and the "right" value`; break;
       case "list":

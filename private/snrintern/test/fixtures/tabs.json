@@ -1146,19 +1146,20 @@
   ],
   "views": [
    {
-    "kind": "upcoming",
-    "field": "review_date",
-    "where": {
-     "status": "open"
-    },
-    "limit": 3
-   },
-   {
     "kind": "calibration",
     "confidence": "confidence",
     "verdict": "verdict",
     "right": "right",
     "min": 10
+   },
+   {
+    "kind": "upcoming",
+    "field": "review_date",
+    "where": {
+     "status": "open"
+    },
+    "limit": 20,
+    "lead": "confidence"
    }
   ]
  },
