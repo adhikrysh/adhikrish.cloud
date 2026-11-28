@@ -329,16 +329,12 @@ test("predictions open on the score, then every open bet counting down with its 
   // the score first, big, as counts: 1 of 1 came true, next to how sure you said you were
   expect(page).toContain('<div class="score"><div><p class="big">1 of 1</p><p class="sub">came true</p></div><div><p class="big said">80%</p><p class="sub">you said, on average</p></div></div>');
   expect(page.indexOf('class="score"')).toBeLessThan(page.indexOf('<span class="pill">upcoming</span>'));
-  // upcoming: every open one, overdue first, each with its confidence and a bar for how near; the overdue one has words in red, no bar
+  // upcoming: every open one, overdue first, each with its confidence; the overdue one in red
   const upcoming = page.split('<h2><span class="pill">upcoming</span></h2>')[1].split("</section>")[0];
   expect(upcoming.indexOf("Overdue bet")).toBeLessThan(upcoming.indexOf("Due soon bet"));
   expect(upcoming.indexOf("Due soon bet")).toBeLessThan(upcoming.indexOf("Far away bet"));
-  expect(upcoming).toContain('<small class="bad">overdue 10 days</small><span class="near"></span>');
+  expect(upcoming).toContain('<small class="bad">overdue 10 days</small>');
   expect(upcoming).toContain('<li><span class="lead">80%</span><a href="/predictions/');
-  const bars = [...upcoming.matchAll(/<i style="width:([\d.]+)%"><\/i>/g)].map((m) => Number(m[1]));
-  expect(bars).toHaveLength(2);
-  expect(bars[0]).toBeLessThan(bars[1]); // 5 days is a short bar, 900 days the full one
-  expect(bars[1]).toBe(100);
   expect(upcoming).not.toContain("Scored bet");
   const views = (await call("predictions views", "/api/predictions/_views", { token: await dots() })).body.views;
   expect(views.find((v: any) => v.kind === "calibration")).toMatchObject({ "avg confidence": "80%", "came true": "1 of 1" }); // the api keeps its numbers

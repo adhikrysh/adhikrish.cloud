@@ -33,9 +33,6 @@ export const VIEW_CSS = `
   .countdown .lead { color: var(--bright); }
   .countdown small { color: var(--muted); font-size: var(--fs-tiny); white-space: nowrap; }
   .countdown small.bad { color: var(--bad); }
-  .countdown .near { grid-column: 1 / -1; height: 3px; background: var(--line); border-radius: 2px; }
-  .countdown.led .near { grid-column: 2 / -1; }
-  .countdown .near i { display: block; height: 3px; background: var(--muted); border-radius: 2px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
   .card { aspect-ratio: 2 / 3; border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; }
   .card:hover { background: var(--surface); }
@@ -205,14 +202,11 @@ function upcoming(v: Extract<View, { kind: "upcoming" }>, { tab, rows, today: no
   const next = rows.filter((row) => matches(v.where, row)).map((row) => ({ row, t: dayOf(row[v.field]) }))
     .filter((x): x is { row: db.Row; t: number } => x.t !== null).sort((a, b) => a.t - b.t).slice(0, v.limit ?? 3);
   if (!next.length) return null;
-  // the bar: how near each one is, on a log scale so next week and next year both read; overdue ones have none, their words are red
-  const far = Math.max(...next.map(({ t }) => (t - now) / DAY), 1);
   const unit = tab.fields.find((f) => f.name === v.lead)?.unit ?? "";
   const html = next.map(({ row, t }) => {
-    const days = (t - now) / DAY, over = days < 0;
+    const over = t < now;
     const lead = v.lead && Number.isFinite(Number(row[v.lead])) && row[v.lead] !== null && row[v.lead] !== "" ? `<span class="lead">${escape(fmt(Number(row[v.lead])))}${escape(unit)}</span>` : "";
-    const bar = over ? "" : `<i style="width:${Math.max(2, (Math.log1p(days) / Math.log1p(far)) * 100).toFixed(1)}%"></i>`;
-    return `<li>${lead}<a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${over ? "bad" : ""}">${over ? `overdue ${ago(t, now).replace(" ago", "")}` : ago(t, now)}</small><span class="near">${bar}</span></li>`;
+    return `<li>${lead}<a href="/${tab.slug}/${row.id}">${title(tab, row)}</a><small class="${over ? "bad" : ""}">${over ? `overdue ${ago(t, now).replace(" ago", "")}` : ago(t, now)}</small></li>`;
   });
   return result("upcoming", "upcoming", { rows: next.map(({ row, t }) => ({ id: row.id, title: row[tab.title] ?? null, date: isoDay(t), overdue: t < now, ...(v.lead ? { [v.lead]: row[v.lead] ?? null } : {}) })) },
     `<ul class="countdown${v.lead ? " led" : ""}">${html.join("")}</ul>`);
