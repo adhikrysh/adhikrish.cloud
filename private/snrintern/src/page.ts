@@ -193,10 +193,11 @@ const titleOf = (tab: Tab, row: db.Row, where: "aside" | "detail") => {
   return p ? escape(day(p, where === "detail" ? "long" : "short")) : escape(v);
 };
 
-/** Uptime top right on every page; below home, an arrow back to the parent on the left (a tab goes home, a row or lift goes to its tab). */
-function nav(parent?: { href: string; label: string }): string {
+/** Uptime top right on every page; below home, an arrow back to the parent on the left (a tab goes home, a row or lift goes to its tab);
+ * on home, the coaches on the left instead, as plain nav links like uptime. */
+function nav(parent?: { href: string; label: string }, left = ""): string {
   const uptime = `<a class="external" href="https://uptime.adhikrish.cloud/">uptime</a>`;
-  return parent ? `<a class="back" href="${parent.href}" aria-label="back to ${escape(parent.label)}">←</a>${uptime}` : uptime;
+  return parent ? `<a class="back" href="${parent.href}" aria-label="back to ${escape(parent.label)}">←</a>${uptime}` : `${left}${uptime}`;
 }
 const schemaLink = (tab: Tab) => `<a class="schema" href="/api/_tabs/${tab.slug}">schema</a>`;
 
@@ -228,7 +229,6 @@ const NOTES_CSS = `
   .notes li { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); column-gap: 24px; align-items: baseline; }
   .notes time { color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
   .notes p { white-space: pre-wrap; }
-  .coaches { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-bottom: 28px; }
   @media (max-width: 520px) { .notes li { grid-template-columns: 1fr; row-gap: 4px; } }
 `;
 
@@ -239,12 +239,12 @@ export async function homePage(design: Design, database: D1Database, birthday?: 
             <a href="/${tab.slug}"><span>${escape(tab.label)}</span></a>
             <p>${escape(tab.about)}</p>
           </li>`);
-  const coachLinks = coachList.length ? `      <p class="coaches">${coachList.map((c) => `<a href="/coaches/${coachSlug(c)}">${escape(c)}</a>`).join("")}</p>\n` : "";
-  const body = `${coachLinks}      <h1>senior intern</h1>
+  const coachLinks = coachList.map((c) => `<a href="/coaches/${coachSlug(c)}">${escape(c)}</a>`).join("");
+  const body = `      <h1>senior intern</h1>
       <ul class="project-list">
 ${items.join("\n")}
       </ul>`;
-  return page({ design, title: "senior intern", nav: nav(), body, css: CSS + NOTES_CSS });
+  return page({ design, title: "senior intern", nav: nav(undefined, coachLinks), body, css: CSS });
 }
 
 /** Rows a page shows. A tab grouped by a value (people by topic) is one page: its groups are collapsed, and pages would split a topic. */

@@ -310,19 +310,18 @@ test("skills are served by the api and named in the agent's instructions, so it 
   expect((await call("skills are read-only", "/api/_skills/fitness-coach", { method: "PUT", token: await me(), body: "x" })).status).toBe(405);
 });
 
-test("a coach keeps its memory as notes; each coach gets a link above senior intern and a page of its thoughts, newest first", async () => {
+test("a coach keeps its memory as notes; each coach gets a link in the top bar, left of uptime, and a page of its thoughts, newest first", async () => {
   const token = await me(), agent = await dots();
-  expect((await call("home before any notes", "/", { token })).body).not.toContain('class="coaches"');
+  expect((await call("home before any notes", "/", { token })).body).toContain('<nav aria-label="site"><a class="external" href="https://uptime.adhikrish.cloud/">uptime</a></nav>');
   const note = (at: string, coach: string, text: string) => send(agent, "/api/notes", { at, coach, note: text });
   await note("2026-11-20T07:05-08:00", "fitness coach", "access: gym and pool, no bike.");
   await note("2026-11-27T18:42-08:00", "fitness coach", "shins sore after the long run. holding run volume, more calf and tibialis work.\nrecheck in a week.");
   await note("2026-11-26T09:00-08:00", "daily coach", "this week's constraint: sleep.");
   expect((await note("2026-11-27", "fitness coach", "no time")).body.error).toContain("time"); // a note says when, to the minute
   expect((await send(agent, "/api/notes", { at: "2026-11-27T10:00-08:00", note: "who wrote this?" })).body.error).toStartWith('"coach" is required');
-  // home: one underlined link per coach, above the title, apart from the tabs
+  // home: each coach in the top bar on the left, the same kind of link as uptime on the right
   const home = (await call("home with coaches", "/", { token })).body as string;
-  expect(home).toContain('<p class="coaches"><a href="/coaches/daily-coach">daily coach</a><a href="/coaches/fitness-coach">fitness coach</a></p>');
-  expect(home.indexOf('class="coaches"')).toBeLessThan(home.indexOf("<h1>senior intern</h1>"));
+  expect(home).toContain('<nav aria-label="site"><a href="/coaches/daily-coach">daily coach</a><a href="/coaches/fitness-coach">fitness coach</a><a class="external" href="https://uptime.adhikrish.cloud/">uptime</a></nav>');
   expect(home).not.toContain('href="/notes"'); // the tab itself stays hidden
   // a coach's page: readable time on the left, the thought on the right, newest first, only that coach
   const page = (await call("fitness coach notes", "/coaches/fitness-coach", { token })).body as string;
@@ -891,7 +890,7 @@ test("home is just the visible tabs, no numbers", async () => {
   for (const hidden of ["body", "companies", "events"]) expect(page).not.toContain(`href="/${hidden}"`);
   expect(page).not.toContain("<small>");
   expect(page).not.toContain('class="views"');
-  expect(page).toContain('<nav aria-label="site"><a class="external" href="https://uptime.adhikrish.cloud/">uptime</a></nav>'); // only uptime, top right
+  expect(page).toContain('<a class="external" href="https://uptime.adhikrish.cloud/">uptime</a></nav>'); // uptime last, top right; coaches, if any, on its left
   writeFileSync(join(artifacts, "page-home.html"), page);
 });
 
